@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Transaction, Company, User } from '../types';
-import { X, Printer, Share2, MessageCircle } from 'lucide-react';
+import { X, Printer, MessageCircle } from 'lucide-react';
 
 interface ReceiptModalProps {
   transaction: Transaction | null;
