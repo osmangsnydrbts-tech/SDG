@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Plus, Power, Calendar, Building, Image, UploadCloud, PieChart, Activity } from 'lucide-react';
+import { Plus, Power, Calendar, Building, UploadCloud, Activity } from 'lucide-react';
 
 const SuperAdminDashboard: React.FC = () => {
   const { companies, addCompany, renewSubscription, toggleCompanyStatus } = useStore();
