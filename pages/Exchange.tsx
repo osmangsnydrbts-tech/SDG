@@ -1,9 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { ArrowLeftRight, CheckCircle, Calculator } from 'lucide-react';
+import ReceiptModal from '../components/ReceiptModal';
+import { Transaction } from '../types';
 
 const Exchange: React.FC = () => {
-  const { currentUser, performExchange, exchangeRates } = useStore();
+  const { currentUser, performExchange, exchangeRates, companies } = useStore();
   const [direction, setDirection] = useState<'SDG_TO_EGP' | 'EGP_TO_SDG'>('SDG_TO_EGP');
   const [amount, setAmount] = useState<string>('');
   const [result, setResult] = useState<number>(0);
@@ -11,8 +14,12 @@ const Exchange: React.FC = () => {
   const [isWholesale, setIsWholesale] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  
+  // Receipt Modal State
+  const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
 
   const rates = exchangeRates.find(r => r.company_id === currentUser?.company_id);
+  const company = companies.find(c => c.id === currentUser?.company_id);
 
   useEffect(() => {
     if (!rates || !amount) {
@@ -25,11 +32,9 @@ const Exchange: React.FC = () => {
     if (isNaN(numAmount)) return;
 
     if (direction === 'SDG_TO_EGP') {
-      // Logic: SDG / Rate = EGP
       let finalRate = rates.sd_to_eg_rate;
       let calculatedEgp = numAmount / finalRate;
 
-      // Check wholesale
       if (calculatedEgp >= rates.wholesale_threshold) {
         setIsWholesale(true);
         finalRate = rates.wholesale_rate;
@@ -39,8 +44,6 @@ const Exchange: React.FC = () => {
       }
       setResult(calculatedEgp);
     } else {
-      // Logic: EGP * Rate = SDG
-      // No wholesale logic for EGP -> SDG in requirements usually
       setIsWholesale(false);
       setResult(numAmount * rates.eg_to_sd_rate);
     }
@@ -65,7 +68,9 @@ const Exchange: React.FC = () => {
       setSuccessMsg(res.message);
       setAmount('');
       setReceipt('');
-      setTimeout(() => setSuccessMsg(''), 3000);
+      if (res.transaction) {
+          setLastTransaction(res.transaction);
+      }
     } else {
       setErrorMsg(res.message);
     }
@@ -158,6 +163,16 @@ const Exchange: React.FC = () => {
           </button>
         </form>
       </div>
+
+      {/* Receipt Modal */}
+      {lastTransaction && (
+          <ReceiptModal 
+            transaction={lastTransaction} 
+            company={company} 
+            employee={currentUser!} 
+            onClose={() => setLastTransaction(null)} 
+          />
+      )}
     </div>
   );
 };
