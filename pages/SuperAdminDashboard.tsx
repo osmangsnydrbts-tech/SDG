@@ -51,10 +51,10 @@ const SuperAdminDashboard: React.FC = () => {
       setShowEditModal(company);
   };
 
-  const handleAddCompany = (e: React.FormEvent) => {
+  const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const res = addCompany(name, username, password, days, logo);
+    const res = await addCompany(name, username, password, days, logo);
     if (res.success) {
         setShowAddModal(false);
     } else {
@@ -62,13 +62,13 @@ const SuperAdminDashboard: React.FC = () => {
     }
   };
 
-  const handleUpdateCompany = (e: React.FormEvent) => {
+  const handleUpdateCompany = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!showEditModal) return;
       setError('');
       
       // Update logic
-      const res = updateCompany(showEditModal.id, {
+      const res = await updateCompany(showEditModal.id, {
           name,
           username,
           logo,
@@ -99,9 +99,9 @@ const SuperAdminDashboard: React.FC = () => {
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
           if (event.target?.result) {
-              const res = importDatabase(event.target.result as string);
+              const res = await importDatabase(event.target.result as string);
               setDbMessage(res.message);
               setTimeout(() => setDbMessage(''), 3000);
           }
