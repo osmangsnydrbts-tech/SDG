@@ -29,19 +29,29 @@ interface StoreData {
   updateEmployee: (userId: number, data: { full_name: string; username: string }) => { success: boolean; message: string };
   updateEmployeePassword: (userId: number, newPass: string) => void;
   deleteEmployee: (userId: number) => void;
+  
+  // Operations now return the transaction object on success for receipt generation
   performExchange: (
     employeeId: number, 
     companyId: number, 
     fromCurrency: 'EGP' | 'SDG', 
     amount: number, 
     receipt: string
-  ) => { success: boolean; message: string };
+  ) => { success: boolean; message: string; transaction?: Transaction };
+  
   addMerchant: (companyId: number, name: string, phone: string) => void;
   addMerchantEntry: (merchantId: number, type: 'credit' | 'debit', currency: 'EGP' | 'SDG', amount: number) => void;
   addEWallet: (companyId: number, employeeId: number, phone: string, provider: string) => void;
   deleteEWallet: (id: number) => void;
   feedEWallet: (walletId: number, amount: number) => { success: boolean; message: string };
-  performEWalletTransfer: (walletId: number, amount: number, recipientPhone: string, receipt: string) => { success: boolean; message: string };
+  
+  performEWalletTransfer: (
+      walletId: number, 
+      amount: number, 
+      recipientPhone: string, 
+      receipt: string
+  ) => { success: boolean; message: string; transaction?: Transaction };
+  
   manageTreasury: (
     type: 'feed' | 'withdraw', 
     target: 'main' | 'employee', 
@@ -49,7 +59,11 @@ interface StoreData {
     currency: 'EGP' | 'SDG', 
     amount: number,
     employeeId?: number
-  ) => { success: boolean; message: string };
+  ) => { success: boolean; message: string; transaction?: Transaction };
+
+  // Database Management
+  exportDatabase: () => void;
+  importDatabase: (jsonData: string) => { success: boolean; message: string };
 }
 
 const StoreContext = createContext<StoreData | undefined>(undefined);
@@ -176,14 +190,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateCompany = (id: number, data: Partial<Company>) => {
-      // If username is changing, check uniqueness and update the Admin User
       if (data.username) {
           const currentCompany = companies.find(c => c.id === id);
           if (currentCompany && currentCompany.username !== data.username) {
               if (isUsernameTaken(data.username)) {
                   return { success: false, message: 'اسم المستخدم الجديد مسجل مسبقاً' };
               }
-              // Update Admin User
               setUsers(prev => prev.map(u => 
                   u.company_id === id && u.role === 'admin' 
                   ? { ...u, username: data.username! } 
@@ -208,7 +220,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteCompany = (companyId: number) => {
-    // Soft delete company and its users
     setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, is_active: false } : c));
     setUsers(prev => prev.map(u => u.company_id === companyId ? { ...u, is_active: false } : u));
   };
@@ -372,7 +383,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setTransactions(prev => [...prev, newTx]);
 
-    return { success: true, message: 'تمت العملية بنجاح' };
+    return { success: true, message: 'تمت العملية بنجاح', transaction: newTx };
   };
 
   const addMerchant = (companyId: number, name: string, phone: string) => {
@@ -437,7 +448,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return { success: false, message: 'رصيد الخزينة الرئيسية (EGP) غير كافي' };
     }
 
-    // Deduct from Main Treasury
     setTreasuries(prev => prev.map(t => {
         if (t.id === mainTreasury.id) {
             return { ...t, egp_balance: t.egp_balance - amount };
@@ -445,7 +455,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return t;
     }));
 
-    // Add to Wallet
     setEWallets(prev => prev.map(w => {
         if (w.id === walletId) {
             return { ...w, balance: w.balance + amount };
@@ -475,10 +484,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!user) return { success: false, message: 'User not found' };
 
       const rates = exchangeRates.find(r => r.company_id === wallet.company_id);
-      const commissionRate = rates?.ewallet_commission || 1; // Default to 1% if missing
+      const commissionRate = rates?.ewallet_commission || 1; 
       const commission = amount * (commissionRate / 100);
 
-      // Check Wallet Balance
       if (wallet.balance < amount) {
           return { success: false, message: `رصيد المحفظة (${wallet.balance} EGP) غير كافي` };
       }
@@ -490,8 +498,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return w;
       }));
 
-      setTransactions(prev => [...prev, {
-          id: prev.length + 1,
+      const newTx: Transaction = {
+          id: transactions.length + 1,
           company_id: user.company_id!,
           employee_id: wallet.employee_id,
           type: 'e_wallet',
@@ -504,9 +512,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           description: `To: ${recipientPhone} via ${wallet.provider}`,
           created_at: new Date().toISOString(),
           e_wallet_id: walletId
-      }]);
+      };
 
-      return { success: true, message: 'تم التحويل بنجاح' };
+      setTransactions(prev => [...prev, newTx]);
+
+      return { success: true, message: 'تم التحويل بنجاح', transaction: newTx };
   };
 
   const manageTreasury = (
@@ -520,7 +530,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const balanceKey = currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
       const mainTreasury = treasuries.find(t => t.company_id === companyId && !t.employee_id);
 
-      // Validation for feeding Employee from Main Treasury
       if (type === 'feed' && target === 'employee') {
           if (!mainTreasury) {
             return { success: false, message: 'الخزينة الرئيسية غير موجودة' };
@@ -534,12 +543,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const isMain = t.company_id === companyId && !t.employee_id;
           const isTargetEmployee = target === 'employee' && t.employee_id === employeeId;
 
-          // Logic:
-          // Feed Employee = Withdraw from Main -> Add to Employee
-          // Withdraw Employee = Withdraw from Employee -> Add to Main
-          // Feed Main = External -> Add to Main
-          // Withdraw Main = Withdraw from Main -> External
-
           if (type === 'feed' && target === 'employee') {
               if (isMain) return { ...t, [balanceKey]: t[balanceKey] - amount };
               if (isTargetEmployee) return { ...t, [balanceKey]: t[balanceKey] + amount };
@@ -552,7 +555,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                return { ...t, [balanceKey]: t[balanceKey] + amount };
           }
           else if (type === 'withdraw' && target === 'main' && isMain) {
-              if (t[balanceKey] < amount) return t; // Validation handled in UI but safety check
+              if (t[balanceKey] < amount) return t; 
               return { ...t, [balanceKey]: t[balanceKey] - amount };
           }
 
@@ -565,8 +568,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       else if (target === 'main' && type === 'feed') desc = 'إيداع خارجي للخزينة الرئيسية';
       else desc = 'سحب خارجي من الخزينة الرئيسية';
 
-      setTransactions(prev => [...prev, {
-          id: prev.length + 1,
+      const newTx: Transaction = {
+          id: transactions.length + 1,
           company_id: companyId,
           employee_id: target === 'employee' ? employeeId : undefined,
           type: type === 'feed' ? 'treasury_feed' : 'treasury_withdraw',
@@ -574,9 +577,62 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           from_currency: currency,
           description: desc,
           created_at: new Date().toISOString()
-      }]);
+      };
 
-      return { success: true, message: 'تم تنفيذ العملية بنجاح' };
+      setTransactions(prev => [...prev, newTx]);
+
+      return { success: true, message: 'تم تنفيذ العملية بنجاح', transaction: newTx };
+  };
+
+  // --- DATABASE MANAGEMENT ---
+
+  const exportDatabase = () => {
+    const data = {
+        companies,
+        users,
+        treasuries,
+        exchangeRates,
+        transactions,
+        merchants,
+        merchantEntries,
+        eWallets
+    };
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const date = new Date().toISOString().split('T')[0];
+    link.download = `exchange_flow_backup_${date}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const importDatabase = (jsonString: string) => {
+      try {
+          const data = JSON.parse(jsonString);
+          
+          // Basic validation
+          if (!data.users || !data.companies) {
+              return { success: false, message: 'ملف غير صالح' };
+          }
+
+          // Restore Data
+          setCompanies(data.companies || []);
+          setUsers(data.users || [DEFAULT_SUPER_ADMIN]);
+          setTreasuries(data.treasuries || []);
+          setExchangeRates(data.exchangeRates || []);
+          setTransactions(data.transactions || []);
+          setMerchants(data.merchants || []);
+          setMerchantEntries(data.merchantEntries || []);
+          setEWallets(data.eWallets || []);
+
+          return { success: true, message: 'تم استعادة قاعدة البيانات بنجاح' };
+      } catch (e) {
+          console.error(e);
+          return { success: false, message: 'حدث خطأ أثناء معالجة الملف' };
+      }
   };
 
   return (
@@ -584,7 +640,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       currentUser, companies, users, treasuries, exchangeRates, transactions, merchants, merchantEntries, eWallets,
       login, logout, addCompany, updateCompany, renewSubscription, deleteCompany, toggleCompanyStatus, updateExchangeRate, 
       addEmployee, updateEmployee, updateEmployeePassword, deleteEmployee,
-      performExchange, addMerchant, addMerchantEntry, addEWallet, deleteEWallet, performEWalletTransfer, manageTreasury, feedEWallet
+      performExchange, addMerchant, addMerchantEntry, addEWallet, deleteEWallet, performEWalletTransfer, manageTreasury, feedEWallet,
+      exportDatabase, importDatabase
     }}>
       {children}
     </StoreContext.Provider>
