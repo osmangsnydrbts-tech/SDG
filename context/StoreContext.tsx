@@ -88,38 +88,46 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Fetch Data from Supabase
   const fetchData = async () => {
     try {
-      const { data: companiesData } = await supabase.from('companies').select('*');
-      if (companiesData) setCompanies(companiesData);
+      const { data: companiesData, error: compError } = await supabase.from('companies').select('*');
+      if (compError) console.error('Error fetching companies:', compError);
+      else if (companiesData) setCompanies(companiesData);
 
-      const { data: usersData } = await supabase.from('users').select('*');
-      if (usersData) setUsers(usersData);
+      const { data: usersData, error: usersError } = await supabase.from('users').select('*');
+      if (usersError) console.error('Error fetching users:', usersError);
+      else if (usersData) setUsers(usersData);
 
-      const { data: treasuriesData } = await supabase.from('treasuries').select('*');
-      if (treasuriesData) setTreasuries(treasuriesData);
+      const { data: treasuriesData, error: trError } = await supabase.from('treasuries').select('*');
+      if (trError) console.error('Error fetching treasuries:', trError);
+      else if (treasuriesData) setTreasuries(treasuriesData);
 
-      const { data: ratesData } = await supabase.from('exchange_rates').select('*');
-      if (ratesData) setExchangeRates(ratesData);
+      const { data: ratesData, error: rtError } = await supabase.from('exchange_rates').select('*');
+      if (rtError) console.error('Error fetching rates:', rtError);
+      else if (ratesData) setExchangeRates(ratesData);
 
-      const { data: txData } = await supabase.from('transactions').select('*');
-      if (txData) setTransactions(txData);
+      const { data: txData, error: txError } = await supabase.from('transactions').select('*');
+      if (txError) console.error('Error fetching transactions:', txError);
+      else if (txData) setTransactions(txData);
 
-      const { data: merchData } = await supabase.from('merchants').select('*');
-      if (merchData) setMerchants(merchData);
+      const { data: merchData, error: mError } = await supabase.from('merchants').select('*');
+      if (mError) console.error('Error fetching merchants:', mError);
+      else if (merchData) setMerchants(merchData);
 
-      const { data: entriesData } = await supabase.from('merchant_entries').select('*');
-      if (entriesData) setMerchantEntries(entriesData);
+      const { data: entriesData, error: entError } = await supabase.from('merchant_entries').select('*');
+      if (entError) console.error('Error fetching merchant entries:', entError);
+      else if (entriesData) setMerchantEntries(entriesData);
 
-      const { data: walletsData } = await supabase.from('e_wallets').select('*');
-      if (walletsData) setEWallets(walletsData);
+      const { data: walletsData, error: wError } = await supabase.from('e_wallets').select('*');
+      if (wError) console.error('Error fetching e-wallets:', wError);
+      else if (walletsData) setEWallets(walletsData);
 
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Critical error fetching data:", error);
     }
   };
 
   useEffect(() => {
     fetchData();
-    // Set up real-time subscription (Optional enhancement later)
+    // Set up real-time subscription
     const channels = supabase.channel('custom-all-channel')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => {
         fetchData();
@@ -183,7 +191,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       logo
     }).select().single();
 
-    if (compError || !company) return { success: false, message: 'فشل إنشاء الشركة' };
+    if (compError || !company) return { success: false, message: 'فشل إنشاء الشركة: ' + (compError?.message || '') };
 
     // 2. Create Admin User
     const { data: user } = await supabase.from('users').insert({
@@ -232,7 +240,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
 
-      await supabase.from('companies').update(data).eq('id', id);
+      const { error } = await supabase.from('companies').update(data).eq('id', id);
+      if (error) return { success: false, message: error.message };
+      
       await fetchData();
       return { success: true, message: 'تم تحديث بيانات الشركة بنجاح' };
   };
@@ -301,7 +311,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await fetchData();
         return { success: true, message: 'تم إضافة الموظف بنجاح' };
     }
-    return { success: false, message: 'حدث خطأ أثناء الإضافة' };
+    return { success: false, message: 'حدث خطأ أثناء الإضافة: ' + (error?.message || '') };
   };
 
   const updateEmployee = async (userId: number, data: { full_name: string; username: string }) => {
@@ -386,7 +396,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     // Insert Transaction
-    const { data: newTx } = await supabase.from('transactions').insert({
+    const { data: newTx, error } = await supabase.from('transactions').insert({
         company_id: companyId,
         employee_id: employeeId,
         type: 'exchange',
@@ -399,6 +409,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         created_at: new Date().toISOString(),
         is_wholesale: isWholesale
     }).select().single();
+
+    if (error) return { success: false, message: 'فشل تسجيل العملية: ' + error.message };
 
     await fetchData();
     return { success: true, message: 'تمت العملية بنجاح', transaction: newTx };
@@ -511,7 +523,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }).eq('id', walletId);
 
       // Record Transaction
-      const { data: newTx } = await supabase.from('transactions').insert({
+      const { data: newTx, error } = await supabase.from('transactions').insert({
           company_id: user.company_id!,
           employee_id: wallet.employee_id,
           type: 'e_wallet',
@@ -525,6 +537,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           created_at: new Date().toISOString(),
           e_wallet_id: walletId
       }).select().single();
+
+      if (error) return { success: false, message: error.message };
 
       await fetchData();
       return { success: true, message: 'تم التحويل بنجاح', transaction: newTx };
@@ -584,7 +598,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       else if (target === 'main' && type === 'feed') desc = 'إيداع خارجي للخزينة الرئيسية';
       else desc = 'سحب خارجي من الخزينة الرئيسية';
 
-      const { data: newTx } = await supabase.from('transactions').insert({
+      const { data: newTx, error } = await supabase.from('transactions').insert({
           company_id: companyId,
           employee_id: target === 'employee' ? employeeId : undefined,
           type: type === 'feed' ? 'treasury_feed' : 'treasury_withdraw',
@@ -593,6 +607,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           description: desc,
           created_at: new Date().toISOString()
       }).select().single();
+
+      if (error) return { success: false, message: error.message };
 
       await fetchData();
       return { success: true, message: 'تم تنفيذ العملية بنجاح', transaction: newTx };
@@ -616,10 +632,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const importDatabase = async (jsonString: string) => {
-    // This function is tricky with a real DB. 
-    // Usually, we don't want to wipe the real DB and replace it with a JSON file easily.
-    // For now, I'll return a message saying this is disabled for cloud DB safety, or implement insert only.
-    // Given the request, I will just log it. Real import to SQL from JSON client-side is risky/complex.
     return { success: false, message: 'الاستيراد غير متاح في وضع السحابة للحفاظ على سلامة البيانات' };
   };
 
