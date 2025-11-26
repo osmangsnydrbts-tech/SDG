@@ -54,11 +54,11 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleAddEmployee = (e: React.FormEvent) => {
+  const handleAddEmployee = async (e: React.FormEvent) => {
       e.preventDefault();
       setError('');
       if(currentUser?.company_id) {
-          const res = addEmployee(currentUser.company_id, empName, empUser, empPass);
+          const res = await addEmployee(currentUser.company_id, empName, empUser, empPass);
           if (res.success) {
             setShowEmpModal(false);
             setEmpName(''); setEmpUser(''); setEmpPass('');
@@ -75,9 +75,9 @@ const AdminDashboard: React.FC = () => {
       setError('');
   };
 
-  const handleUpdateInfo = () => {
+  const handleUpdateInfo = async () => {
       if (!editInfoId) return;
-      const res = updateEmployee(editInfoId.id, { full_name: editName, username: editUser });
+      const res = await updateEmployee(editInfoId.id, { full_name: editName, username: editUser });
       if (res.success) {
           setEditInfoId(null);
       } else {
