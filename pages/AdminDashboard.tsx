@@ -82,11 +82,11 @@ const AdminDashboard: React.FC = () => {
           <div className="flex justify-between items-end">
             <div>
               <span className="text-3xl font-bold block">{rateData?.sd_to_eg_rate}</span>
-              <span className="text-xs opacity-75">سوداني -> مصري</span>
+              <span className="text-xs opacity-75">سوداني {'->'} مصري</span>
             </div>
             <div className="text-right">
               <span className="text-3xl font-bold block">{rateData?.eg_to_sd_rate}</span>
-              <span className="text-xs opacity-75">مصري -> سوداني</span>
+              <span className="text-xs opacity-75">مصري {'->'} سوداني</span>
             </div>
           </div>
         </div>
@@ -140,11 +140,11 @@ const AdminDashboard: React.FC = () => {
                 <form onSubmit={handleUpdateRates} className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
                         <div>
-                            <label className="text-xs text-gray-500">سوداني -> مصري</label>
+                            <label className="text-xs text-gray-500">سوداني {'->'} مصري</label>
                             <input type="number" step="0.1" value={sdRate} onChange={e => setSdRate(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
                         </div>
                         <div>
-                            <label className="text-xs text-gray-500">مصري -> سوداني</label>
+                            <label className="text-xs text-gray-500">مصري {'->'} سوداني</label>
                             <input type="number" step="0.1" value={egRate} onChange={e => setEgRate(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
                         </div>
                     </div>
