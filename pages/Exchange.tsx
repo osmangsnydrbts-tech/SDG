@@ -49,14 +49,14 @@ const Exchange: React.FC = () => {
     }
   }, [amount, direction, rates]);
 
-  const handleExchange = (e: React.FormEvent) => {
+  const handleExchange = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser?.company_id) return;
     
     setSuccessMsg('');
     setErrorMsg('');
 
-    const res = performExchange(
+    const res = await performExchange(
       currentUser.id,
       currentUser.company_id,
       direction === 'SDG_TO_EGP' ? 'SDG' : 'EGP',
