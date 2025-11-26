@@ -27,7 +27,7 @@ const WalletTransfer: React.FC = () => {
   const commissionRate = rates?.ewallet_commission || 1;
   const company = companies.find(c => c.id === currentUser?.company_id);
 
-  const handleTransfer = (e: React.FormEvent) => {
+  const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg('');
     setError('');
@@ -37,7 +37,7 @@ const WalletTransfer: React.FC = () => {
         return;
     }
 
-    const res = performEWalletTransfer(
+    const res = await performEWalletTransfer(
         parseInt(selectedWalletId),
         parseFloat(amount),
         phone,
