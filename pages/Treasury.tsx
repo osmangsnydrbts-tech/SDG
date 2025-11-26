@@ -32,7 +32,7 @@ const Treasury: React.FC = () => {
       setAmount('');
   };
 
-  const handleAction = (e: React.FormEvent) => {
+  const handleAction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser?.company_id) return;
     setMessage(null);
@@ -43,7 +43,7 @@ const Treasury: React.FC = () => {
         return;
     }
 
-    const res = manageTreasury(
+    const res = await manageTreasury(
         modalActionType,
         modalTargetType,
         currentUser.company_id,
