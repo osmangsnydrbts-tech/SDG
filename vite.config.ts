@@ -8,6 +8,10 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        allowedHosts: [
+          'sdg-glm0.onrender.com',
+          '.onrender.com'
+        ]
       },
       plugins: [react()],
       define: {
@@ -21,26 +25,3 @@ export default defineConfig(({ mode }) => {
       }
     };
 });
-// vite.config.cjs
-const path = require('path');
-
-module.exports = {
-  server: {
-    port: 3000,
-    host: '0.0.0.0',
-    allowedHosts: [
-      'sdg-glm0.onrender.com',
-      '.onrender.com'
-    ]
-  },
-  plugins: [require('@vitejs/plugin-react')()],
-  define: {
-    'process.env.API_KEY': JSON.stringify(process.env.GEMINI_API_KEY),
-    'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY)
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, '.'),
-    }
-  }
-};
