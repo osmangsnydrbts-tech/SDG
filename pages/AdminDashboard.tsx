@@ -2,17 +2,21 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent } from 'lucide-react';
+import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil } from 'lucide-react';
+import { User } from '../types';
 
 const AdminDashboard: React.FC = () => {
-  const { currentUser, exchangeRates, updateExchangeRate, addEmployee, users, updateEmployeePassword, deleteEmployee } = useStore();
+  const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee } = useStore();
   const navigate = useNavigate();
   const rateData = exchangeRates.find(r => r.company_id === currentUser?.company_id);
 
   const [showRateModal, setShowRateModal] = useState(false);
   const [showEmpModal, setShowEmpModal] = useState(false);
   const [showManageEmpModal, setShowManageEmpModal] = useState(false);
+  
+  // States for sub-modals in Manage Employees
   const [editPassId, setEditPassId] = useState<number | null>(null);
+  const [editInfoId, setEditInfoId] = useState<User | null>(null);
 
   // Rate Form
   const [sdRate, setSdRate] = useState(rateData?.sd_to_eg_rate || 74);
@@ -26,6 +30,10 @@ const AdminDashboard: React.FC = () => {
   const [empUser, setEmpUser] = useState('');
   const [empPass, setEmpPass] = useState('');
   const [error, setError] = useState('');
+
+  // Emp Edit Form (Info)
+  const [editName, setEditName] = useState('');
+  const [editUser, setEditUser] = useState('');
 
   // Emp Pass Change
   const [newPass, setNewPass] = useState('');
@@ -60,11 +68,34 @@ const AdminDashboard: React.FC = () => {
       }
   };
 
+  const openEditInfo = (user: User) => {
+      setEditInfoId(user);
+      setEditName(user.full_name);
+      setEditUser(user.username);
+      setError('');
+  };
+
+  const handleUpdateInfo = () => {
+      if (!editInfoId) return;
+      const res = updateEmployee(editInfoId.id, { full_name: editName, username: editUser });
+      if (res.success) {
+          setEditInfoId(null);
+      } else {
+          setError(res.message);
+      }
+  };
+
   const handleChangePassword = (id: number) => {
       if (newPass.length < 3) return;
       updateEmployeePassword(id, newPass);
       setEditPassId(null);
       setNewPass('');
+  };
+
+  const handleDeleteEmployee = (id: number) => {
+      if (window.confirm('هل أنت متأكد من حذف هذا الموظف؟')) {
+          deleteEmployee(id);
+      }
   };
 
   const QuickAction = ({ icon: Icon, label, onClick, color }: any) => (
@@ -199,22 +230,38 @@ const AdminDashboard: React.FC = () => {
                 <div className="space-y-4">
                     {companyEmployees.map(emp => (
                         <div key={emp.id} className="border p-3 rounded-xl bg-gray-50">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <p className="font-bold">{emp.full_name}</p>
-                                    <p className="text-xs text-gray-500">user: {emp.username}</p>
+                            {editInfoId?.id === emp.id ? (
+                                <div className="space-y-2 mb-2">
+                                    <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded" placeholder="الاسم" />
+                                    <input value={editUser} onChange={e => setEditUser(e.target.value)} className="w-full p-2 border rounded" placeholder="اسم المستخدم" />
+                                    {error && <p className="text-red-500 text-xs">{error}</p>}
+                                    <div className="flex gap-2">
+                                        <button onClick={handleUpdateInfo} className="bg-green-600 text-white px-3 py-1 rounded text-sm">حفظ</button>
+                                        <button onClick={() => setEditInfoId(null)} className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm">إلغاء</button>
+                                    </div>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setEditPassId(editPassId === emp.id ? null : emp.id)} className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                                        <Key size={16} />
-                                    </button>
-                                    <button onClick={() => deleteEmployee(emp.id)} className="p-2 bg-red-100 text-red-600 rounded-lg">
-                                        <Trash2 size={16} />
-                                    </button>
+                            ) : (
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="font-bold">{emp.full_name}</p>
+                                        <p className="text-xs text-gray-500">user: {emp.username}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => openEditInfo(emp)} className="p-2 bg-indigo-100 text-indigo-600 rounded-lg" title="تعديل البيانات">
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button onClick={() => setEditPassId(editPassId === emp.id ? null : emp.id)} className="p-2 bg-blue-100 text-blue-600 rounded-lg" title="تغيير كلمة المرور">
+                                            <Key size={16} />
+                                        </button>
+                                        <button onClick={() => handleDeleteEmployee(emp.id)} className="p-2 bg-red-100 text-red-600 rounded-lg" title="حذف الموظف">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+
                             {editPassId === emp.id && (
-                                <div className="mt-3 flex gap-2">
+                                <div className="mt-3 flex gap-2 border-t pt-2">
                                     <input 
                                         type="text" 
                                         placeholder="كلمة المرور الجديدة" 
@@ -222,7 +269,7 @@ const AdminDashboard: React.FC = () => {
                                         value={newPass}
                                         onChange={e => setNewPass(e.target.value)}
                                     />
-                                    <button onClick={() => handleChangePassword(emp.id)} className="bg-green-600 text-white px-3 rounded-lg text-sm">حفظ</button>
+                                    <button onClick={() => handleChangePassword(emp.id)} className="bg-green-600 text-white px-3 rounded-lg text-sm">تغيير</button>
                                 </div>
                             )}
                         </div>
