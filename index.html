@@ -12,29 +12,35 @@
         background-color: #f3f4f6;
         -webkit-tap-highlight-color: transparent;
       }
-      /* Hide scrollbar for Chrome, Safari and Opera */
-      .no-scrollbar::-webkit-scrollbar {
-          display: none;
-      }
-      /* Hide scrollbar for IE, Edge and Firefox */
+      .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;  /* Firefox */
+          -ms-overflow-style: none;
+          scrollbar-width: none;
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6"
-  }
-}
-</script>
-</head>
+  </head>
   <body>
     <div id="root"></div>
+    
+    <!-- أضف React من CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- أضف تطبيقك هنا -->
+    <script>
+      const { useState, useEffect } = React;
+      
+      function App() {
+        return React.createElement('div', { 
+          className: 'min-h-screen bg-gray-100 flex items-center justify-center'
+        }, 
+          React.createElement('h1', { 
+            className: 'text-3xl font-bold text-blue-600' 
+          }, 'نظام الصرافة - يعمل بنجاح! 🎉')
+        );
+      }
+      
+      ReactDOM.render(React.createElement(App), document.getElementById('root'));
+    </script>
   </body>
 </html>
