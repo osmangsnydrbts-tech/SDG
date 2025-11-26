@@ -21,3 +21,11 @@ export default defineConfig(({ mode }) => {
       }
     };
 });
+export default {
+  server: {
+    allowedHosts: [
+      'sdg-glm0.onrender.com',
+      '.onrender.com' // يسمح لجميع نطاقات render
+    ]
+  }
+}
