@@ -33,10 +33,10 @@ const EWallets: React.FC = () => {
       }
   };
 
-  const handleFeed = (e: React.FormEvent) => {
+  const handleFeed = async (e: React.FormEvent) => {
       e.preventDefault();
       if (showFeedModal) {
-          const res = feedEWallet(showFeedModal, parseFloat(amount));
+          const res = await feedEWallet(showFeedModal, parseFloat(amount));
           if (res.success) {
               setMsg('تمت التغذية بنجاح');
               setTimeout(() => { setShowFeedModal(null); setMsg(''); setAmount(''); }, 1000);
