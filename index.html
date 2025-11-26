@@ -6,37 +6,55 @@
     <title>نظام الصرافة - ExchangeFlow</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <!-- مكتبات React -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
     <style>
       body {
         font-family: 'Tajawal', sans-serif;
         background-color: #f3f4f6;
         -webkit-tap-highlight-color: transparent;
       }
-      /* Hide scrollbar for Chrome, Safari and Opera */
-      .no-scrollbar::-webkit-scrollbar {
-          display: none;
-      }
-      /* Hide scrollbar for IE, Edge and Firefox */
+      .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;  /* Firefox */
+          -ms-overflow-style: none;
+          scrollbar-width: none;
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+    
+    <script type="text/babel">
+      // هنا ضع محتوى App.tsx كاملاً
+      const { useState, useEffect } = React;
+      
+      // ضع كل مكوناتك هنا من components/ و pages/
+      function Login() {
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+            <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+              <h1 className="text-2xl font-bold text-center mb-6">تسجيل الدخول</h1>
+              {/* محتوى Login.tsx */}
+            </div>
+          </div>
+        );
+      }
+      
+      // التطبيق الرئيسي (محتوى App.tsx)
+      function App() {
+        return (
+          <div>
+            <Login />
+          </div>
+        );
+      }
+      
+      // بدء التطبيق
+      ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+  </body>
 </html>
