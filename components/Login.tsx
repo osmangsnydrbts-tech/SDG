@@ -35,17 +35,20 @@ const Login: React.FC = () => {
             <Lock className="text-blue-600" size={40} />
           </div>
           <h2 className="text-2xl font-bold text-gray-800">تسجيل الدخول</h2>
-          <p className="text-gray-500 mt-2">نظام ExchangeFlow</p>
+          <p className="text-gray-500 mt-2">نظام الصرفة</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-gray-700 text-sm font-bold mb-2">اسم المستخدم</label>
+            <label htmlFor="username" className="block text-gray-700 text-sm font-bold mb-2">اسم المستخدم</label>
             <div className="relative">
               <span className="absolute inset-y-0 right-0 flex items-center pr-3">
                 <UserIcon size={20} className="text-gray-400" />
               </span>
               <input
+                id="username"
+                name="username"
+                autoComplete="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -57,12 +60,15 @@ const Login: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-gray-700 text-sm font-bold mb-2">كلمة المرور</label>
+            <label htmlFor="password" className="block text-gray-700 text-sm font-bold mb-2">كلمة المرور</label>
             <div className="relative">
               <span className="absolute inset-y-0 right-0 flex items-center pr-3">
                 <Lock size={20} className="text-gray-400" />
               </span>
               <input
+                id="password"
+                name="password"
+                autoComplete="current-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
