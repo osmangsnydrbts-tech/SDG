@@ -1,15 +1,19 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Plus, Power, Calendar, Building, UploadCloud, Activity, Trash2, Pencil } from 'lucide-react';
+import { Plus, Power, Calendar, Building, UploadCloud, Activity, Trash2, Pencil, Database, Download } from 'lucide-react';
 import { Company } from '../types';
 
 const SuperAdminDashboard: React.FC = () => {
-  const { companies, addCompany, updateCompany, renewSubscription, toggleCompanyStatus, deleteCompany } = useStore();
+  const { 
+    companies, addCompany, updateCompany, renewSubscription, toggleCompanyStatus, deleteCompany, 
+    exportDatabase, importDatabase 
+  } = useStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState<Company | null>(null);
   const [showRenewModal, setShowRenewModal] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [dbMessage, setDbMessage] = useState('');
 
   // Form States (Add/Edit)
   const [name, setName] = useState('');
@@ -89,6 +93,22 @@ const SuperAdminDashboard: React.FC = () => {
     setShowRenewModal(null);
   };
 
+  // Database Handlers
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          if (event.target?.result) {
+              const res = importDatabase(event.target.result as string);
+              setDbMessage(res.message);
+              setTimeout(() => setDbMessage(''), 3000);
+          }
+      };
+      reader.readAsText(file);
+  };
+
   return (
     <div className="space-y-6">
       {/* Active Companies Report */}
@@ -109,7 +129,35 @@ const SuperAdminDashboard: React.FC = () => {
           </div>
       </div>
 
-      <div className="flex justify-between items-center">
+      {/* Database Management */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <Database size={20} className="text-purple-600"/> إدارة قاعدة البيانات
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={exportDatabase}
+                className="bg-purple-50 text-purple-700 border border-purple-200 p-4 rounded-xl flex flex-col items-center gap-2 hover:bg-purple-100 transition"
+              >
+                  <Download size={24} />
+                  <span className="font-bold">نسخ احتياطي (تصدير)</span>
+              </button>
+              
+              <div className="relative bg-blue-50 text-blue-700 border border-blue-200 p-4 rounded-xl flex flex-col items-center gap-2 hover:bg-blue-100 transition cursor-pointer">
+                  <UploadCloud size={24} />
+                  <span className="font-bold">استعادة بيانات (استيراد)</span>
+                  <input 
+                    type="file" 
+                    accept=".json" 
+                    onChange={handleImport} 
+                    className="absolute inset-0 opacity-0 cursor-pointer" 
+                  />
+              </div>
+          </div>
+          {dbMessage && <p className="text-center text-sm font-bold text-green-600 mt-2">{dbMessage}</p>}
+      </div>
+
+      <div className="flex justify-between items-center mt-8">
         <h2 className="text-xl font-bold text-gray-800">إدارة الشركات</h2>
         <button 
           onClick={openAddModal}
