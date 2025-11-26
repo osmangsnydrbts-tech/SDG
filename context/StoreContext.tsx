@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   User, Company, Treasury, ExchangeRate, Transaction, 
-  Merchant, MerchantEntry, EWallet, DEFAULT_SUPER_ADMIN, Role 
+  Merchant, MerchantEntry, EWallet, DEFAULT_SUPER_ADMIN 
 } from '../types';
 
 interface StoreData {
