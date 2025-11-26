@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { ArrowDownCircle, ArrowUpCircle, Wallet, AlertCircle, CheckCircle2, UserCheck, Banknote } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, AlertCircle, CheckCircle2, UserCheck, Banknote } from 'lucide-react';
 
 const Treasury: React.FC = () => {
   const { currentUser, treasuries, users, manageTreasury } = useStore();
