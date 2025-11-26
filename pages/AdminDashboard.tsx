@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Edit, Percent } from 'lucide-react';
+import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
   const { currentUser, exchangeRates, updateExchangeRate, addEmployee, users, updateEmployeePassword, deleteEmployee } = useStore();
