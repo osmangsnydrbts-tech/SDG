@@ -20,11 +20,13 @@ interface StoreData {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   addCompany: (name: string, username: string, password: string, days: number, logo?: string) => { success: boolean; message: string };
+  updateCompany: (id: number, data: Partial<Company>) => { success: boolean; message: string };
   renewSubscription: (companyId: number, days: number) => void;
   deleteCompany: (companyId: number) => void;
-  toggleCompanyStatus: (companyId: number) => void; // New Action
+  toggleCompanyStatus: (companyId: number) => void; 
   updateExchangeRate: (companyId: number, rates: Partial<ExchangeRate>) => void;
   addEmployee: (companyId: number, fullName: string, username: string, password: string) => { success: boolean; message: string };
+  updateEmployee: (userId: number, data: { full_name: string; username: string }) => { success: boolean; message: string };
   updateEmployeePassword: (userId: number, newPass: string) => void;
   deleteEmployee: (userId: number) => void;
   performExchange: (
@@ -98,7 +100,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => localStorage.setItem('eWallets', JSON.stringify(eWallets)), [eWallets]);
 
   // Check unique username
-  const isUsernameTaken = (username: string) => users.some(u => u.username.toLowerCase() === username.toLowerCase() && u.is_active);
+  const isUsernameTaken = (username: string, excludeId?: number) => {
+      return users.some(u => u.username.toLowerCase() === username.toLowerCase() && u.is_active && u.id !== excludeId);
+  };
 
   // Actions
   const login = async (username: string, pass: string) => {
@@ -171,6 +175,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return { success: true, message: 'تم إضافة الشركة بنجاح' };
   };
 
+  const updateCompany = (id: number, data: Partial<Company>) => {
+      // If username is changing, check uniqueness and update the Admin User
+      if (data.username) {
+          const currentCompany = companies.find(c => c.id === id);
+          if (currentCompany && currentCompany.username !== data.username) {
+              if (isUsernameTaken(data.username)) {
+                  return { success: false, message: 'اسم المستخدم الجديد مسجل مسبقاً' };
+              }
+              // Update Admin User
+              setUsers(prev => prev.map(u => 
+                  u.company_id === id && u.role === 'admin' 
+                  ? { ...u, username: data.username! } 
+                  : u
+              ));
+          }
+      }
+
+      setCompanies(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+      return { success: true, message: 'تم تحديث بيانات الشركة بنجاح' };
+  };
+
   const renewSubscription = (companyId: number, days: number) => {
     setCompanies(prev => prev.map(c => {
       if (c.id === companyId) {
@@ -183,6 +208,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteCompany = (companyId: number) => {
+    // Soft delete company and its users
     setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, is_active: false } : c));
     setUsers(prev => prev.map(u => u.company_id === companyId ? { ...u, is_active: false } : u));
   };
@@ -240,6 +266,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setUsers([...users, newUser]);
     setTreasuries([...treasuries, newTreasury]);
     return { success: true, message: 'تم إضافة الموظف بنجاح' };
+  };
+
+  const updateEmployee = (userId: number, data: { full_name: string; username: string }) => {
+      const user = users.find(u => u.id === userId);
+      if (!user) return { success: false, message: 'الموظف غير موجود' };
+
+      if (user.username !== data.username) {
+          if (isUsernameTaken(data.username, userId)) {
+              return { success: false, message: 'اسم المستخدم مسجل مسبقاً' };
+          }
+      }
+
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...data } : u));
+      return { success: true, message: 'تم تحديث بيانات الموظف بنجاح' };
   };
 
   const updateEmployeePassword = (userId: number, newPass: string) => {
@@ -542,7 +582,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <StoreContext.Provider value={{
       currentUser, companies, users, treasuries, exchangeRates, transactions, merchants, merchantEntries, eWallets,
-      login, logout, addCompany, renewSubscription, deleteCompany, toggleCompanyStatus, updateExchangeRate, addEmployee, updateEmployeePassword, deleteEmployee,
+      login, logout, addCompany, updateCompany, renewSubscription, deleteCompany, toggleCompanyStatus, updateExchangeRate, 
+      addEmployee, updateEmployee, updateEmployeePassword, deleteEmployee,
       performExchange, addMerchant, addMerchantEntry, addEWallet, deleteEWallet, performEWalletTransfer, manageTreasury, feedEWallet
     }}>
       {children}
