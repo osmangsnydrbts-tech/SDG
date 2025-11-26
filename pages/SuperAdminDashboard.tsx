@@ -1,20 +1,23 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Plus, Power, Calendar, Building, UploadCloud, Activity } from 'lucide-react';
+import { Plus, Power, Calendar, Building, UploadCloud, Activity, Trash2, Pencil } from 'lucide-react';
+import { Company } from '../types';
 
 const SuperAdminDashboard: React.FC = () => {
-  const { companies, addCompany, renewSubscription, toggleCompanyStatus } = useStore();
+  const { companies, addCompany, updateCompany, renewSubscription, toggleCompanyStatus, deleteCompany } = useStore();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState<Company | null>(null);
   const [showRenewModal, setShowRenewModal] = useState<number | null>(null);
   const [error, setError] = useState('');
 
-  // Form States
-  const [newName, setNewName] = useState('');
-  const [newUsername, setNewUsername] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [newLogo, setNewLogo] = useState('');
-  const [newDays, setNewDays] = useState(365);
+  // Form States (Add/Edit)
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState(''); // Only for Add
+  const [logo, setLogo] = useState('');
+  const [days, setDays] = useState(365);
+  const [expiryDate, setExpiryDate] = useState(''); // Only for Edit
 
   const activeCompanies = companies.filter(c => c.is_active).length;
   const totalCompanies = companies.length;
@@ -24,24 +27,61 @@ const SuperAdminDashboard: React.FC = () => {
       if (file) {
           const reader = new FileReader();
           reader.onloadend = () => {
-              setNewLogo(reader.result as string);
+              setLogo(reader.result as string);
           };
           reader.readAsDataURL(file);
       }
   };
 
+  const openAddModal = () => {
+      setName(''); setUsername(''); setPassword(''); setDays(365); setLogo(''); setError('');
+      setShowAddModal(true);
+  };
+
+  const openEditModal = (company: Company) => {
+      setName(company.name);
+      setUsername(company.username);
+      setLogo(company.logo || '');
+      setExpiryDate(new Date(company.subscription_end).toISOString().split('T')[0]);
+      setError('');
+      setShowEditModal(company);
+  };
+
   const handleAddCompany = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const res = addCompany(newName, newUsername, newPassword, newDays, newLogo);
-    
+    const res = addCompany(name, username, password, days, logo);
     if (res.success) {
         setShowAddModal(false);
-        // Reset form
-        setNewName(''); setNewUsername(''); setNewPassword(''); setNewDays(365); setNewLogo('');
     } else {
         setError(res.message);
     }
+  };
+
+  const handleUpdateCompany = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!showEditModal) return;
+      setError('');
+      
+      // Update logic
+      const res = updateCompany(showEditModal.id, {
+          name,
+          username,
+          logo,
+          subscription_end: new Date(expiryDate).toISOString()
+      });
+
+      if (res.success) {
+          setShowEditModal(null);
+      } else {
+          setError(res.message);
+      }
+  };
+
+  const handleDeleteCompany = (id: number) => {
+      if (window.confirm('هل أنت متأكد من حذف هذه الشركة؟ سيتم تعطيل جميع حساباتها.')) {
+          deleteCompany(id);
+      }
   };
 
   const handleRenew = (companyId: number, days: number) => {
@@ -72,7 +112,7 @@ const SuperAdminDashboard: React.FC = () => {
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold text-gray-800">إدارة الشركات</h2>
         <button 
-          onClick={() => setShowAddModal(true)}
+          onClick={openAddModal}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm text-sm"
         >
           <Plus size={16} /> إضافة شركة
@@ -99,13 +139,30 @@ const SuperAdminDashboard: React.FC = () => {
                   <p className="text-sm text-gray-500">Admin: {company.username}</p>
                 </div>
               </div>
-              <button 
-                onClick={() => toggleCompanyStatus(company.id)}
-                className={`p-2 rounded-full transition ${company.is_active ? 'text-red-500 hover:bg-red-50' : 'text-green-500 hover:bg-green-50'}`}
-                title={company.is_active ? 'إيقاف الشركة' : 'تنشيط الشركة'}
-              >
-                <Power size={18} />
-              </button>
+              
+              <div className="flex gap-2">
+                  <button 
+                    onClick={() => openEditModal(company)}
+                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-full"
+                    title="تعديل البيانات"
+                  >
+                      <Pencil size={18} />
+                  </button>
+                  <button 
+                    onClick={() => toggleCompanyStatus(company.id)}
+                    className={`p-2 rounded-full transition ${company.is_active ? 'text-orange-500 hover:bg-orange-50' : 'text-green-500 hover:bg-green-50'}`}
+                    title={company.is_active ? 'إيقاف الشركة' : 'تنشيط الشركة'}
+                  >
+                    <Power size={18} />
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteCompany(company.id)}
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-full"
+                    title="حذف الشركة"
+                  >
+                      <Trash2 size={18} />
+                  </button>
+              </div>
             </div>
             
             <div className="mt-4 flex items-center justify-between text-sm">
@@ -133,7 +190,7 @@ const SuperAdminDashboard: React.FC = () => {
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">إضافة شركة جديدة</h3>
             <form onSubmit={handleAddCompany} className="space-y-4">
-              <input type="text" placeholder="اسم الشركة" className="w-full p-2 border rounded-lg" value={newName} onChange={e => setNewName(e.target.value)} required />
+              <input type="text" placeholder="اسم الشركة" className="w-full p-2 border rounded-lg" value={name} onChange={e => setName(e.target.value)} required />
               
               <div className="space-y-1">
                  <label className="text-xs text-gray-500">شعار الشركة (صورة)</label>
@@ -145,25 +202,77 @@ const SuperAdminDashboard: React.FC = () => {
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
                     <div className="flex flex-col items-center justify-center text-gray-400">
-                        {newLogo ? (
-                            <img src={newLogo} alt="Preview" className="h-16 w-16 object-cover rounded-lg mb-2" />
+                        {logo ? (
+                            <img src={logo} alt="Preview" className="h-16 w-16 object-cover rounded-lg mb-2" />
                         ) : (
                             <UploadCloud size={24} className="mb-2" />
                         )}
-                        <span className="text-xs">{newLogo ? 'تم اختيار الصورة' : 'اضغط لرفع الشعار'}</span>
+                        <span className="text-xs">{logo ? 'تم اختيار الصورة' : 'اضغط لرفع الشعار'}</span>
                     </div>
                  </div>
               </div>
 
-              <input type="text" placeholder="اسم مستخدم المدير" className="w-full p-2 border rounded-lg" value={newUsername} onChange={e => setNewUsername(e.target.value)} required />
-              <input type="password" placeholder="كلمة المرور" className="w-full p-2 border rounded-lg" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
-              <input type="number" placeholder="مدة الاشتراك (يوم)" className="w-full p-2 border rounded-lg" value={newDays} onChange={e => setNewDays(parseInt(e.target.value))} required />
+              <input type="text" placeholder="اسم مستخدم المدير" className="w-full p-2 border rounded-lg" value={username} onChange={e => setUsername(e.target.value)} required />
+              <input type="password" placeholder="كلمة المرور" className="w-full p-2 border rounded-lg" value={password} onChange={e => setPassword(e.target.value)} required />
+              <input type="number" placeholder="مدة الاشتراك (يوم)" className="w-full p-2 border rounded-lg" value={days} onChange={e => setDays(parseInt(e.target.value))} required />
               
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
               <div className="flex gap-2 pt-2">
                 <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg">حفظ</button>
                 <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg">إلغاء</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Company Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold mb-4">تعديل بيانات الشركة</h3>
+            <form onSubmit={handleUpdateCompany} className="space-y-4">
+              <div>
+                  <label className="text-xs text-gray-500 font-bold">اسم الشركة</label>
+                  <input type="text" className="w-full p-2 border rounded-lg" value={name} onChange={e => setName(e.target.value)} required />
+              </div>
+
+              <div className="space-y-1">
+                 <label className="text-xs text-gray-500 font-bold">شعار الشركة</label>
+                 <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 cursor-pointer">
+                    <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageUpload} 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="flex flex-col items-center justify-center text-gray-400">
+                        {logo ? (
+                            <img src={logo} alt="Preview" className="h-16 w-16 object-cover rounded-lg mb-2" />
+                        ) : (
+                            <UploadCloud size={24} className="mb-2" />
+                        )}
+                        <span className="text-xs">{logo ? 'تغيير الصورة' : 'رفع شعار'}</span>
+                    </div>
+                 </div>
+              </div>
+
+              <div>
+                  <label className="text-xs text-gray-500 font-bold">اسم مستخدم المدير</label>
+                  <input type="text" className="w-full p-2 border rounded-lg" value={username} onChange={e => setUsername(e.target.value)} required />
+              </div>
+
+              <div>
+                  <label className="text-xs text-gray-500 font-bold">تاريخ انتهاء الاشتراك</label>
+                  <input type="date" className="w-full p-2 border rounded-lg" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} required />
+              </div>
+              
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
+              <div className="flex gap-2 pt-2">
+                <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg">تحديث</button>
+                <button type="button" onClick={() => setShowEditModal(null)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg">إلغاء</button>
               </div>
             </form>
           </div>
