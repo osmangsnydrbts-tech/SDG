@@ -1,21 +1,34 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Download, Filter, PieChart, ArrowUpRight, ArrowDownLeft, Calculator, Search } from 'lucide-react';
+import { FileText, Download, Filter, PieChart, ArrowUpRight, ArrowDownLeft, Calculator, Search, Eye } from 'lucide-react';
+import ReceiptModal from '../components/ReceiptModal';
+import { Transaction } from '../types';
 
 type TabType = 'stats' | 'exchange' | 'treasury' | 'breakdown';
 
 const Reports: React.FC = () => {
-  const { transactions, currentUser, users } = useStore();
+  const { transactions, currentUser, users, companies } = useStore();
   const [activeTab, setActiveTab] = useState<TabType>('breakdown');
   const [filterType, setFilterType] = useState<'day' | 'month' | 'all'>('day');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Modal State
+  const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
 
   // Helper to get employee name
   const getEmployeeName = (empId?: number) => {
       if (!empId) return '-';
       return users.find(u => u.id === empId)?.full_name || 'Unknown';
+  };
+
+  const getCompany = (companyId: number) => {
+      return companies.find(c => c.id === companyId);
+  };
+
+  const getEmployee = (empId?: number) => {
+      return users.find(u => u.id === empId);
   };
 
   // Base Filter Logic
@@ -254,8 +267,8 @@ const Reports: React.FC = () => {
                                 <th className="p-3">الموظف</th>
                                 <th className="p-3">من</th>
                                 <th className="p-3">إلى</th>
-                                <th className="p-3">السعر</th>
                                 <th className="p-3">الإشعار</th>
+                                <th className="p-3">عرض</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
@@ -268,8 +281,12 @@ const Reports: React.FC = () => {
                                     <td className="p-3">{getEmployeeName(t.employee_id)}</td>
                                     <td className="p-3 font-bold">{t.from_amount.toLocaleString()} {t.from_currency}</td>
                                     <td className="p-3 text-gray-500">{t.to_amount?.toLocaleString()} {t.to_currency}</td>
-                                    <td className="p-3 text-xs">{t.rate}</td>
                                     <td className="p-3 text-xs text-gray-400">{t.receipt_number || '-'}</td>
+                                    <td className="p-3">
+                                        <button onClick={() => setViewTransaction(t)} className="text-blue-600 hover:bg-blue-50 p-2 rounded-full">
+                                            <Eye size={18} />
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                             {exchangeTx.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-gray-400">لا توجد عمليات</td></tr>}
@@ -314,6 +331,16 @@ const Reports: React.FC = () => {
                  </table>
              </div>
          </div>
+        )}
+
+        {/* Receipt Viewer */}
+        {viewTransaction && (
+            <ReceiptModal 
+                transaction={viewTransaction} 
+                company={getCompany(viewTransaction.company_id)} 
+                employee={getEmployee(viewTransaction.employee_id)} 
+                onClose={() => setViewTransaction(null)} 
+            />
         )}
     </div>
   );
