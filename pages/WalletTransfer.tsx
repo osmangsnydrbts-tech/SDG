@@ -2,17 +2,21 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Send, Smartphone, CheckCircle } from 'lucide-react';
+import ReceiptModal from '../components/ReceiptModal';
+import { Transaction } from '../types';
 
 const WalletTransfer: React.FC = () => {
-  const { currentUser, eWallets, performEWalletTransfer, exchangeRates } = useStore();
+  const { currentUser, eWallets, performEWalletTransfer, exchangeRates, companies } = useStore();
   const [selectedWalletId, setSelectedWalletId] = useState<string>('');
   const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
   const [receipt, setReceipt] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  
+  // Receipt State
+  const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
 
-  // Get employee's assigned wallets or company wallets
   const myWallets = eWallets.filter(w => 
     w.company_id === currentUser?.company_id && 
     w.is_active && 
@@ -21,6 +25,7 @@ const WalletTransfer: React.FC = () => {
 
   const rates = exchangeRates.find(r => r.company_id === currentUser?.company_id);
   const commissionRate = rates?.ewallet_commission || 1;
+  const company = companies.find(c => c.id === currentUser?.company_id);
 
   const handleTransfer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +50,9 @@ const WalletTransfer: React.FC = () => {
         setPhone('');
         setReceipt('');
         setSelectedWalletId('');
+        if (res.transaction) {
+            setLastTransaction(res.transaction);
+        }
     } else {
         setError(res.message);
     }
@@ -151,6 +159,16 @@ const WalletTransfer: React.FC = () => {
                 </form>
             )}
         </div>
+
+        {/* Receipt Modal */}
+        {lastTransaction && (
+            <ReceiptModal 
+                transaction={lastTransaction} 
+                company={company} 
+                employee={currentUser!} 
+                onClose={() => setLastTransaction(null)} 
+            />
+        )}
     </div>
   );
 };
