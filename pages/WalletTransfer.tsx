@@ -111,6 +111,7 @@ const WalletTransfer: React.FC = () => {
                         <label className="block text-sm font-bold text-gray-700 mb-1">المبلغ المراد تحويله</label>
                         <input 
                             type="number" 
+                            inputMode="decimal"
                             value={amount}
                             onChange={e => setAmount(e.target.value)}
                             className="w-full p-3 border rounded-xl text-lg font-bold"
@@ -140,6 +141,7 @@ const WalletTransfer: React.FC = () => {
                         <label className="block text-sm font-bold text-gray-700 mb-1">رقم الإشعار / العملية</label>
                         <input 
                             type="text" 
+                            inputMode="numeric"
                             value={receipt}
                             onChange={e => setReceipt(e.target.value)}
                             className="w-full p-3 border rounded-xl"
