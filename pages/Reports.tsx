@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Download, Filter, PieChart, ArrowUpRight, ArrowDownLeft, Calculator, Search, Eye } from 'lucide-react';
+import { FileText, Download, Filter, Calculator, Search, Eye } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
-type TabType = 'stats' | 'exchange' | 'treasury' | 'breakdown';
+type TabType = 'exchange' | 'treasury' | 'breakdown';
 
 const Reports: React.FC = () => {
   const { transactions, currentUser, users, companies } = useStore();
@@ -68,9 +68,6 @@ const Reports: React.FC = () => {
   // --- STATS CALCULATION ---
   const stats = {
       exchangeCount: exchangeTx.length,
-      sdgVolume: exchangeTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
-      egpVolume: exchangeTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
-      totalCommission: filtered.reduce((sum, t) => sum + (t.commission || 0), 0),
       receivedSdg: exchangeTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
       receivedEgp: exchangeTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
       walletCommission: walletTx.reduce((sum, t) => sum + (t.commission || 0), 0),
@@ -160,7 +157,6 @@ const Reports: React.FC = () => {
         {/* Tabs */}
         <div className="flex bg-white p-1 rounded-xl border border-gray-200 overflow-x-auto">
             <button onClick={() => setActiveTab('breakdown')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap ${activeTab === 'breakdown' ? 'bg-gray-100 text-gray-900 shadow-sm' : 'text-gray-500'}`}>تقرير تفصيلي</button>
-            <button onClick={() => setActiveTab('stats')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap ${activeTab === 'stats' ? 'bg-gray-100 text-gray-900 shadow-sm' : 'text-gray-500'}`}>رسوم بيانية</button>
             <button onClick={() => setActiveTab('exchange')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap ${activeTab === 'exchange' ? 'bg-gray-100 text-gray-900 shadow-sm' : 'text-gray-500'}`}>سجل الصرف</button>
             <button onClick={() => setActiveTab('treasury')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap ${activeTab === 'treasury' ? 'bg-gray-100 text-gray-900 shadow-sm' : 'text-gray-500'}`}>سجل الخزينة</button>
         </div>
@@ -211,48 +207,6 @@ const Reports: React.FC = () => {
                     </div>
                  </div>
              </div>
-        )}
-
-        {/* Charts & Graphs */}
-        {activeTab === 'stats' && (
-            <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                        <div className="text-gray-500 text-xs mb-1">إجمالي العمليات</div>
-                        <div className="text-2xl font-bold">{filtered.length}</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                        <div className="text-gray-500 text-xs mb-1">إجمالي العمولات</div>
-                        <div className="text-2xl font-bold text-green-600">{stats.totalCommission.toLocaleString()} <span className="text-xs">EGP</span></div>
-                    </div>
-                </div>
-
-                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                    <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2"><PieChart size={18}/> نسب التداول</h3>
-                    
-                    <div className="space-y-4">
-                        <div>
-                            <div className="flex justify-between text-sm mb-1">
-                                <span className="flex items-center gap-1"><ArrowDownLeft size={14} className="text-blue-500"/> شراء سوداني (SDG)</span>
-                                <span className="font-bold">{stats.egpVolume.toLocaleString()} EGP</span>
-                            </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2.5">
-                                <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: '100%' }}></div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <div className="flex justify-between text-sm mb-1">
-                                <span className="flex items-center gap-1"><ArrowUpRight size={14} className="text-orange-500"/> بيع سوداني (SDG)</span>
-                                <span className="font-bold">{stats.sdgVolume.toLocaleString()} SDG</span>
-                            </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2.5">
-                                <div className="bg-orange-500 h-2.5 rounded-full" style={{ width: '100%' }}></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         )}
 
         {/* Exchange Log */}
