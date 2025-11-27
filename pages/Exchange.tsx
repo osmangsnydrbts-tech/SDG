@@ -137,7 +137,7 @@ const Exchange: React.FC = () => {
               <Calculator size={20} />
               <span className="font-medium">الصافي للعميل</span>
             </div>
-            <span className="text-2xl font-bold">{result.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+            <span className="text-2xl font-bold">{result.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
           </div>
 
           <div>
