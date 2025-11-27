@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   User, Company, Treasury, ExchangeRate, Transaction, 
-  Merchant, MerchantEntry, EWallet, DEFAULT_SUPER_ADMIN 
+  Merchant, MerchantEntry, EWallet
 } from '../types';
 import { supabase } from '../src/lib/supabase';
 
@@ -151,7 +151,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const login = async (username: string, pass: string) => {
     // We query the DB directly for latest status
-    const { data: user, error } = await supabase
+    const { data: user } = await supabase
       .from('users')
       .select('*')
       .eq('username', username)
@@ -194,14 +194,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (compError || !company) return { success: false, message: 'فشل إنشاء الشركة: ' + (compError?.message || '') };
 
     // 2. Create Admin User
-    const { data: user } = await supabase.from('users').insert({
+    await supabase.from('users').insert({
       username,
       password: pass,
       role: 'admin',
       full_name: `مدير ${name}`,
       company_id: company.id,
       is_active: true
-    }).select().single();
+    });
 
     // 3. Create Treasury
     await supabase.from('treasuries').insert({
@@ -631,7 +631,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     document.body.removeChild(link);
   };
 
-  const importDatabase = async (jsonString: string) => {
+  const importDatabase = async (_jsonString: string) => {
     return { success: false, message: 'الاستيراد غير متاح في وضع السحابة للحفاظ على سلامة البيانات' };
   };
 
