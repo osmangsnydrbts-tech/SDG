@@ -23,12 +23,11 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     setIsSharing(true);
 
     try {
-      // Wait a moment to ensure UI is fully rendered
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
-        scale: 3, // Higher scale for better text rendering
+        scale: 2,
         useCORS: true,
         logging: false,
         allowTaint: true,
@@ -36,7 +35,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
         windowWidth: element.scrollWidth,
         windowHeight: element.scrollHeight,
         x: 0,
-        y: 0,
+        y: 0
       });
 
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
@@ -94,128 +93,103 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
 
   return (
     <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto font-sans">
-      <div className="w-full max-w-md my-auto">
+      <div className="w-full max-w-sm my-auto">
         
         {/* Printable Area */}
         <div 
           id="receipt-content" 
-          className="bg-white rounded-3xl shadow-2xl overflow-hidden relative px-6 py-8" 
+          className="bg-white rounded-xl shadow-2xl overflow-hidden relative p-6 text-center" 
           dir="rtl"
           style={{ fontFamily: "'Tajawal', sans-serif" }}
         >
           
-          {/* 1. Header Section */}
-          <div className="flex justify-between items-center mb-6">
-             {/* Right: Logo */}
-             <div className="flex-shrink-0">
-                {company.logo ? (
-                  <img 
-                    src={company.logo} 
-                    alt="Logo" 
-                    className="h-20 w-20 object-contain rounded-xl border border-gray-100 bg-white p-1 shadow-sm" 
-                    crossOrigin="anonymous" 
-                  />
-                ) : (
-                  <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-2xl border border-blue-200">
-                     {company.name.charAt(0)}
-                  </div>
-                )}
-             </div>
-
-             {/* Left: Company Name */}
-             <div className="flex-1 text-left pl-4">
-                <h2 className="text-2xl font-extrabold text-gray-900 leading-relaxed py-1" style={{ wordBreak: 'break-word' }}>
-                  {company.name}
-                </h2>
-             </div>
+          {/* 1. Logo (Center) */}
+          <div className="flex justify-center mb-3">
+            {company.logo ? (
+              <img 
+                src={company.logo} 
+                alt="Logo" 
+                className="h-20 w-20 object-contain rounded-xl border border-gray-100 bg-white p-1" 
+                crossOrigin="anonymous" 
+              />
+            ) : (
+              <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-2xl border border-blue-200">
+                  {company.name.charAt(0)}
+              </div>
+            )}
           </div>
 
-          {/* Gray Capsule Title */}
-          <div className="flex justify-center mb-8">
-            <div className="bg-gray-100 text-gray-600 font-bold px-6 py-2 rounded-full text-sm tracking-wide shadow-inner border border-gray-200">
-              إشعار معاملة مالية
-            </div>
-          </div>
+          {/* 2. Company Name (Center) */}
+          <h2 className="text-lg font-bold text-gray-800 mb-1 leading-tight">
+            {company.name}
+          </h2>
 
-          {/* 2. Transaction Details */}
-          <div className="text-center mb-8">
-             <h3 className="text-2xl font-extrabold text-blue-700 mb-2 leading-snug">{getTransactionType(transaction)}</h3>
-             
-             <div className="flex items-center justify-center gap-2 text-gray-500 mb-1">
-               <span className="text-sm font-medium">رقم الإشعار:</span>
-               <span className="font-mono font-bold text-gray-800 text-lg">{transaction.receipt_number || `#${transaction.id}`}</span>
-             </div>
-             
-             <p className="text-xs text-gray-400 font-medium" dir="ltr">
-                {new Date(transaction.created_at).toLocaleDateString('ar-EG')} - {new Date(transaction.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
-             </p>
-          </div>
+          {/* 3. Transaction Type (Center) */}
+          <h3 className="text-blue-600 font-bold text-base mb-6 pb-4 border-b border-dashed border-gray-200">
+            {getTransactionType(transaction)}
+          </h3>
 
-          {/* Separator Line */}
-          <div className="border-t-2 border-dashed border-gray-100 mb-8"></div>
-
-          {/* 3. Amounts Section */}
-          <div className="space-y-6">
+          {/* 4. Details Body */}
+          <div className="space-y-5 mb-6">
             
             {/* Amount Received */}
-            <div className="flex justify-between items-center px-2">
-              <span className="text-gray-600 font-bold text-lg">المبلغ المستلم من العميل</span>
-              <div className="text-left">
-                <div className="font-extrabold text-gray-900 text-2xl leading-none" dir="ltr">
-                  {formatAmount(transaction.from_amount)}
-                </div>
-                <div className="text-xs text-gray-500 font-bold mt-1 uppercase text-left" dir="ltr">{transaction.from_currency}</div>
+            <div>
+              <p className="text-gray-500 text-xs mb-1">المبلغ المستلم من العميل</p>
+              <div className="text-gray-900 font-bold text-xl dir-ltr">
+                {formatAmount(transaction.from_amount)} <span className="text-sm font-medium">{transaction.from_currency}</span>
               </div>
             </div>
 
-            {/* Exchange Rate */}
+            {/* Exchange Rate (If exists) - Side by Side */}
             {transaction.type === 'exchange' && transaction.rate && (
-              <div className="flex justify-between items-center px-2">
-                <span className="text-gray-500 font-medium">سعر الصرف</span>
-                <span className="font-bold text-gray-800 text-xl">{transaction.rate}</span>
+              <div className="flex justify-center items-center gap-2 bg-gray-50 py-2 rounded-lg mx-4">
+                <span className="text-gray-500 text-xs">سعر الصرف:</span>
+                <span className="text-gray-800 font-bold text-base">{transaction.rate}</span>
               </div>
             )}
 
-            {/* Delivered Amount (Blue Card) */}
+            {/* Amount Delivered */}
             {transaction.to_amount && (
-              <div className="bg-blue-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-200 mt-2">
-                <div className="flex justify-between items-center mb-1">
-                   <span className="font-bold text-blue-100 text-lg">المبلغ المسلم للعميل</span>
-                </div>
-                <div className="flex justify-between items-end">
-                   <div className="font-extrabold text-4xl tracking-tight leading-tight pt-2" dir="ltr">
-                     {formatAmount(transaction.to_amount)}
-                   </div>
-                   <div className="text-lg font-bold text-blue-200 mb-1 uppercase" dir="ltr">{transaction.to_currency}</div>
+              <div>
+                <p className="text-gray-500 text-xs mb-1">المبلغ المسلم للعميل</p>
+                <div className="text-blue-700 font-extrabold text-2xl dir-ltr">
+                  {formatAmount(transaction.to_amount)} <span className="text-base font-bold">{transaction.to_currency}</span>
                 </div>
               </div>
             )}
 
-            {/* Commission */}
+            {/* Commission (If exists) */}
             {transaction.commission && transaction.commission > 0 && (
-                <div className="flex justify-between items-center px-2 pt-2">
-                <span className="text-gray-500 font-medium">العمولة</span>
-                <span className="font-bold text-red-500 text-lg">{transaction.commission.toLocaleString()} EGP</span>
-              </div>
+               <div>
+                 <p className="text-gray-400 text-[10px]">العمولة</p>
+                 <p className="text-red-500 font-bold text-sm">{transaction.commission.toLocaleString()} EGP</p>
+               </div>
             )}
+
           </div>
 
-          {/* 4. Footer */}
-          <div className="mt-10 pt-6 border-t border-gray-100">
-            <div className="flex justify-between items-center mb-4 px-2">
-              <span className="text-gray-500 text-sm font-medium">الموظف المسؤول:</span>
-              <span className="font-bold text-gray-800 text-base">{employee?.full_name}</span>
+          {/* 5. Footer Info */}
+          <div className="border-t border-gray-100 pt-4 text-xs text-gray-500 space-y-2">
+            <div className="flex justify-between px-2">
+               <span>التاريخ:</span>
+               <span className="font-bold dir-ltr">
+                 {new Date(transaction.created_at).toLocaleDateString('ar-EG')}
+               </span>
             </div>
-            
-            <div className="text-center">
-               <p className="text-gray-400 text-xs font-medium">شكراً لثقتكم بنا</p>
+            <div className="flex justify-between px-2">
+               <span>رقم الإشعار:</span>
+               <span className="font-mono font-bold text-gray-700">{transaction.receipt_number || `#${transaction.id}`}</span>
+            </div>
+            <div className="flex justify-between px-2">
+               <span>الموظف:</span>
+               <span className="font-bold text-gray-700">{employee?.full_name}</span>
             </div>
           </div>
 
         </div>
 
-        {/* Action Buttons (Hidden in Image) */}
-        <div className="mt-6 flex gap-3">
+        {/* Action Buttons */}
+        <div className="mt-5 flex gap-3">
           <button onClick={onClose} className="bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors">
             <X size={24} />
           </button>
