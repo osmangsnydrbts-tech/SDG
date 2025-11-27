@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Send, Smartphone, CheckCircle } from 'lucide-react';
+import { Send, Smartphone, CheckCircle, Loader2 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -13,6 +13,7 @@ const WalletTransfer: React.FC = () => {
   const [receipt, setReceipt] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   
   // Receipt State
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
@@ -29,32 +30,42 @@ const WalletTransfer: React.FC = () => {
 
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+
     setMsg('');
     setError('');
+    setIsLoading(true);
 
     if (!selectedWalletId) {
         setError('يرجى اختيار المحفظة');
+        setIsLoading(false);
         return;
     }
 
-    const res = await performEWalletTransfer(
-        parseInt(selectedWalletId),
-        parseFloat(amount),
-        phone,
-        receipt
-    );
+    try {
+        const res = await performEWalletTransfer(
+            parseInt(selectedWalletId),
+            parseFloat(amount),
+            phone,
+            receipt
+        );
 
-    if (res.success) {
-        setMsg(res.message);
-        setAmount('');
-        setPhone('');
-        setReceipt('');
-        setSelectedWalletId('');
-        if (res.transaction) {
-            setLastTransaction(res.transaction);
+        if (res.success) {
+            setMsg(res.message);
+            setAmount('');
+            setPhone('');
+            setReceipt('');
+            setSelectedWalletId('');
+            if (res.transaction) {
+                setLastTransaction(res.transaction);
+            }
+        } else {
+            setError(res.message);
         }
-    } else {
-        setError(res.message);
+    } catch (err) {
+        setError('حدث خطأ غير متوقع');
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -154,9 +165,19 @@ const WalletTransfer: React.FC = () => {
 
                     <button 
                         type="submit" 
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2"
+                        disabled={isLoading}
+                        className={`w-full py-4 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2 text-white font-bold ${isLoading ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'}`}
                     >
-                        <Send size={20} /> تنفيذ التحويل
+                        {isLoading ? (
+                            <>
+                                <Loader2 size={20} className="animate-spin" />
+                                جاري المعالجة...
+                            </>
+                        ) : (
+                            <>
+                                <Send size={20} /> تنفيذ التحويل
+                            </>
+                        )}
                     </button>
                 </form>
             )}
