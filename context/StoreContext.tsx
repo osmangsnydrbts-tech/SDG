@@ -46,6 +46,8 @@ interface StoreData {
     receipt: string
   ) => Promise<{ success: boolean; message: string; transaction?: Transaction }>;
   
+  deleteTransaction: (transactionId: number) => Promise<{ success: boolean; message: string }>;
+
   addMerchant: (companyId: number, name: string, phone: string) => Promise<void>;
   addMerchantEntry: (merchantId: number, type: 'credit' | 'debit', currency: 'EGP' | 'SDG', amount: number) => Promise<void>;
   addEWallet: (companyId: number, employeeId: number, phone: string, provider: string) => Promise<void>;
@@ -436,6 +438,44 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return { success: true, message: 'تمت العملية بنجاح', transaction: newTx };
   };
 
+  const deleteTransaction = async (transactionId: number) => {
+    const transaction = transactions.find(t => t.id === transactionId);
+    if (!transaction || transaction.type !== 'exchange') {
+        return { success: false, message: 'لا يمكن حذف هذه العملية' };
+    }
+
+    const empTreasury = treasuries.find(t => t.employee_id === transaction.employee_id);
+    if (!empTreasury) {
+        return { success: false, message: 'خزينة الموظف غير موجودة لاسترداد المبلغ' };
+    }
+
+    // Reverse logic
+    const fromAmount = transaction.from_amount;
+    const toAmount = transaction.to_amount || 0;
+
+    if (transaction.from_currency === 'SDG') {
+        // Was: Employee got SDG, Gave EGP
+        // Reverse: Remove SDG, Add EGP back
+        await supabase.from('treasuries').update({
+            sdg_balance: empTreasury.sdg_balance - fromAmount,
+            egp_balance: empTreasury.egp_balance + toAmount
+        }).eq('id', empTreasury.id);
+    } else { // EGP -> SDG
+        // Was: Employee got EGP, Gave SDG
+        // Reverse: Remove EGP, Add SDG back
+        await supabase.from('treasuries').update({
+            egp_balance: empTreasury.egp_balance - fromAmount,
+            sdg_balance: empTreasury.sdg_balance + toAmount
+        }).eq('id', empTreasury.id);
+    }
+
+    await supabase.from('transactions').delete().eq('id', transactionId);
+    
+    await fetchData();
+    showToast('تم حذف العملية واسترداد المبلغ', 'info');
+    return { success: true, message: 'تم الحذف بنجاح' };
+  };
+
   const addMerchant = async (companyId: number, name: string, phone: string) => {
     await supabase.from('merchants').insert({
         company_id: companyId,
@@ -657,7 +697,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       toast, showToast, hideToast,
       login, logout, addCompany, updateCompany, renewSubscription, deleteCompany, toggleCompanyStatus, updateExchangeRate, 
       addEmployee, updateEmployee, updateEmployeePassword, deleteEmployee,
-      performExchange, addMerchant, addMerchantEntry, addEWallet, deleteEWallet, performEWalletTransfer, manageTreasury, feedEWallet,
+      performExchange, deleteTransaction, addMerchant, addMerchantEntry, addEWallet, deleteEWallet, performEWalletTransfer, manageTreasury, feedEWallet,
       exportDatabase, importDatabase
     }}>
       {children}
