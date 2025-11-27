@@ -23,23 +23,31 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     setIsSharing(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait a moment to ensure UI is fully rendered and stable
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
-        scale: 3,
-        useCORS: true,
+        scale: 2, // Good balance between quality and performance
+        useCORS: true, // Essential for loading images (logos)
         logging: false,
-        allowTaint: true
+        allowTaint: true,
+        scrollY: -window.scrollY, // Fixes issues where content is cut off if page is scrolled
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight,
+        x: 0,
+        y: 0
       });
 
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+      // Generate blob with high quality jpeg
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
 
       if (blob) {
-        const fileName = `receipt_${transaction.receipt_number || transaction.id}.png`;
-        const file = new File([blob], fileName, { type: 'image/png' });
+        const fileName = `receipt_${transaction.receipt_number || transaction.id}.jpg`;
+        const file = new File([blob], fileName, { type: 'image/jpeg' });
         let shared = false;
         
+        // Try native sharing first (Mobile)
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
@@ -53,6 +61,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
           }
         } 
 
+        // Fallback to download if sharing failed or not supported
         if (!shared) {
           const link = document.createElement('a');
           link.href = URL.createObjectURL(blob);
@@ -87,34 +96,41 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-md">
+    <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto">
+      <div className="w-full max-w-md my-auto">
         
         {/* Printable Area */}
-        <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative transform transition-all">
+        <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative">
           
-          {/* 1. Header: Logo & Company Name - Adjusted for single line alignment */}
-          <div className="bg-gray-50 p-6 border-b border-gray-100">
-            <div className="flex flex-row items-center justify-center gap-3 w-full" dir="rtl">
+          {/* 1. Header: Logo & Company Name - Optimized Layout for HTML2Canvas */}
+          <div className="bg-gray-50 p-6 border-b border-gray-100 flex flex-col items-center justify-center text-center">
+            <div className="flex flex-row-reverse items-center justify-center gap-3 w-full">
+                <h2 className="text-xl font-extrabold text-gray-800 leading-tight break-words text-right" style={{ maxWidth: '75%' }}>
+                  {company.name}
+                </h2>
                 {company.logo ? (
-                  <img src={company.logo} alt="Logo" className="h-12 w-12 object-contain rounded-lg bg-white border border-gray-200 p-0.5 shrink-0" />
+                  <img 
+                    src={company.logo} 
+                    alt="Logo" 
+                    className="h-14 w-14 object-contain rounded-lg bg-white border border-gray-200 p-0.5 shrink-0" 
+                    crossOrigin="anonymous" 
+                  />
                 ) : (
-                  <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
-                     <span className="text-xl font-bold text-blue-600">{company.name.charAt(0)}</span>
+                  <div className="h-14 w-14 bg-blue-100 rounded-full flex items-center justify-center shrink-0 text-blue-600 font-bold text-xl">
+                     {company.name.charAt(0)}
                   </div>
                 )}
-                <h2 className="text-xl sm:text-2xl font-extrabold text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">{company.name}</h2>
             </div>
-            <p className="text-gray-400 text-xs text-center mt-2 font-medium">إشعار معاملة مالية</p>
+            <p className="text-gray-400 text-xs mt-3 font-medium tracking-wide">إشعار معاملة مالية</p>
           </div>
 
           {/* 2. Receipt Content */}
-          <div className="p-6 space-y-5">
+          <div className="p-6 space-y-5 bg-white">
             
             {/* Status & Type */}
             <div className="text-center border-b border-dashed border-gray-200 pb-4">
                <h3 className="text-lg font-bold text-blue-700 mb-1">{getTransactionType(transaction)}</h3>
-               <p className="text-xs text-gray-500">رقم الإشعار: <span className="font-mono font-bold text-gray-700">{transaction.receipt_number || `#${transaction.id}`}</span></p>
+               <p className="text-xs text-gray-500">رقم الإشعار: <span className="font-mono font-bold text-gray-700 text-sm">{transaction.receipt_number || `#${transaction.id}`}</span></p>
                <p className="text-xs text-gray-500 mt-1" dir="ltr">
                   {new Date(transaction.created_at).toLocaleDateString('ar-EG')} - {new Date(transaction.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
                </p>
@@ -124,8 +140,8 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             <div className="space-y-3 text-sm">
               
               {/* Amount Received */}
-              <div className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
-                <span className="text-gray-600">المبلغ المستلم من العميل</span>
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span className="text-gray-600 font-medium">المبلغ المستلم من العميل</span>
                 <span className="font-bold text-gray-900 text-lg" dir="ltr">
                   {formatAmount(transaction.from_amount)} {transaction.from_currency}
                 </span>
@@ -141,9 +157,9 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
 
               {/* Amount Delivered */}
               {transaction.to_amount && (
-                <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg border border-blue-100">
-                  <span className="text-blue-800 font-bold">المبلغ المسلم للعميل</span>
-                  <span className="font-extrabold text-blue-700 text-xl" dir="ltr">
+                <div className="flex justify-between items-center p-4 bg-blue-600 rounded-lg shadow-sm text-white">
+                  <span className="text-blue-100 font-bold">المبلغ المسلم للعميل</span>
+                  <span className="font-extrabold text-2xl" dir="ltr">
                     {formatAmount(transaction.to_amount)} {transaction.to_currency}
                   </span>
                 </div>
@@ -159,20 +175,20 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             </div>
 
             {/* 3. Footer: Employee Info */}
-            <div className="pt-4 mt-2 border-t border-gray-100">
+            <div className="pt-6 mt-2 border-t border-gray-100">
               <div className="flex justify-between items-center text-xs text-gray-500 mb-4">
                 <span>الموظف المسؤول:</span>
                 <span className="font-bold text-gray-700">{employee?.full_name}</span>
               </div>
               <div className="text-center text-xs text-gray-400 font-light">
-                 شكراً لتعاملكم مع {company.name}
+                 شكراً لتعاملكم معنا
               </div>
             </div>
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="mt-4 flex gap-3">
+        <div className="mt-6 flex gap-3">
           <button onClick={onClose} className="bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors">
             <X size={24} />
           </button>
@@ -185,7 +201,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             {isSharing ? (
               <>
                 <Loader2 size={20} className="animate-spin" />
-                <span>جاري المعالجة...</span>
+                <span>جاري إنشاء الصورة...</span>
               </>
             ) : (
               <>
