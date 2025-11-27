@@ -18,7 +18,7 @@ const SuperAdminDashboard: React.FC = () => {
   // Form States (Add/Edit)
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState(''); // Only for Add
+  const [password, setPassword] = useState(''); // Shared state for Add & Edit (Optional in Edit)
   const [logo, setLogo] = useState('');
   const [days, setDays] = useState(365);
   const [expiryDate, setExpiryDate] = useState(''); // Only for Edit
@@ -45,6 +45,7 @@ const SuperAdminDashboard: React.FC = () => {
   const openEditModal = (company: Company) => {
       setName(company.name);
       setUsername(company.username);
+      setPassword(''); // Reset password field
       setLogo(company.logo || '');
       setExpiryDate(new Date(company.subscription_end).toISOString().split('T')[0]);
       setError('');
@@ -67,12 +68,12 @@ const SuperAdminDashboard: React.FC = () => {
       if (!showEditModal) return;
       setError('');
       
-      // Update logic
       const res = await updateCompany(showEditModal.id, {
           name,
           username,
           logo,
-          subscription_end: new Date(expiryDate).toISOString()
+          subscription_end: new Date(expiryDate).toISOString(),
+          password: password || undefined // Only send if not empty
       });
 
       if (res.success) {
@@ -93,7 +94,6 @@ const SuperAdminDashboard: React.FC = () => {
     setShowRenewModal(null);
   };
 
-  // Database Handlers
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -309,6 +309,17 @@ const SuperAdminDashboard: React.FC = () => {
               <div>
                   <label className="text-xs text-gray-500 font-bold">اسم مستخدم المدير</label>
                   <input type="text" className="w-full p-2 border rounded-lg" value={username} onChange={e => setUsername(e.target.value)} required />
+              </div>
+
+              <div>
+                  <label className="text-xs text-gray-500 font-bold">كلمة المرور الجديدة (اختياري)</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-2 border rounded-lg" 
+                    placeholder="اتركه فارغاً إذا لم ترد التغيير"
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)} 
+                  />
               </div>
 
               <div>
