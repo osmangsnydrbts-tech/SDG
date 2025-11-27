@@ -261,8 +261,8 @@ const SuperAdminDashboard: React.FC = () => {
               </div>
 
               <input type="text" placeholder="اسم مستخدم المدير" className="w-full p-2 border rounded-lg" value={username} onChange={e => setUsername(e.target.value)} required />
-              <input type="password" placeholder="كلمة المرور" className="w-full p-2 border rounded-lg" value={password} onChange={e => setPassword(e.target.value)} required />
-              <input type="number" placeholder="مدة الاشتراك (يوم)" className="w-full p-2 border rounded-lg" value={days} onChange={e => setDays(parseInt(e.target.value))} required />
+              <input type="password" inputMode="numeric" placeholder="كلمة المرور" className="w-full p-2 border rounded-lg" value={password} onChange={e => setPassword(e.target.value)} required />
+              <input type="number" inputMode="numeric" placeholder="مدة الاشتراك (يوم)" className="w-full p-2 border rounded-lg" value={days} onChange={e => setDays(parseInt(e.target.value))} required />
               
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
@@ -314,7 +314,8 @@ const SuperAdminDashboard: React.FC = () => {
               <div>
                   <label className="text-xs text-gray-500 font-bold">كلمة المرور الجديدة (اختياري)</label>
                   <input 
-                    type="text" 
+                    type="text"
+                    inputMode="numeric" 
                     className="w-full p-2 border rounded-lg" 
                     placeholder="اتركه فارغاً إذا لم ترد التغيير"
                     value={password} 
