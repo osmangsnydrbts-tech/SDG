@@ -370,6 +370,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     amount: number, 
     receipt: string
   ) => {
+    // 1. DUPLICATE CHECK
+    if (receipt) {
+        const duplicate = transactions.find(t => 
+            t.company_id === companyId && 
+            t.receipt_number === receipt && 
+            t.from_amount === amount &&
+            t.type === 'exchange'
+        );
+        if (duplicate) {
+            return { success: false, message: 'عفواً، العملية مكررة! يوجد إشعار سابق بنفس الرقم والمبلغ.' };
+        }
+    }
+
     const rateData = exchangeRates.find(r => r.company_id === companyId);
     if (!rateData) return { success: false, message: 'لم يتم تحديد أسعار الصرف' };
 
@@ -570,6 +583,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       const user = users.find(u => u.id === wallet.employee_id);
       if (!user) return { success: false, message: 'User not found' };
+
+      // 1. DUPLICATE CHECK
+      if (receipt) {
+        const duplicate = transactions.find(t => 
+            t.company_id === user.company_id && 
+            t.receipt_number === receipt && 
+            t.from_amount === amount &&
+            t.type === 'e_wallet'
+        );
+        if (duplicate) {
+            return { success: false, message: 'عفواً، العملية مكررة! يوجد إشعار سابق بنفس الرقم والمبلغ.' };
+        }
+      }
 
       const rates = exchangeRates.find(r => r.company_id === wallet.company_id);
       const commissionRate = rates?.ewallet_commission || 1; 
