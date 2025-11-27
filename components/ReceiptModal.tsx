@@ -104,8 +104,8 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
           
           {/* 1. Header: Logo & Company Name - Optimized Layout for HTML2Canvas */}
           <div className="bg-gray-50 p-6 border-b border-gray-100 flex flex-col items-center justify-center text-center">
-            <div className="flex flex-row-reverse items-center justify-center gap-3 w-full">
-                <h2 className="text-xl font-extrabold text-gray-800 leading-tight break-words text-right" style={{ maxWidth: '75%' }}>
+            <div className="flex flex-row-reverse items-center justify-center gap-3 w-full flex-nowrap">
+                <h2 className="text-xl font-extrabold text-gray-800 text-right whitespace-nowrap overflow-visible">
                   {company.name}
                 </h2>
                 {company.logo ? (
