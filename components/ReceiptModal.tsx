@@ -34,14 +34,15 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
         allowTaint: true
       });
 
-      // Convert canvas to blob using a Promise wrapper for cleaner async/await
+      // Convert canvas to blob using a Promise wrapper
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
 
       if (blob) {
         const fileName = `receipt_${transaction.receipt_number || transaction.id}.png`;
         const file = new File([blob], fileName, { type: 'image/png' });
+        let shared = false;
         
-        // Check if the browser supports file sharing via Web Share API
+        // Try Web Share API first (Mobile Native Share)
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
@@ -49,11 +50,15 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
               title: 'إشعار عملية',
               text: `إشعار عملية - ${company.name}`,
             });
+            shared = true;
           } catch (error) {
-            console.log('Sharing cancelled or failed', error);
+            console.warn('Sharing cancelled or failed, falling back to download', error);
+            // If sharing fails (e.g. user cancelled), we fall back to download below
           }
-        } else {
-          // Fallback to direct download
+        } 
+
+        // Fallback: Direct Download if share failed or not supported
+        if (!shared) {
           const link = document.createElement('a');
           link.href = URL.createObjectURL(blob);
           link.download = fileName;
@@ -126,7 +131,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
 
               {transaction.to_amount && (
                 <div className="flex justify-between border-b border-dashed border-gray-200 pb-2">
-                  <span className="text-gray-500">المبلغ المستلم</span>
+                  <span className="text-gray-500">المبلغ المسلم للعميل</span>
                   <span className="font-bold" dir="ltr">{transaction.to_amount.toLocaleString()} {transaction.to_currency}</span>
                 </div>
               )}
