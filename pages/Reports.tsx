@@ -1,14 +1,14 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Download, Filter, Calculator, Search, Eye } from 'lucide-react';
+import { FileText, Download, Filter, Calculator, Search, Eye, Trash2 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
 type TabType = 'exchange' | 'treasury' | 'breakdown';
 
 const Reports: React.FC = () => {
-  const { transactions, currentUser, users, companies } = useStore();
+  const { transactions, currentUser, users, companies, deleteTransaction } = useStore();
   const [activeTab, setActiveTab] = useState<TabType>('breakdown');
   const [filterType, setFilterType] = useState<'day' | 'month' | 'all'>('day');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -29,6 +29,12 @@ const Reports: React.FC = () => {
 
   const getEmployee = (empId?: number) => {
       return users.find(u => u.id === empId);
+  };
+
+  const handleDelete = async (id: number) => {
+      if (window.confirm('هل أنت متأكد من حذف هذه العملية؟ سيتم استرداد المبلغ إلى خزينة الموظف.')) {
+          await deleteTransaction(id);
+      }
   };
 
   // Base Filter Logic
@@ -222,7 +228,7 @@ const Reports: React.FC = () => {
                                 <th className="p-3">من</th>
                                 <th className="p-3">إلى</th>
                                 <th className="p-3">الإشعار</th>
-                                <th className="p-3">عرض</th>
+                                <th className="p-3">إجراءات</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
@@ -236,10 +242,15 @@ const Reports: React.FC = () => {
                                     <td className="p-3 font-bold">{t.from_amount.toLocaleString()} {t.from_currency}</td>
                                     <td className="p-3 text-gray-500">{t.to_amount?.toLocaleString()} {t.to_currency}</td>
                                     <td className="p-3 text-xs text-gray-400">{t.receipt_number || '-'}</td>
-                                    <td className="p-3">
+                                    <td className="p-3 flex items-center gap-2">
                                         <button onClick={() => setViewTransaction(t)} className="text-blue-600 hover:bg-blue-50 p-2 rounded-full">
                                             <Eye size={18} />
                                         </button>
+                                        {currentUser?.role === 'admin' && (
+                                            <button onClick={() => handleDelete(t.id)} className="text-red-600 hover:bg-red-50 p-2 rounded-full" title="حذف واسترداد">
+                                                <Trash2 size={18} />
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
