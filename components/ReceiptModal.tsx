@@ -87,16 +87,18 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
         <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative transform transition-all">
           
           {/* 1. Header: Logo & Company Name */}
-          <div className="bg-gray-50 p-6 text-center border-b border-gray-100 flex flex-col items-center justify-center">
-            {company.logo ? (
-              <img src={company.logo} alt="Logo" className="h-20 object-contain mb-3 rounded-lg" />
-            ) : (
-              <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mb-3">
-                 <span className="text-2xl font-bold text-blue-600">{company.name.charAt(0)}</span>
-              </div>
-            )}
-            <h2 className="text-xl font-extrabold text-gray-800">{company.name}</h2>
-            <p className="text-gray-400 text-xs mt-1">إشعار معاملة مالية</p>
+          <div className="bg-gray-50 p-6 border-b border-gray-100">
+            <div className="flex items-center justify-center gap-3" dir="rtl">
+                {company.logo ? (
+                  <img src={company.logo} alt="Logo" className="h-14 w-14 object-contain rounded-lg bg-white border border-gray-100 p-1" />
+                ) : (
+                  <div className="h-14 w-14 bg-blue-100 rounded-full flex items-center justify-center">
+                     <span className="text-xl font-bold text-blue-600">{company.name.charAt(0)}</span>
+                  </div>
+                )}
+                <h2 className="text-2xl font-extrabold text-gray-800">{company.name}</h2>
+            </div>
+            <p className="text-gray-400 text-xs text-center mt-2 font-medium">إشعار معاملة مالية</p>
           </div>
 
           {/* 2. Receipt Content */}
