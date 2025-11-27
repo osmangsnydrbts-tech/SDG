@@ -1,12 +1,13 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Plus, Trash2, Smartphone, ArrowDownCircle } from 'lucide-react';
+import { Plus, Trash2, Smartphone, ArrowDownCircle, Loader2 } from 'lucide-react';
 
 const EWallets: React.FC = () => {
   const { currentUser, eWallets, users, addEWallet, deleteEWallet, feedEWallet } = useStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFeedModal, setShowFeedModal] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   
   const [phone, setPhone] = useState('');
   const [employeeId, setEmployeeId] = useState('');
@@ -33,13 +34,20 @@ const EWallets: React.FC = () => {
 
   const handleFeed = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (showFeedModal) {
-          const res = await feedEWallet(showFeedModal, parseFloat(amount));
-          if (res.success) {
-              setMsg('تمت التغذية بنجاح');
-              setTimeout(() => { setShowFeedModal(null); setMsg(''); setAmount(''); }, 1000);
-          } else {
-              setMsg(res.message);
+      if (showFeedModal && !isLoading) {
+          setIsLoading(true);
+          try {
+            const res = await feedEWallet(showFeedModal, parseFloat(amount));
+            if (res.success) {
+                setMsg('تمت التغذية بنجاح');
+                setTimeout(() => { setShowFeedModal(null); setMsg(''); setAmount(''); }, 1000);
+            } else {
+                setMsg(res.message);
+            }
+          } catch (err) {
+              setMsg('حدث خطأ');
+          } finally {
+              setIsLoading(false);
           }
       }
   };
@@ -142,7 +150,14 @@ const EWallets: React.FC = () => {
                             required 
                         />
                         {msg && <p className={`text-center text-sm font-bold ${msg.includes('بنجاح') ? 'text-green-600' : 'text-red-600'}`}>{msg}</p>}
-                        <button className="w-full bg-green-600 text-white py-3 rounded-lg font-bold mt-2">تأكيد التغذية</button>
+                        
+                        <button 
+                            disabled={isLoading}
+                            className={`w-full py-3 rounded-lg font-bold mt-2 flex items-center justify-center gap-2 text-white ${isLoading ? 'bg-green-400 cursor-wait' : 'bg-green-600'}`}
+                        >
+                            {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'تأكيد التغذية'}
+                        </button>
+                        
                         <button type="button" onClick={() => {setShowFeedModal(null); setMsg('');}} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                     </form>
                 </div>
