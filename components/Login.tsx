@@ -3,19 +3,18 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { Lock, User as UserIcon, Info, Phone, MessageCircle, X } from 'lucide-react';
+import Toast from './Toast';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [showAbout, setShowAbout] = useState(false);
   
-  const { login } = useStore();
+  const { login, toast, hideToast, showToast } = useStore();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     const success = await login(username, password);
     if (success) {
       const savedUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
@@ -23,12 +22,21 @@ const Login: React.FC = () => {
       else if (savedUser.role === 'admin') navigate('/admin');
       else navigate('/employee');
     } else {
-      setError('بيانات الدخول غير صحيحة أو الاشتراك منتهي');
+      showToast('بيانات الدخول غير صحيحة أو الاشتراك منتهي', 'error');
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4 relative">
+      {/* Toast Notification */}
+      {toast && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={hideToast} 
+        />
+      )}
+
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md z-10">
         <div className="text-center mb-8">
           <div className="bg-blue-100 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
@@ -78,8 +86,6 @@ const Login: React.FC = () => {
               />
             </div>
           </div>
-
-          {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
 
           <button
             type="submit"
