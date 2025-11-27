@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { ArrowLeftRight, CheckCircle, Calculator } from 'lucide-react';
+import { ArrowLeftRight, CheckCircle, Calculator, Loader2 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -14,6 +14,7 @@ const Exchange: React.FC = () => {
   const [isWholesale, setIsWholesale] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   
   // Receipt Modal State
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
@@ -51,28 +52,35 @@ const Exchange: React.FC = () => {
 
   const handleExchange = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser?.company_id) return;
+    if (!currentUser?.company_id || isLoading) return;
     
     setSuccessMsg('');
     setErrorMsg('');
+    setIsLoading(true);
 
-    const res = await performExchange(
-      currentUser.id,
-      currentUser.company_id,
-      direction === 'SDG_TO_EGP' ? 'SDG' : 'EGP',
-      parseFloat(amount),
-      receipt
-    );
+    try {
+      const res = await performExchange(
+        currentUser.id,
+        currentUser.company_id,
+        direction === 'SDG_TO_EGP' ? 'SDG' : 'EGP',
+        parseFloat(amount),
+        receipt
+      );
 
-    if (res.success) {
-      setSuccessMsg(res.message);
-      setAmount('');
-      setReceipt('');
-      if (res.transaction) {
-          setLastTransaction(res.transaction);
+      if (res.success) {
+        setSuccessMsg(res.message);
+        setAmount('');
+        setReceipt('');
+        if (res.transaction) {
+            setLastTransaction(res.transaction);
+        }
+      } else {
+        setErrorMsg(res.message);
       }
-    } else {
-      setErrorMsg(res.message);
+    } catch (err) {
+        setErrorMsg('حدث خطأ غير متوقع');
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -159,9 +167,17 @@ const Exchange: React.FC = () => {
 
           <button 
             type="submit" 
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition transform active:scale-95"
+            disabled={isLoading}
+            className={`w-full py-4 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2 text-white font-bold ${isLoading ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'}`}
           >
-            تأكيد العملية
+            {isLoading ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                جاري المعالجة...
+              </>
+            ) : (
+              'تأكيد العملية'
+            )}
           </button>
         </form>
       </div>
