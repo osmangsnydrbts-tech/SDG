@@ -79,6 +79,13 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     return 'عملية مالية';
   };
 
+  const formatAmount = (amount: number) => {
+    if (transaction.type === 'exchange') {
+      return amount.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    }
+    return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-md">
@@ -120,7 +127,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
               <div className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
                 <span className="text-gray-600">المبلغ المستلم من العميل</span>
                 <span className="font-bold text-gray-900 text-lg" dir="ltr">
-                  {transaction.from_amount.toLocaleString()} {transaction.from_currency}
+                  {formatAmount(transaction.from_amount)} {transaction.from_currency}
                 </span>
               </div>
 
@@ -137,7 +144,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
                 <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg border border-blue-100">
                   <span className="text-blue-800 font-bold">المبلغ المسلم للعميل</span>
                   <span className="font-extrabold text-blue-700 text-xl" dir="ltr">
-                    {transaction.to_amount.toLocaleString()} {transaction.to_currency}
+                    {formatAmount(transaction.to_amount)} {transaction.to_currency}
                   </span>
                 </div>
               )}
