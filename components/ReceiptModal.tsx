@@ -93,17 +93,17 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
         {/* Printable Area */}
         <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative transform transition-all">
           
-          {/* 1. Header: Logo & Company Name */}
+          {/* 1. Header: Logo & Company Name - Adjusted for single line alignment */}
           <div className="bg-gray-50 p-6 border-b border-gray-100">
-            <div className="flex items-center justify-center gap-3" dir="rtl">
+            <div className="flex flex-row items-center justify-center gap-3 w-full" dir="rtl">
                 {company.logo ? (
-                  <img src={company.logo} alt="Logo" className="h-14 w-14 object-contain rounded-lg bg-white border border-gray-100 p-1" />
+                  <img src={company.logo} alt="Logo" className="h-12 w-12 object-contain rounded-lg bg-white border border-gray-200 p-0.5 shrink-0" />
                 ) : (
-                  <div className="h-14 w-14 bg-blue-100 rounded-full flex items-center justify-center">
+                  <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
                      <span className="text-xl font-bold text-blue-600">{company.name.charAt(0)}</span>
                   </div>
                 )}
-                <h2 className="text-2xl font-extrabold text-gray-800">{company.name}</h2>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">{company.name}</h2>
             </div>
             <p className="text-gray-400 text-xs text-center mt-2 font-medium">إشعار معاملة مالية</p>
           </div>
