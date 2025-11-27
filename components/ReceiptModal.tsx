@@ -23,18 +23,16 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     setIsSharing(true);
 
     try {
-      // Wait a moment to ensure UI is stable
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
-        scale: 3, // High resolution for crisp text
-        useCORS: true, // Allow loading external images (logos)
+        scale: 3,
+        useCORS: true,
         logging: false,
         allowTaint: true
       });
 
-      // Convert canvas to blob using a Promise wrapper
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
 
       if (blob) {
@@ -42,7 +40,6 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
         const file = new File([blob], fileName, { type: 'image/png' });
         let shared = false;
         
-        // Try Web Share API first (Mobile Native Share)
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
@@ -52,12 +49,10 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             });
             shared = true;
           } catch (error) {
-            console.warn('Sharing cancelled or failed, falling back to download', error);
-            // If sharing fails (e.g. user cancelled), we fall back to download below
+            console.warn('Sharing cancelled or failed', error);
           }
         } 
 
-        // Fallback: Direct Download if share failed or not supported
         if (!shared) {
           const link = document.createElement('a');
           link.href = URL.createObjectURL(blob);
@@ -76,12 +71,12 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
   };
 
   const getTransactionType = (t: Transaction) => {
-    if (t.type === 'exchange') return `صرف (${t.from_currency} -> ${t.to_currency})`;
+    if (t.type === 'exchange') return 'عملية صرف عملة';
     if (t.type === 'e_wallet') return 'تحويل محفظة إلكترونية';
-    if (t.type === 'treasury_feed') return 'إيداع خزينة';
-    if (t.type === 'treasury_withdraw') return 'سحب خزينة';
+    if (t.type === 'treasury_feed') return 'إيداع نقدي';
+    if (t.type === 'treasury_withdraw') return 'سحب نقدي';
     if (t.type === 'wallet_feed') return 'تغذية محفظة';
-    return 'عملية أخرى';
+    return 'عملية مالية';
   };
 
   return (
@@ -90,67 +85,79 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
         
         {/* Printable Area */}
         <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative transform transition-all">
-          {/* Header / Logo */}
-          <div className="bg-gray-50 p-6 text-center border-b border-gray-100">
+          
+          {/* 1. Header: Logo & Company Name */}
+          <div className="bg-gray-50 p-6 text-center border-b border-gray-100 flex flex-col items-center justify-center">
             {company.logo ? (
-              <img src={company.logo} alt="Logo" className="h-20 mx-auto object-contain mb-3" />
+              <img src={company.logo} alt="Logo" className="h-20 object-contain mb-3 rounded-lg" />
             ) : (
-              <div className="text-2xl font-bold text-gray-800">{company.name}</div>
+              <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mb-3">
+                 <span className="text-2xl font-bold text-blue-600">{company.name.charAt(0)}</span>
+              </div>
             )}
-            <p className="text-gray-500 text-sm mt-2">إشعار عملية</p>
+            <h2 className="text-xl font-extrabold text-gray-800">{company.name}</h2>
+            <p className="text-gray-400 text-xs mt-1">إشعار معاملة مالية</p>
           </div>
 
-          {/* Receipt Content */}
-          <div className="p-8 space-y-6">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold text-gray-800 mb-1" dir="ltr">
-                {transaction.from_amount.toLocaleString()} <span className="text-lg text-gray-500">{transaction.from_currency}</span>
-              </h2>
-              <p className="text-green-600 font-bold bg-green-50 inline-block px-3 py-1 rounded-full text-sm">
-                 تمت العملية بنجاح
-              </p>
+          {/* 2. Receipt Content */}
+          <div className="p-6 space-y-5">
+            
+            {/* Status & Type */}
+            <div className="text-center border-b border-dashed border-gray-200 pb-4">
+               <h3 className="text-lg font-bold text-blue-700 mb-1">{getTransactionType(transaction)}</h3>
+               <p className="text-xs text-gray-500">رقم الإشعار: <span className="font-mono font-bold text-gray-700">{transaction.receipt_number || `#${transaction.id}`}</span></p>
+               <p className="text-xs text-gray-500 mt-1" dir="ltr">
+                  {new Date(transaction.created_at).toLocaleDateString('ar-EG')} - {new Date(transaction.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
+               </p>
             </div>
 
-            <div className="space-y-4 text-sm">
-              <div className="flex justify-between border-b border-dashed border-gray-200 pb-2">
-                <span className="text-gray-500">رقم الإشعار</span>
-                <span className="font-bold font-mono">{transaction.receipt_number || `#${transaction.id}`}</span>
-              </div>
+            {/* Detailed Table */}
+            <div className="space-y-3 text-sm">
               
-              <div className="flex justify-between border-b border-dashed border-gray-200 pb-2">
-                <span className="text-gray-500">نوع العملية</span>
-                <span className="font-bold">{getTransactionType(transaction)}</span>
-              </div>
-
-              <div className="flex justify-between border-b border-dashed border-gray-200 pb-2">
-                <span className="text-gray-500">التاريخ والوقت</span>
-                <span className="font-bold" dir="ltr">
-                  {new Date(transaction.created_at).toLocaleDateString('ar-EG')} - {new Date(transaction.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
+              {/* Amount Received */}
+              <div className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                <span className="text-gray-600">المبلغ المستلم من العميل</span>
+                <span className="font-bold text-gray-900 text-lg" dir="ltr">
+                  {transaction.from_amount.toLocaleString()} {transaction.from_currency}
                 </span>
               </div>
 
-              {transaction.to_amount && (
-                <div className="flex justify-between border-b border-dashed border-gray-200 pb-2">
-                  <span className="text-gray-500">المبلغ المسلم للعميل</span>
-                  <span className="font-bold" dir="ltr">{transaction.to_amount.toLocaleString()} {transaction.to_currency}</span>
+              {/* Exchange Rate (Only for Exchange) */}
+              {transaction.type === 'exchange' && transaction.rate && (
+                <div className="flex justify-between items-center px-2">
+                  <span className="text-gray-500">سعر الصرف</span>
+                  <span className="font-bold text-gray-800">{transaction.rate}</span>
                 </div>
               )}
 
+              {/* Amount Delivered */}
+              {transaction.to_amount && (
+                <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg border border-blue-100">
+                  <span className="text-blue-800 font-bold">المبلغ المسلم للعميل</span>
+                  <span className="font-extrabold text-blue-700 text-xl" dir="ltr">
+                    {transaction.to_amount.toLocaleString()} {transaction.to_currency}
+                  </span>
+                </div>
+              )}
+
+              {/* Commission */}
               {transaction.commission && transaction.commission > 0 && (
-                 <div className="flex justify-between border-b border-dashed border-gray-200 pb-2">
+                 <div className="flex justify-between items-center px-2 pt-1">
                   <span className="text-gray-500">العمولة</span>
                   <span className="font-bold text-red-500">{transaction.commission.toLocaleString()} EGP</span>
                 </div>
               )}
-
-              <div className="flex justify-between pt-2">
-                <span className="text-gray-500">الموظف المسؤول</span>
-                <span className="font-bold">{employee?.full_name}</span>
-              </div>
             </div>
-            
-            <div className="text-center text-xs text-gray-300 pt-4 mt-4 border-t border-gray-50">
-               نظام الصرفة الإلكتروني
+
+            {/* 3. Footer: Employee Info */}
+            <div className="pt-4 mt-2 border-t border-gray-100">
+              <div className="flex justify-between items-center text-xs text-gray-500 mb-4">
+                <span>الموظف المسؤول:</span>
+                <span className="font-bold text-gray-700">{employee?.full_name}</span>
+              </div>
+              <div className="text-center text-xs text-gray-400 font-light">
+                 شكراً لتعاملكم مع {company.name}
+              </div>
             </div>
           </div>
         </div>
