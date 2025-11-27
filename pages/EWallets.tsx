@@ -8,12 +8,10 @@ const EWallets: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFeedModal, setShowFeedModal] = useState<number | null>(null);
   
-  // Add Form
   const [phone, setPhone] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [provider, setProvider] = useState('Vodafone');
 
-  // Feed Form
   const [amount, setAmount] = useState('');
   const [msg, setMsg] = useState('');
 
@@ -70,7 +68,7 @@ const EWallets: React.FC = () => {
                     <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
                          <div>
                              <span className="text-xs text-gray-500 block">الرصيد الحالي</span>
-                             <span className="font-bold text-lg">{w.balance.toLocaleString()} EGP</span>
+                             <span className="font-bold text-lg">{w.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP</span>
                          </div>
                          <button 
                             onClick={() => setShowFeedModal(w.id)}
