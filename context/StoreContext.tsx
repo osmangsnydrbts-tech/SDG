@@ -5,6 +5,7 @@ import {
   Merchant, MerchantEntry, EWallet
 } from '../types';
 import { supabase } from '../src/lib/supabase';
+import { ToastType } from '../components/Toast';
 
 interface StoreData {
   currentUser: User | null;
@@ -17,11 +18,16 @@ interface StoreData {
   merchantEntries: MerchantEntry[];
   eWallets: EWallet[];
   
+  // Toast State
+  toast: { message: string; type: ToastType } | null;
+  showToast: (message: string, type: ToastType) => void;
+  hideToast: () => void;
+
   // Actions
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   addCompany: (name: string, username: string, password: string, days: number, logo?: string) => Promise<{ success: boolean; message: string }>;
-  updateCompany: (id: number, data: Partial<Company>) => Promise<{ success: boolean; message: string }>;
+  updateCompany: (id: number, data: Partial<Company> & { password?: string }) => Promise<{ success: boolean; message: string }>;
   renewSubscription: (companyId: number, days: number) => Promise<void>;
   deleteCompany: (companyId: number) => Promise<void>;
   toggleCompanyStatus: (companyId: number) => Promise<void>; 
@@ -84,41 +90,44 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [merchantEntries, setMerchantEntries] = useState<MerchantEntry[]>([]);
   const [eWallets, setEWallets] = useState<EWallet[]>([]);
+  
+  // Toast State
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+  const showToast = (message: string, type: ToastType) => {
+    setToast({ message, type });
+  };
+
+  const hideToast = () => {
+    setToast(null);
+  };
 
   // Fetch Data from Supabase
   const fetchData = async () => {
     try {
-      const { data: companiesData, error: compError } = await supabase.from('companies').select('*');
-      if (compError) console.error('Error fetching companies:', compError);
-      else if (companiesData) setCompanies(companiesData);
+      const { data: companiesData } = await supabase.from('companies').select('*');
+      if (companiesData) setCompanies(companiesData);
 
-      const { data: usersData, error: usersError } = await supabase.from('users').select('*');
-      if (usersError) console.error('Error fetching users:', usersError);
-      else if (usersData) setUsers(usersData);
+      const { data: usersData } = await supabase.from('users').select('*');
+      if (usersData) setUsers(usersData);
 
-      const { data: treasuriesData, error: trError } = await supabase.from('treasuries').select('*');
-      if (trError) console.error('Error fetching treasuries:', trError);
-      else if (treasuriesData) setTreasuries(treasuriesData);
+      const { data: treasuriesData } = await supabase.from('treasuries').select('*');
+      if (treasuriesData) setTreasuries(treasuriesData);
 
-      const { data: ratesData, error: rtError } = await supabase.from('exchange_rates').select('*');
-      if (rtError) console.error('Error fetching rates:', rtError);
-      else if (ratesData) setExchangeRates(ratesData);
+      const { data: ratesData } = await supabase.from('exchange_rates').select('*');
+      if (ratesData) setExchangeRates(ratesData);
 
-      const { data: txData, error: txError } = await supabase.from('transactions').select('*');
-      if (txError) console.error('Error fetching transactions:', txError);
-      else if (txData) setTransactions(txData);
+      const { data: txData } = await supabase.from('transactions').select('*');
+      if (txData) setTransactions(txData);
 
-      const { data: merchData, error: mError } = await supabase.from('merchants').select('*');
-      if (mError) console.error('Error fetching merchants:', mError);
-      else if (merchData) setMerchants(merchData);
+      const { data: merchData } = await supabase.from('merchants').select('*');
+      if (merchData) setMerchants(merchData);
 
-      const { data: entriesData, error: entError } = await supabase.from('merchant_entries').select('*');
-      if (entError) console.error('Error fetching merchant entries:', entError);
-      else if (entriesData) setMerchantEntries(entriesData);
+      const { data: entriesData } = await supabase.from('merchant_entries').select('*');
+      if (entriesData) setMerchantEntries(entriesData);
 
-      const { data: walletsData, error: wError } = await supabase.from('e_wallets').select('*');
-      if (wError) console.error('Error fetching e-wallets:', wError);
-      else if (walletsData) setEWallets(walletsData);
+      const { data: walletsData } = await supabase.from('e_wallets').select('*');
+      if (walletsData) setEWallets(walletsData);
 
     } catch (error) {
       console.error("Critical error fetching data:", error);
@@ -127,7 +136,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     fetchData();
-    // Set up real-time subscription
     const channels = supabase.channel('custom-all-channel')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => {
         fetchData();
@@ -139,10 +147,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  // Save currentUser to LocalStorage for persistence
   useEffect(() => localStorage.setItem('currentUser', JSON.stringify(currentUser)), [currentUser]);
 
-  // Check unique username
   const isUsernameTaken = (username: string, excludeId?: number) => {
       return users.some(u => u.username.toLowerCase() === username.toLowerCase() && u.is_active && u.id !== excludeId);
   };
@@ -150,7 +156,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // --- ACTIONS ---
 
   const login = async (username: string, pass: string) => {
-    // We query the DB directly for latest status
     const { data: user } = await supabase
       .from('users')
       .select('*')
@@ -167,12 +172,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
       setCurrentUser(user);
+      showToast(`مرحباً ${user.full_name}`, 'success');
       return true;
     }
     return false;
   };
 
-  const logout = () => setCurrentUser(null);
+  const logout = () => {
+      setCurrentUser(null);
+      showToast('تم تسجيل الخروج', 'info');
+  };
 
   const addCompany = async (name: string, username: string, pass: string, days: number, logo?: string) => {
     if (isUsernameTaken(username)) {
@@ -182,7 +191,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const subEnd = new Date();
     subEnd.setDate(subEnd.getDate() + days);
 
-    // 1. Create Company
     const { data: company, error: compError } = await supabase.from('companies').insert({
       name,
       username,
@@ -191,9 +199,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       logo
     }).select().single();
 
-    if (compError || !company) return { success: false, message: 'فشل إنشاء الشركة: ' + (compError?.message || '') };
+    if (compError || !company) return { success: false, message: 'فشل إنشاء الشركة' };
 
-    // 2. Create Admin User
     await supabase.from('users').insert({
       username,
       password: pass,
@@ -203,14 +210,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       is_active: true
     });
 
-    // 3. Create Treasury
     await supabase.from('treasuries').insert({
       company_id: company.id,
       egp_balance: 0,
       sdg_balance: 0
     });
 
-    // 4. Create Rates
     await supabase.from('exchange_rates').insert({
         company_id: company.id,
         sd_to_eg_rate: 74.0,
@@ -221,30 +226,40 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updated_at: new Date().toISOString()
     });
 
-    await fetchData(); // Refresh local state
+    await fetchData();
+    showToast('تم إضافة الشركة بنجاح', 'success');
     return { success: true, message: 'تم إضافة الشركة بنجاح' };
   };
 
-  const updateCompany = async (id: number, data: Partial<Company>) => {
-      // Logic for username check would be server-side or pre-check
+  const updateCompany = async (id: number, data: Partial<Company> & { password?: string }) => {
+      // Handle Username change collision check
       if (data.username) {
         const currentCompany = companies.find(c => c.id === id);
         if (currentCompany && currentCompany.username !== data.username) {
              if (isUsernameTaken(data.username)) return { success: false, message: 'اسم المستخدم الجديد مسجل مسبقاً' };
-             
-             // Update the admin user as well
-             await supabase.from('users')
-                .update({ username: data.username })
-                .eq('company_id', id)
-                .eq('role', 'admin');
         }
       }
 
-      const { error } = await supabase.from('companies').update(data).eq('id', id);
+      const { password, ...companyData } = data;
+
+      const { error } = await supabase.from('companies').update(companyData).eq('id', id);
       if (error) return { success: false, message: error.message };
       
+      // Update Admin User details
+      const updateData: any = {};
+      if (data.username) updateData.username = data.username;
+      if (password) updateData.password = password;
+
+      if (Object.keys(updateData).length > 0) {
+          await supabase.from('users')
+            .update(updateData)
+            .eq('company_id', id)
+            .eq('role', 'admin');
+      }
+      
       await fetchData();
-      return { success: true, message: 'تم تحديث بيانات الشركة بنجاح' };
+      showToast('تم تحديث بيانات الشركة', 'success');
+      return { success: true, message: 'تم التحديث بنجاح' };
   };
 
   const renewSubscription = async (companyId: number, days: number) => {
@@ -256,13 +271,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     await supabase.from('companies').update({ subscription_end: currentEnd.toISOString() }).eq('id', companyId);
     await fetchData();
+    showToast('تم تجديد الاشتراك', 'success');
   };
 
   const deleteCompany = async (companyId: number) => {
-    // Soft delete company and users
     await supabase.from('companies').update({ is_active: false }).eq('id', companyId);
     await supabase.from('users').update({ is_active: false }).eq('company_id', companyId);
     await fetchData();
+    showToast('تم حذف الشركة بنجاح', 'success');
   };
 
   const toggleCompanyStatus = async (companyId: number) => {
@@ -270,6 +286,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (company) {
         await supabase.from('companies').update({ is_active: !company.is_active }).eq('id', companyId);
         await fetchData();
+        showToast(company.is_active ? 'تم إيقاف الشركة' : 'تم تنشيط الشركة', 'info');
     }
   };
 
@@ -285,6 +302,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
     }
     await fetchData();
+    showToast('تم تحديث الأسعار', 'success');
   };
 
   const addEmployee = async (companyId: number, fullName: string, username: string, pass: string) => {
@@ -309,9 +327,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             sdg_balance: 0
         });
         await fetchData();
+        showToast('تم إضافة الموظف بنجاح', 'success');
         return { success: true, message: 'تم إضافة الموظف بنجاح' };
     }
-    return { success: false, message: 'حدث خطأ أثناء الإضافة: ' + (error?.message || '') };
+    return { success: false, message: 'حدث خطأ: ' + (error?.message || '') };
   };
 
   const updateEmployee = async (userId: number, data: { full_name: string; username: string }) => {
@@ -324,17 +343,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       await supabase.from('users').update(data).eq('id', userId);
       await fetchData();
-      return { success: true, message: 'تم تحديث بيانات الموظف بنجاح' };
+      showToast('تم تحديث بيانات الموظف', 'success');
+      return { success: true, message: 'تم التحديث بنجاح' };
   };
 
   const updateEmployeePassword = async (userId: number, newPass: string) => {
     await supabase.from('users').update({ password: newPass }).eq('id', userId);
     await fetchData();
+    showToast('تم تغيير كلمة المرور', 'success');
   };
 
   const deleteEmployee = async (userId: number) => {
     await supabase.from('users').update({ is_active: false }).eq('id', userId);
     await fetchData();
+    showToast('تم حذف الموظف', 'success');
   };
 
   // --- OPERATIONS ---
@@ -346,7 +368,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     amount: number, 
     receipt: string
   ) => {
-    // 1. Validate
     const rateData = exchangeRates.find(r => r.company_id === companyId);
     if (!rateData) return { success: false, message: 'لم يتم تحديد أسعار الصرف' };
 
@@ -372,10 +393,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
        toAmount = calcAmount;
 
        if (empTreasury.egp_balance < toAmount) {
-           return { success: false, message: `رصيد المصري (EGP) لديك غير كافي لإعطاء العميل.` };
+           return { success: false, message: `رصيد المصري غير كافي` };
        }
        
-       // Update Treasury
        await supabase.from('treasuries').update({
            sdg_balance: empTreasury.sdg_balance + amount,
            egp_balance: empTreasury.egp_balance - toAmount
@@ -386,7 +406,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toAmount = amount * exchangeRate;
 
         if (empTreasury.sdg_balance < toAmount) {
-            return { success: false, message: `رصيد السوداني (SDG) لديك غير كافي لإعطاء العميل.` };
+            return { success: false, message: `رصيد السوداني غير كافي` };
         }
 
         await supabase.from('treasuries').update({
@@ -395,7 +415,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }).eq('id', empTreasury.id);
     }
 
-    // Insert Transaction
     const { data: newTx, error } = await supabase.from('transactions').insert({
         company_id: companyId,
         employee_id: employeeId,
@@ -410,9 +429,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         is_wholesale: isWholesale
     }).select().single();
 
-    if (error) return { success: false, message: 'فشل تسجيل العملية: ' + error.message };
+    if (error) return { success: false, message: 'فشل العملية' };
 
     await fetchData();
+    showToast('تمت عملية الصرف بنجاح', 'success');
     return { success: true, message: 'تمت العملية بنجاح', transaction: newTx };
   };
 
@@ -426,6 +446,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         is_active: true
     });
     await fetchData();
+    showToast('تم إضافة التاجر', 'success');
   };
 
   const addMerchantEntry = async (merchantId: number, type: 'credit' | 'debit', currency: 'EGP' | 'SDG', amount: number) => {
@@ -448,6 +469,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               created_at: new Date().toISOString()
           });
           await fetchData();
+          showToast('تم تسجيل القيد', 'success');
       }
   };
 
@@ -461,11 +483,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           is_active: true
       });
       await fetchData();
+      showToast('تم إضافة المحفظة', 'success');
   };
 
   const deleteEWallet = async (id: number) => {
       await supabase.from('e_wallets').update({ is_active: false }).eq('id', id);
       await fetchData();
+      showToast('تم حذف المحفظة', 'success');
   };
 
   const feedEWallet = async (walletId: number, amount: number) => {
@@ -474,20 +498,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const mainTreasury = treasuries.find(t => t.company_id === wallet.company_id && !t.employee_id);
     if (!mainTreasury || mainTreasury.egp_balance < amount) {
-        return { success: false, message: 'رصيد الخزينة الرئيسية (EGP) غير كافي' };
+        return { success: false, message: 'رصيد الخزينة الرئيسية غير كافي' };
     }
 
-    // Deduct from Main
     await supabase.from('treasuries').update({
         egp_balance: mainTreasury.egp_balance - amount
     }).eq('id', mainTreasury.id);
 
-    // Add to Wallet
     await supabase.from('e_wallets').update({
         balance: wallet.balance + amount
     }).eq('id', walletId);
 
-    // Record Transaction
     await supabase.from('transactions').insert({
         company_id: wallet.company_id,
         type: 'wallet_feed',
@@ -499,6 +520,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     await fetchData();
+    showToast('تم تغذية المحفظة بنجاح', 'success');
     return { success: true, message: 'تم تغذية المحفظة بنجاح' };
   };
 
@@ -514,15 +536,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const commission = amount * (commissionRate / 100);
 
       if (wallet.balance < amount) {
-          return { success: false, message: `رصيد المحفظة (${wallet.balance} EGP) غير كافي` };
+          return { success: false, message: `رصيد المحفظة غير كافي` };
       }
 
-      // Deduct from Wallet
       await supabase.from('e_wallets').update({
           balance: wallet.balance - amount
       }).eq('id', walletId);
 
-      // Record Transaction
       const { data: newTx, error } = await supabase.from('transactions').insert({
           company_id: user.company_id!,
           employee_id: wallet.employee_id,
@@ -541,6 +561,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (error) return { success: false, message: error.message };
 
       await fetchData();
+      showToast('تم التحويل بنجاح', 'success');
       return { success: true, message: 'تم التحويل بنجاح', transaction: newTx };
   };
 
@@ -557,16 +578,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (!mainTreasury) return { success: false, message: 'الخزينة الرئيسية غير موجودة' };
 
-      // Validation
       if (type === 'feed' && target === 'employee') {
           if (mainTreasury[balanceKey] < amount) {
               return { success: false, message: 'رصيد الخزينة الرئيسية غير كافي' };
           }
       }
 
-      // Execution Logic
       if (type === 'feed' && target === 'employee') {
-          // Main -> Employee
           const empT = treasuries.find(t => t.employee_id === employeeId);
           if (empT) {
              await supabase.from('treasuries').update({ [balanceKey]: mainTreasury[balanceKey] - amount }).eq('id', mainTreasury.id);
@@ -574,7 +592,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
       } 
       else if (type === 'withdraw' && target === 'employee') {
-          // Employee -> Main
           const empT = treasuries.find(t => t.employee_id === employeeId);
           if (empT) {
               if (empT[balanceKey] < amount) return { success: false, message: 'رصيد الموظف غير كافي' };
@@ -583,11 +600,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
       }
       else if (type === 'feed' && target === 'main') {
-          // External -> Main
           await supabase.from('treasuries').update({ [balanceKey]: mainTreasury[balanceKey] + amount }).eq('id', mainTreasury.id);
       }
       else if (type === 'withdraw' && target === 'main') {
-          // Main -> External
           if (mainTreasury[balanceKey] < amount) return { success: false, message: 'رصيد الخزينة غير كافي' };
           await supabase.from('treasuries').update({ [balanceKey]: mainTreasury[balanceKey] - amount }).eq('id', mainTreasury.id);
       }
@@ -611,10 +626,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (error) return { success: false, message: error.message };
 
       await fetchData();
+      showToast('تم تنفيذ العملية بنجاح', 'success');
       return { success: true, message: 'تم تنفيذ العملية بنجاح', transaction: newTx };
   };
 
-  // Database Backup (Export)
   const exportDatabase = () => {
     const data = {
         companies, users, treasuries, exchangeRates, transactions, merchants, merchantEntries, eWallets
@@ -629,6 +644,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    showToast('تم تحميل النسخة الاحتياطية', 'info');
   };
 
   const importDatabase = async (_jsonString: string) => {
@@ -638,6 +654,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <StoreContext.Provider value={{
       currentUser, companies, users, treasuries, exchangeRates, transactions, merchants, merchantEntries, eWallets,
+      toast, showToast, hideToast,
       login, logout, addCompany, updateCompany, renewSubscription, deleteCompany, toggleCompanyStatus, updateExchangeRate, 
       addEmployee, updateEmployee, updateEmployeePassword, deleteEmployee,
       performExchange, addMerchant, addMerchantEntry, addEWallet, deleteEWallet, performEWalletTransfer, manageTreasury, feedEWallet,
