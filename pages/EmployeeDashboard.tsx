@@ -44,11 +44,11 @@ const EmployeeDashboard: React.FC = () => {
         <div className="grid grid-cols-2 gap-4">
             <div className="p-3 bg-blue-50 rounded-xl">
                 <p className="text-xs text-blue-400 mb-1">مصري (EGP)</p>
-                <p className="text-xl font-bold text-blue-700">{myTreasury?.egp_balance.toLocaleString()}</p>
+                <p className="text-xl font-bold text-blue-700">{myTreasury?.egp_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
             </div>
             <div className="p-3 bg-emerald-50 rounded-xl">
                 <p className="text-xs text-emerald-400 mb-1">سوداني (SDG)</p>
-                <p className="text-xl font-bold text-emerald-700">{myTreasury?.sdg_balance.toLocaleString()}</p>
+                <p className="text-xl font-bold text-emerald-700">{myTreasury?.sdg_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
             </div>
         </div>
         
