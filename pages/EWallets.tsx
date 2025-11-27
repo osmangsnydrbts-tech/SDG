@@ -134,6 +134,7 @@ const EWallets: React.FC = () => {
                     <form onSubmit={handleFeed} className="space-y-3">
                         <input 
                             type="number" 
+                            inputMode="decimal"
                             placeholder="المبلغ (EGP)" 
                             value={amount} 
                             onChange={e => setAmount(e.target.value)} 
