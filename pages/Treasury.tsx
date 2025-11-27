@@ -187,6 +187,7 @@ const Treasury: React.FC = () => {
                           </div>
                           <input 
                               type="number" 
+                              inputMode="decimal"
                               value={amount}
                               onChange={(e) => setAmount(e.target.value)}
                               className="w-full pr-12 pl-4 py-4 text-2xl font-bold border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
