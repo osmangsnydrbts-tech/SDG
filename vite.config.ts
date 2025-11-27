@@ -5,4 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: '/', // مهم جداً لضمان تحميل الملفات بشكل صحيح
+  build: {
+    chunkSizeWarningLimit: 1600,
+  },
 })
