@@ -172,26 +172,26 @@ const AdminDashboard: React.FC = () => {
                     <div className="grid grid-cols-2 gap-2">
                         <div>
                             <label className="text-xs text-gray-500">سوداني {'->'} مصري</label>
-                            <input type="number" step="0.1" value={sdRate} onChange={e => setSdRate(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
+                            <input type="number" step="0.1" inputMode="decimal" value={sdRate} onChange={e => setSdRate(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
                         </div>
                         <div>
                             <label className="text-xs text-gray-500">مصري {'->'} سوداني</label>
-                            <input type="number" step="0.1" value={egRate} onChange={e => setEgRate(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
+                            <input type="number" step="0.1" inputMode="decimal" value={egRate} onChange={e => setEgRate(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
                         </div>
                     </div>
                     
                     <div className="pt-2 border-t">
                         <label className="text-xs text-blue-600 font-bold">سعر الجملة</label>
-                        <input type="number" step="0.1" value={wholesale} onChange={e => setWholesale(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
+                        <input type="number" step="0.1" inputMode="decimal" value={wholesale} onChange={e => setWholesale(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
                     </div>
                     <div>
                         <label className="text-xs text-blue-600 font-bold">حد الجملة (EGP)</label>
-                        <input type="number" value={threshold} onChange={e => setThreshold(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
+                        <input type="number" inputMode="decimal" value={threshold} onChange={e => setThreshold(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
                     </div>
 
                     <div className="pt-2 border-t">
                         <label className="text-xs text-pink-600 font-bold flex items-center gap-1"><Percent size={12}/> عمولة المحفظة (%)</label>
-                        <input type="number" step="0.1" value={commission} onChange={e => setCommission(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" placeholder="مثال: 1.0" />
+                        <input type="number" step="0.1" inputMode="decimal" value={commission} onChange={e => setCommission(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" placeholder="مثال: 1.0" />
                     </div>
 
                     <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold mt-2">حفظ التغييرات</button>
@@ -209,7 +209,7 @@ const AdminDashboard: React.FC = () => {
                 <form onSubmit={handleAddEmployee} className="space-y-3">
                     <input type="text" placeholder="الاسم الكامل" value={empName} onChange={e => setEmpName(e.target.value)} className="w-full p-3 border rounded-lg" required />
                     <input type="text" placeholder="اسم المستخدم" value={empUser} onChange={e => setEmpUser(e.target.value)} className="w-full p-3 border rounded-lg" required />
-                    <input type="password" placeholder="كلمة المرور" value={empPass} onChange={e => setEmpPass(e.target.value)} className="w-full p-3 border rounded-lg" required />
+                    <input type="password" inputMode="numeric" placeholder="كلمة المرور (أرقام)" value={empPass} onChange={e => setEmpPass(e.target.value)} className="w-full p-3 border rounded-lg" required />
                     {error && <p className="text-red-500 text-xs">{error}</p>}
                     <button className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold mt-2">إضافة</button>
                     <button type="button" onClick={() => setShowEmpModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
@@ -264,7 +264,8 @@ const AdminDashboard: React.FC = () => {
                                 <div className="mt-3 flex gap-2 border-t pt-2">
                                     <input 
                                         type="text" 
-                                        placeholder="كلمة المرور الجديدة" 
+                                        inputMode="numeric"
+                                        placeholder="كلمة المرور الجديدة (أرقام)" 
                                         className="flex-1 p-2 border rounded-lg text-sm"
                                         value={newPass}
                                         onChange={e => setNewPass(e.target.value)}
