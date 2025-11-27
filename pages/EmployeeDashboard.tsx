@@ -1,17 +1,24 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRightLeft, Wallet, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import ReceiptModal from '../components/ReceiptModal';
+import { Transaction } from '../types';
 
 const EmployeeDashboard: React.FC = () => {
-  const { currentUser, treasuries, transactions } = useStore();
+  const { currentUser, treasuries, transactions, companies, users } = useStore();
   const navigate = useNavigate();
+  const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
 
   const myTreasury = treasuries.find(t => t.employee_id === currentUser?.id);
   const myTransactions = transactions
     .filter(t => t.employee_id === currentUser?.id)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 5);
+
+  const getCompany = (companyId: number) => companies.find(c => c.id === companyId);
+  const getEmployee = (empId?: number) => users.find(u => u.id === empId);
 
   return (
     <div className="space-y-6">
@@ -50,7 +57,11 @@ const EmployeeDashboard: React.FC = () => {
           <h3 className="font-bold text-gray-800 mb-3">آخر العمليات</h3>
           <div className="space-y-3">
               {myTransactions.map(t => (
-                  <div key={t.id} className="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center">
+                  <div 
+                    key={t.id} 
+                    onClick={() => setViewTransaction(t)}
+                    className="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center cursor-pointer hover:bg-gray-50 transition active:scale-95"
+                  >
                       <div className="flex items-center gap-3">
                           <div className={`p-2 rounded-full ${t.from_currency === 'SDG' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
                               {t.from_currency === 'SDG' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
@@ -69,6 +80,15 @@ const EmployeeDashboard: React.FC = () => {
               {myTransactions.length === 0 && <p className="text-center text-gray-400 text-sm">لا توجد عمليات اليوم</p>}
           </div>
       </div>
+
+      {viewTransaction && (
+        <ReceiptModal 
+            transaction={viewTransaction} 
+            company={getCompany(viewTransaction.company_id)} 
+            employee={getEmployee(viewTransaction.employee_id)} 
+            onClose={() => setViewTransaction(null)} 
+        />
+      )}
     </div>
   );
 };
