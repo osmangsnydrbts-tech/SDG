@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Plus, User, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
@@ -82,7 +83,7 @@ const Merchants: React.FC = () => {
                     <h3 className="font-bold mb-4">إضافة تاجر</h3>
                     <form onSubmit={handleAddMerchant} className="space-y-3">
                         <input type="text" placeholder="اسم التاجر" value={name} onChange={e => setName(e.target.value)} className="w-full p-3 border rounded-lg" required />
-                        <input type="text" placeholder="رقم الهاتف (اختياري)" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-3 border rounded-lg" />
+                        <input type="tel" placeholder="رقم الهاتف (اختياري)" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-3 border rounded-lg" />
                         <button className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold mt-2">حفظ</button>
                         <button type="button" onClick={() => setShowAddModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                     </form>
@@ -108,7 +109,7 @@ const Merchants: React.FC = () => {
                             <option value="EGP">EGP</option>
                             <option value="SDG">SDG</option>
                         </select>
-                        <input type="number" placeholder="المبلغ" value={amount} onChange={e => setAmount(e.target.value)} className="w-full p-3 border rounded-lg text-lg font-bold" required />
+                        <input type="number" inputMode="decimal" placeholder="المبلغ" value={amount} onChange={e => setAmount(e.target.value)} className="w-full p-3 border rounded-lg text-lg font-bold" required />
                         <button className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold mt-2">تسجيل</button>
                         <button type="button" onClick={() => setShowEntryModal(null)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                     </form>
