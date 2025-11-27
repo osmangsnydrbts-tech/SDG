@@ -3,6 +3,7 @@ import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, Home, ArrowRightLeft, Landmark, BarChart3, Building, Smartphone } from 'lucide-react';
+import Toast from './Toast';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -10,7 +11,7 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, title }) => {
-  const { currentUser, logout, companies } = useStore();
+  const { currentUser, logout, companies, toast, hideToast } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -19,7 +20,6 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
     navigate('/login');
   };
 
-  // Get current company logo if user is admin or employee
   const currentCompany = currentUser?.company_id 
     ? companies.find(c => c.id === currentUser.company_id) 
     : null;
@@ -39,6 +39,15 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Toast Notification */}
+      {toast && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={hideToast} 
+        />
+      )}
+
       {/* Header */}
       <header className="bg-blue-600 text-white shadow-lg sticky top-0 z-10">
         <div className="flex justify-between items-center p-4">
@@ -77,7 +86,6 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
             <>
               <NavItem to="/admin" icon={Home} label="الرئيسية" />
               <NavItem to="/admin/treasury" icon={Landmark} label="الخزينة" />
-              {/* Removed Exchange Link for Admin */}
               <NavItem to="/reports" icon={BarChart3} label="التقارير" />
             </>
           )}
