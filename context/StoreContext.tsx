@@ -277,10 +277,41 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteCompany = async (companyId: number) => {
-    await supabase.from('companies').update({ is_active: false }).eq('id', companyId);
-    await supabase.from('users').update({ is_active: false }).eq('company_id', companyId);
-    await fetchData();
-    showToast('تم حذف الشركة بنجاح', 'success');
+    try {
+        // Hard Delete Strategy: Delete ALL dependencies first
+        
+        // 1. Delete Merchant Entries (Must delete before merchants)
+        await supabase.from('merchant_entries').delete().eq('company_id', companyId);
+
+        // 2. Delete Transactions (References users, e_wallets, companies)
+        await supabase.from('transactions').delete().eq('company_id', companyId);
+
+        // 3. Delete Treasuries (References users, companies)
+        await supabase.from('treasuries').delete().eq('company_id', companyId);
+
+        // 4. Delete E-Wallets (References users, companies)
+        await supabase.from('e_wallets').delete().eq('company_id', companyId);
+
+        // 5. Delete Merchants (References companies)
+        await supabase.from('merchants').delete().eq('company_id', companyId);
+
+        // 6. Delete Exchange Rates (References companies)
+        await supabase.from('exchange_rates').delete().eq('company_id', companyId);
+
+        // 7. Delete Users (References companies)
+        await supabase.from('users').delete().eq('company_id', companyId);
+
+        // 8. Finally, Delete Company
+        const { error } = await supabase.from('companies').delete().eq('id', companyId);
+
+        if (error) throw error;
+
+        await fetchData();
+        showToast('تم حذف الشركة وجميع بياناتها نهائياً', 'success');
+    } catch (error) {
+        console.error('Failed to delete company:', error);
+        showToast('حدث خطأ أثناء حذف الشركة', 'error');
+    }
   };
 
   const toggleCompanyStatus = async (companyId: number) => {
