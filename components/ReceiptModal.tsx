@@ -23,23 +23,29 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     setIsSharing(true);
 
     try {
-      // Wait a moment to ensure UI is fully rendered and stable
+      // Wait a moment to ensure UI is fully rendered
       await new Promise(resolve => setTimeout(resolve, 200));
 
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
-        scale: 2, // Good balance between quality and performance
-        useCORS: true, // Essential for loading images (logos)
+        scale: 2,
+        useCORS: true,
         logging: false,
         allowTaint: true,
-        scrollY: -window.scrollY, // Fixes issues where content is cut off if page is scrolled
+        scrollY: -window.scrollY,
         windowWidth: element.scrollWidth,
         windowHeight: element.scrollHeight,
         x: 0,
-        y: 0
+        y: 0,
+        // Force font rendering optimization
+        onclone: (clonedDoc) => {
+            const clonedElement = clonedDoc.getElementById('receipt-content');
+            if (clonedElement) {
+                clonedElement.style.transform = 'none';
+            }
+        }
       });
 
-      // Generate blob with high quality jpeg
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
 
       if (blob) {
@@ -47,7 +53,6 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
         const file = new File([blob], fileName, { type: 'image/jpeg' });
         let shared = false;
         
-        // Try native sharing first (Mobile)
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
@@ -61,7 +66,6 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
           }
         } 
 
-        // Fallback to download if sharing failed or not supported
         if (!shared) {
           const link = document.createElement('a');
           link.href = URL.createObjectURL(blob);
@@ -73,7 +77,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
       }
     } catch (error) {
       console.error('Error generating image', error);
-      alert('حدث خطأ أثناء إنشاء الصورة. يرجى المحاولة مرة أخرى.');
+      alert('حدث خطأ أثناء إنشاء الصورة.');
     } finally {
       setIsSharing(false);
     }
@@ -100,19 +104,16 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
       <div className="w-full max-w-md my-auto">
         
         {/* Printable Area */}
-        <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative">
+        <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative" dir="rtl">
           
-          {/* 1. Header: Logo & Company Name - Optimized Layout for HTML2Canvas */}
+          {/* 1. Header: Logo & Company Name */}
           <div className="bg-gray-50 p-6 border-b border-gray-100 flex flex-col items-center justify-center text-center">
-            <div className="flex flex-row-reverse items-center justify-center gap-3 w-full flex-nowrap">
-                <h2 className="text-xl font-extrabold text-gray-800 text-right whitespace-nowrap overflow-visible">
-                  {company.name}
-                </h2>
+            <div className="flex flex-row items-center justify-center gap-3 w-full">
                 {company.logo ? (
                   <img 
                     src={company.logo} 
                     alt="Logo" 
-                    className="h-14 w-14 object-contain rounded-lg bg-white border border-gray-200 p-0.5 shrink-0" 
+                    className="h-16 w-16 object-contain rounded-lg bg-white border border-gray-200 p-0.5 shrink-0" 
                     crossOrigin="anonymous" 
                   />
                 ) : (
@@ -120,8 +121,12 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
                      {company.name.charAt(0)}
                   </div>
                 )}
+                
+                <h2 className="text-xl font-extrabold text-gray-800 leading-tight whitespace-nowrap overflow-visible pb-1 pt-1 px-1" style={{ maxWidth: '70%' }}>
+                  {company.name}
+                </h2>
             </div>
-            <p className="text-gray-400 text-xs mt-3 font-medium tracking-wide">إشعار معاملة مالية</p>
+            <p className="text-gray-500 text-sm mt-3 font-bold tracking-wide bg-gray-200/50 px-3 py-1 rounded-full">إشعار معاملة مالية</p>
           </div>
 
           {/* 2. Receipt Content */}
@@ -129,9 +134,12 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             
             {/* Status & Type */}
             <div className="text-center border-b border-dashed border-gray-200 pb-4">
-               <h3 className="text-lg font-bold text-blue-700 mb-1">{getTransactionType(transaction)}</h3>
-               <p className="text-xs text-gray-500">رقم الإشعار: <span className="font-mono font-bold text-gray-700 text-sm">{transaction.receipt_number || `#${transaction.id}`}</span></p>
-               <p className="text-xs text-gray-500 mt-1" dir="ltr">
+               <h3 className="text-xl font-bold text-blue-700 mb-1">{getTransactionType(transaction)}</h3>
+               <div className="flex items-center justify-center gap-2 text-gray-500 mt-1">
+                 <span className="text-xs">رقم الإشعار:</span>
+                 <span className="font-mono font-bold text-gray-800 text-sm tracking-wider">{transaction.receipt_number || `#${transaction.id}`}</span>
+               </div>
+               <p className="text-xs text-gray-400 mt-1" dir="ltr">
                   {new Date(transaction.created_at).toLocaleDateString('ar-EG')} - {new Date(transaction.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
                </p>
             </div>
@@ -140,26 +148,26 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             <div className="space-y-3 text-sm">
               
               {/* Amount Received */}
-              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span className="text-gray-600 font-medium">المبلغ المستلم من العميل</span>
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <span className="text-gray-600 font-bold">المبلغ المستلم من العميل</span>
                 <span className="font-bold text-gray-900 text-lg" dir="ltr">
                   {formatAmount(transaction.from_amount)} {transaction.from_currency}
                 </span>
               </div>
 
-              {/* Exchange Rate (Only for Exchange) */}
+              {/* Exchange Rate */}
               {transaction.type === 'exchange' && transaction.rate && (
-                <div className="flex justify-between items-center px-2">
-                  <span className="text-gray-500">سعر الصرف</span>
-                  <span className="font-bold text-gray-800">{transaction.rate}</span>
+                <div className="flex justify-between items-center px-2 py-1">
+                  <span className="text-gray-500 font-medium">سعر الصرف</span>
+                  <span className="font-bold text-gray-800 text-base">{transaction.rate}</span>
                 </div>
               )}
 
               {/* Amount Delivered */}
               {transaction.to_amount && (
-                <div className="flex justify-between items-center p-4 bg-blue-600 rounded-lg shadow-sm text-white">
-                  <span className="text-blue-100 font-bold">المبلغ المسلم للعميل</span>
-                  <span className="font-extrabold text-2xl" dir="ltr">
+                <div className="flex justify-between items-center p-4 bg-blue-600 rounded-xl shadow-sm text-white mt-2">
+                  <span className="text-blue-100 font-bold text-base">المبلغ المسلم للعميل</span>
+                  <span className="font-extrabold text-2xl tracking-tight" dir="ltr">
                     {formatAmount(transaction.to_amount)} {transaction.to_currency}
                   </span>
                 </div>
@@ -167,7 +175,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
 
               {/* Commission */}
               {transaction.commission && transaction.commission > 0 && (
-                 <div className="flex justify-between items-center px-2 pt-1">
+                 <div className="flex justify-between items-center px-3 pt-1">
                   <span className="text-gray-500">العمولة</span>
                   <span className="font-bold text-red-500">{transaction.commission.toLocaleString()} EGP</span>
                 </div>
@@ -176,12 +184,12 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
 
             {/* 3. Footer: Employee Info */}
             <div className="pt-6 mt-2 border-t border-gray-100">
-              <div className="flex justify-between items-center text-xs text-gray-500 mb-4">
+              <div className="flex justify-between items-center text-xs text-gray-500 mb-4 px-1">
                 <span>الموظف المسؤول:</span>
-                <span className="font-bold text-gray-700">{employee?.full_name}</span>
+                <span className="font-bold text-gray-700 text-sm">{employee?.full_name}</span>
               </div>
-              <div className="text-center text-xs text-gray-400 font-light">
-                 شكراً لتعاملكم معنا
+              <div className="text-center text-xs text-gray-400 font-medium">
+                 شكراً لثقتكم بنا
               </div>
             </div>
           </div>
@@ -201,12 +209,12 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             {isSharing ? (
               <>
                 <Loader2 size={20} className="animate-spin" />
-                <span>جاري إنشاء الصورة...</span>
+                <span>جاري المعالجة...</span>
               </>
             ) : (
               <>
                 <Share2 size={20} />
-                <span>مشاركة الإشعار (صورة)</span>
+                <span>مشاركة الإشعار</span>
               </>
             )}
           </button>
