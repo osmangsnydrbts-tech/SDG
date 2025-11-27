@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Transaction, Company, User } from '../types';
-import { X, Share2, Download } from 'lucide-react';
+import { X, Share2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface ReceiptModalProps {
