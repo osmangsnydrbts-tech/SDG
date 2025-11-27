@@ -124,6 +124,7 @@ const Exchange: React.FC = () => {
             <label className="block text-sm font-bold text-gray-700 mb-1">المبلغ المراد صرفه</label>
             <input 
               type="number" 
+              inputMode="decimal"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="w-full p-4 text-lg font-bold border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -143,7 +144,8 @@ const Exchange: React.FC = () => {
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">رقم الإشعار</label>
             <input 
-              type="text" 
+              type="text"
+              inputMode="numeric"
               value={receipt}
               onChange={(e) => setReceipt(e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-xl"
