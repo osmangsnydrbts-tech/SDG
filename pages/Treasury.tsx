@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { ArrowDownCircle, ArrowUpCircle, AlertCircle, CheckCircle2, UserCheck, Banknote } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, AlertCircle, CheckCircle2, UserCheck, Banknote, Loader2 } from 'lucide-react';
 
 const Treasury: React.FC = () => {
   const { currentUser, treasuries, users, manageTreasury } = useStore();
@@ -16,6 +16,7 @@ const Treasury: React.FC = () => {
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<'EGP' | 'SDG'>('EGP');
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Get Main Treasury
   const mainTreasury = treasuries.find(t => t.company_id === currentUser?.company_id && !t.employee_id);
@@ -30,34 +31,43 @@ const Treasury: React.FC = () => {
       setShowModal(action === 'feed' ? 'deposit' : 'withdraw');
       setMessage(null);
       setAmount('');
+      setIsLoading(false);
   };
 
   const handleAction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser?.company_id) return;
+    if (!currentUser?.company_id || isLoading) return;
     setMessage(null);
+    setIsLoading(true);
 
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) {
         setMessage({ type: 'error', text: 'يرجى إدخال مبلغ صحيح' });
+        setIsLoading(false);
         return;
     }
 
-    const res = await manageTreasury(
-        modalActionType,
-        modalTargetType,
-        currentUser.company_id,
-        currency,
-        numericAmount,
-        selectedEmployee || undefined
-    );
-    
-    if (res.success) {
-        setMessage({ type: 'success', text: res.message });
-        setAmount('');
-        setTimeout(() => setShowModal(false), 1500);
-    } else {
-        setMessage({ type: 'error', text: res.message });
+    try {
+        const res = await manageTreasury(
+            modalActionType,
+            modalTargetType,
+            currentUser.company_id,
+            currency,
+            numericAmount,
+            selectedEmployee || undefined
+        );
+        
+        if (res.success) {
+            setMessage({ type: 'success', text: res.message });
+            setAmount('');
+            setTimeout(() => setShowModal(false), 1500);
+        } else {
+            setMessage({ type: 'error', text: res.message });
+        }
+    } catch (err) {
+        setMessage({ type: 'error', text: 'حدث خطأ غير متوقع' });
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -208,8 +218,18 @@ const Treasury: React.FC = () => {
                         </div>
                       )}
 
-                      <button className={`w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg ${modalActionType === 'feed' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>
-                          تأكيد {modalActionType === 'feed' ? 'الإيداع' : 'السحب'}
+                      <button 
+                        disabled={isLoading}
+                        className={`w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg flex items-center justify-center gap-2 ${modalActionType === 'feed' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} ${isLoading ? 'opacity-75 cursor-wait' : ''}`}
+                      >
+                          {isLoading ? (
+                              <>
+                                <Loader2 size={24} className="animate-spin" />
+                                جاري المعالجة...
+                              </>
+                          ) : (
+                              `تأكيد ${modalActionType === 'feed' ? 'الإيداع' : 'السحب'}`
+                          )}
                       </button>
                   </form>
               </div>
