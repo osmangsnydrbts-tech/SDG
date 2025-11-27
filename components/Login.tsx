@@ -78,6 +78,7 @@ const Login: React.FC = () => {
                 name="password"
                 autoComplete="current-password"
                 type="password"
+                inputMode="numeric"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-3 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
@@ -149,7 +150,7 @@ const Login: React.FC = () => {
               </div>
               
               <div className="text-xs text-gray-400 pt-4 border-t">
-                ExchangeFlow System v1.0
+                نظام الصرفة v1.0
               </div>
             </div>
           </div>
