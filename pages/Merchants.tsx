@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Plus, User, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Plus, User, ArrowUpRight, ArrowDownLeft, Trash2 } from 'lucide-react';
 
 const Merchants: React.FC = () => {
-  const { currentUser, merchants, addMerchant, addMerchantEntry } = useStore();
+  const { currentUser, merchants, addMerchant, addMerchantEntry, deleteMerchant } = useStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEntryModal, setShowEntryModal] = useState<number | null>(null);
 
@@ -37,6 +37,14 @@ const Merchants: React.FC = () => {
       }
   };
 
+  const handleDeleteMerchant = (id: number) => {
+      if (window.confirm('هل أنت متأكد من حذف هذا التاجر؟')) {
+          deleteMerchant(id);
+      }
+  };
+
+  const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   return (
     <div className="space-y-4">
         <button onClick={() => setShowAddModal(true)} className="w-full bg-indigo-600 text-white p-3 rounded-xl flex items-center justify-center gap-2 font-bold shadow-md">
@@ -54,26 +62,32 @@ const Merchants: React.FC = () => {
                                 <p className="text-xs text-gray-500">{m.phone}</p>
                             </div>
                         </div>
-                        <button onClick={() => setShowEntryModal(m.id)} className="text-xs bg-gray-100 px-3 py-1 rounded-lg font-bold hover:bg-gray-200">
-                            تسجيل قيد
-                        </button>
+                        <div className="flex gap-2">
+                            <button onClick={() => setShowEntryModal(m.id)} className="text-xs bg-gray-100 px-3 py-1 rounded-lg font-bold hover:bg-gray-200">
+                                تسجيل قيد
+                            </button>
+                            <button onClick={() => handleDeleteMerchant(m.id)} className="p-1 bg-red-50 text-red-500 rounded-lg hover:bg-red-100">
+                                <Trash2 size={18} />
+                            </button>
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-sm bg-gray-50 p-3 rounded-lg">
                         <div className="flex justify-between">
                             <span className="text-gray-500">مصري</span>
                             <span className={`font-bold ${m.egp_balance < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                {m.egp_balance.toLocaleString()}
+                                {fmt(m.egp_balance)}
                             </span>
                         </div>
                         <div className="flex justify-between border-r pr-2 border-gray-200">
                             <span className="text-gray-500">سوداني</span>
                             <span className={`font-bold ${m.sdg_balance < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                {m.sdg_balance.toLocaleString()}
+                                {fmt(m.sdg_balance)}
                             </span>
                         </div>
                     </div>
                 </div>
             ))}
+            {companyMerchants.length === 0 && <p className="text-center text-gray-500 py-8">لا يوجد تجار</p>}
         </div>
 
         {/* Add Modal */}
