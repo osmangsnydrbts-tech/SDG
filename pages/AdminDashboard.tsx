@@ -2,17 +2,21 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil } from 'lucide-react';
+import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2 } from 'lucide-react';
 import { User } from '../types';
+import html2canvas from 'html2canvas';
 
 const AdminDashboard: React.FC = () => {
-  const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee } = useStore();
+  const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies } = useStore();
   const navigate = useNavigate();
   const rateData = exchangeRates.find(r => r.company_id === currentUser?.company_id);
+  const company = companies.find(c => c.id === currentUser?.company_id);
 
   const [showRateModal, setShowRateModal] = useState(false);
   const [showEmpModal, setShowEmpModal] = useState(false);
   const [showManageEmpModal, setShowManageEmpModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   
   // States for sub-modals in Manage Employees
   const [editPassId, setEditPassId] = useState<number | null>(null);
@@ -51,6 +55,56 @@ const AdminDashboard: React.FC = () => {
             ewallet_commission: commission
         });
         setShowRateModal(false);
+    }
+  };
+
+  const handleShareRates = async () => {
+    const element = document.getElementById('rate-card-content');
+    if (!element || isSharing) return;
+
+    setIsSharing(true);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        allowTaint: true,
+      });
+
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+
+      if (blob) {
+        const fileName = `rates_${new Date().toISOString().split('T')[0]}.jpg`;
+        const file = new File([blob], fileName, { type: 'image/jpeg' });
+        
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: 'نشرة أسعار الصرف',
+              text: `أسعار الصرف اليوم - ${company?.name}`,
+            });
+          } catch (error) {
+            console.warn('Sharing cancelled', error);
+          }
+        } else {
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء المشاركة');
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -109,7 +163,12 @@ const AdminDashboard: React.FC = () => {
     <div className="space-y-6">
       <div className="bg-blue-600 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
         <div className="relative z-10">
-          <p className="text-blue-200 mb-1">أسعار الصرف الحالية</p>
+          <div className="flex justify-between items-start mb-2">
+             <p className="text-blue-200">أسعار الصرف الحالية</p>
+             <button onClick={() => setShowShareModal(true)} className="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
+                 <Share2 size={20} />
+             </button>
+          </div>
           <div className="flex justify-between items-end">
             <div>
               <span className="text-3xl font-bold block">{rateData?.sd_to_eg_rate}</span>
@@ -162,6 +221,59 @@ const AdminDashboard: React.FC = () => {
             color="bg-pink-600" 
         />
       </div>
+
+      {/* Share Rate Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+            <div className="w-full max-w-sm">
+                <div id="rate-card-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                    <div className="bg-blue-600 p-6 text-white text-center">
+                        {company?.logo && <img src={company.logo} alt="Logo" className="h-16 w-16 mx-auto bg-white rounded-lg p-1 object-contain mb-3" crossOrigin="anonymous"/>}
+                        <h2 className="text-2xl font-bold">{company?.name}</h2>
+                        <p className="text-blue-200 text-sm mt-1">نشرة أسعار الصرف اليومية</p>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span className="text-gray-500 font-medium">سوداني {'->'} مصري</span>
+                            <span className="text-3xl font-bold text-gray-800">{rateData?.sd_to_eg_rate}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span className="text-gray-500 font-medium">مصري {'->'} سوداني</span>
+                            <span className="text-3xl font-bold text-gray-800">{rateData?.eg_to_sd_rate}</span>
+                        </div>
+                        
+                        <div className="border-t pt-4 mt-2">
+                            <div className="flex justify-between text-sm mb-2">
+                                <span className="text-gray-500">سعر الجملة</span>
+                                <span className="font-bold text-blue-600">{rateData?.wholesale_rate}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-500">أقل كمية للجملة</span>
+                                <span className="font-bold text-gray-800">{rateData?.wholesale_threshold.toLocaleString()} EGP</span>
+                            </div>
+                        </div>
+
+                        <div className="text-center text-xs text-gray-400 mt-4 pt-4 border-t">
+                            {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-4 flex gap-3">
+                    <button onClick={() => setShowShareModal(false)} className="bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-50">
+                        <X size={24} />
+                    </button>
+                    <button 
+                        onClick={handleShareRates}
+                        disabled={isSharing}
+                        className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg"
+                    >
+                        {isSharing ? <Loader2 className="animate-spin" size={20} /> : <><Share2 size={20} /> مشاركة النشرة</>}
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
 
       {/* Rate Modal */}
       {showRateModal && (
