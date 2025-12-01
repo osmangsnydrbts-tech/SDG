@@ -34,20 +34,6 @@ const Treasury: React.FC = () => {
     });
   }, []);
 
-  // دالة لتحويل النص المدخل مع الفواصل إلى رقم
-  const parseFormattedAmount = useCallback((value: string): string => {
-    // إزالة الفواصل للتحويل إلى رقم
-    const cleanedValue = value.replace(/,/g, '');
-    
-    // التحقق إذا كان الرقم صالحًا
-    if (cleanedValue === '' || cleanedValue === '.') return cleanedValue;
-    
-    const num = parseFloat(cleanedValue);
-    if (isNaN(num)) return '';
-    
-    return num.toString();
-  }, []);
-
   // معالجة تغيير قيمة المبلغ المدخل
   const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
@@ -74,6 +60,7 @@ const Treasury: React.FC = () => {
     if (amount) {
       const num = parseFloat(amount);
       if (!isNaN(num)) {
+        // تنسيق الرقم بمنزلتين عشريتين
         setAmount(num.toFixed(2));
       }
     }
