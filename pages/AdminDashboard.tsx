@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +16,15 @@ const AdminDashboard: React.FC = () => {
   const [showManageEmpModal, setShowManageEmpModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  
+  // States for loading and operations
+  const [isLoading, setIsLoading] = useState({
+    updateRates: false,
+    addEmployee: false,
+    updateEmployee: false,
+    changePassword: false,
+    deleteEmployee: false
+  });
   
   // States for sub-modals in Manage Employees
   const [editPassId, setEditPassId] = useState<number | null>(null);
@@ -44,17 +52,26 @@ const AdminDashboard: React.FC = () => {
 
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee' && u.is_active);
 
-  const handleUpdateRates = (e: React.FormEvent) => {
+  const handleUpdateRates = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(currentUser?.company_id) {
-        updateExchangeRate(currentUser.company_id, {
-            sd_to_eg_rate: sdRate,
-            eg_to_sd_rate: egRate,
-            wholesale_rate: wholesale,
-            wholesale_threshold: threshold,
-            ewallet_commission: commission
-        });
-        setShowRateModal(false);
+    if(!currentUser?.company_id || isLoading.updateRates) return;
+    
+    setIsLoading(prev => ({...prev, updateRates: true}));
+    
+    try {
+      await updateExchangeRate(currentUser.company_id, {
+        sd_to_eg_rate: sdRate,
+        eg_to_sd_rate: egRate,
+        wholesale_rate: wholesale,
+        wholesale_threshold: threshold,
+        ewallet_commission: commission
+      });
+      setShowRateModal(false);
+    } catch (error) {
+      console.error('Error updating rates:', error);
+      setError('حدث خطأ أثناء تحديث الأسعار');
+    } finally {
+      setIsLoading(prev => ({...prev, updateRates: false}));
     }
   };
 
@@ -109,51 +126,99 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleAddEmployee = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setError('');
-      if(currentUser?.company_id) {
-          const res = await addEmployee(currentUser.company_id, empName, empUser, empPass);
-          if (res.success) {
-            setShowEmpModal(false);
-            setEmpName(''); setEmpUser(''); setEmpPass('');
-          } else {
-            setError(res.message);
-          }
+    e.preventDefault();
+    if(isLoading.addEmployee) return;
+    
+    setError('');
+    if(currentUser?.company_id) {
+      setIsLoading(prev => ({...prev, addEmployee: true}));
+      
+      try {
+        const res = await addEmployee(currentUser.company_id, empName, empUser, empPass);
+        if (res.success) {
+          setShowEmpModal(false);
+          setEmpName(''); 
+          setEmpUser(''); 
+          setEmpPass('');
+        } else {
+          setError(res.message);
+        }
+      } catch (error) {
+        console.error('Error adding employee:', error);
+        setError('حدث خطأ أثناء إضافة الموظف');
+      } finally {
+        setIsLoading(prev => ({...prev, addEmployee: false}));
       }
+    }
   };
 
   const openEditInfo = (user: User) => {
-      setEditInfoId(user);
-      setEditName(user.full_name);
-      setEditUser(user.username);
-      setError('');
+    setEditInfoId(user);
+    setEditName(user.full_name);
+    setEditUser(user.username);
+    setError('');
   };
 
   const handleUpdateInfo = async () => {
-      if (!editInfoId) return;
+    if (!editInfoId || isLoading.updateEmployee) return;
+    
+    setIsLoading(prev => ({...prev, updateEmployee: true}));
+    
+    try {
       const res = await updateEmployee(editInfoId.id, { full_name: editName, username: editUser });
       if (res.success) {
-          setEditInfoId(null);
+        setEditInfoId(null);
       } else {
-          setError(res.message);
+        setError(res.message);
       }
+    } catch (error) {
+      console.error('Error updating employee:', error);
+      setError('حدث خطأ أثناء تحديث بيانات الموظف');
+    } finally {
+      setIsLoading(prev => ({...prev, updateEmployee: false}));
+    }
   };
 
-  const handleChangePassword = (id: number) => {
-      if (newPass.length < 3) return;
-      updateEmployeePassword(id, newPass);
+  const handleChangePassword = async (id: number) => {
+    if (newPass.length < 3 || isLoading.changePassword) return;
+    
+    setIsLoading(prev => ({...prev, changePassword: true}));
+    
+    try {
+      await updateEmployeePassword(id, newPass);
       setEditPassId(null);
       setNewPass('');
+    } catch (error) {
+      console.error('Error changing password:', error);
+      setError('حدث خطأ أثناء تغيير كلمة المرور');
+    } finally {
+      setIsLoading(prev => ({...prev, changePassword: false}));
+    }
   };
 
-  const handleDeleteEmployee = (id: number) => {
-      if (window.confirm('هل أنت متأكد من حذف هذا الموظف؟')) {
-          deleteEmployee(id);
+  const handleDeleteEmployee = async (id: number) => {
+    if (isLoading.deleteEmployee) return;
+    
+    if (window.confirm('هل أنت متأكد من حذف هذا الموظف؟')) {
+      setIsLoading(prev => ({...prev, deleteEmployee: true}));
+      
+      try {
+        await deleteEmployee(id);
+      } catch (error) {
+        console.error('Error deleting employee:', error);
+        setError('حدث خطأ أثناء حذف الموظف');
+      } finally {
+        setIsLoading(prev => ({...prev, deleteEmployee: false}));
       }
+    }
   };
 
-  const QuickAction = ({ icon: Icon, label, onClick, color }: any) => (
-    <button onClick={onClick} className={`${color} text-white p-4 rounded-xl shadow-md flex flex-col items-center justify-center gap-2 active:scale-95 transition`}>
+  const QuickAction = ({ icon: Icon, label, onClick, color, disabled = false }: any) => (
+    <button 
+      onClick={onClick} 
+      disabled={disabled}
+      className={`${color} ${disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'} text-white p-4 rounded-xl shadow-md flex flex-col items-center justify-center gap-2 transition`}
+    >
       <Icon size={28} />
       <span className="font-bold text-sm">{label}</span>
     </button>
@@ -165,7 +230,10 @@ const AdminDashboard: React.FC = () => {
         <div className="relative z-10">
           <div className="flex justify-between items-start mb-2">
              <p className="text-blue-200">أسعار الصرف الحالية</p>
-             <button onClick={() => setShowShareModal(true)} className="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
+             <button 
+               onClick={() => setShowShareModal(true)} 
+               className="bg-white/20 p-2 rounded-full hover:bg-white/30 transition"
+             >
                  <Share2 size={20} />
              </button>
           </div>
@@ -272,7 +340,7 @@ const AdminDashboard: React.FC = () => {
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-blue-200">حد الجملة</span>
-                                <span className="font-bold text-white">{rateData?.wholesale_threshold.toLocaleString()} EGP</span>
+                                <span className="font-bold text-white">{rateData?.wholesale_threshold?.toLocaleString() || 0} EGP</span>
                             </div>
                         </div>
 
@@ -290,7 +358,7 @@ const AdminDashboard: React.FC = () => {
                     <button 
                         onClick={handleShareRatesImage}
                         disabled={isSharing}
-                        className={`flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition ${isSharing ? 'opacity-75' : 'hover:bg-blue-700 active:scale-95'}`}
+                        className={`flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition ${isSharing ? 'opacity-75 cursor-not-allowed' : 'hover:bg-blue-700 active:scale-95'}`}
                     >
                         {isSharing ? (
                             <>
@@ -340,7 +408,20 @@ const AdminDashboard: React.FC = () => {
                         <input type="number" step="0.1" inputMode="decimal" value={commission} onChange={e => setCommission(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" placeholder="مثال: 1.0" />
                     </div>
 
-                    <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold mt-2">حفظ التغييرات</button>
+                    <button 
+                      type="submit"
+                      disabled={isLoading.updateRates}
+                      className={`w-full bg-blue-600 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center gap-2 ${isLoading.updateRates ? 'opacity-75 cursor-not-allowed' : ''}`}
+                    >
+                      {isLoading.updateRates ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          جاري الحفظ...
+                        </>
+                      ) : (
+                        'حفظ التغييرات'
+                      )}
+                    </button>
                     <button type="button" onClick={() => setShowRateModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                 </form>
             </div>
@@ -357,7 +438,20 @@ const AdminDashboard: React.FC = () => {
                     <input type="text" placeholder="اسم المستخدم" value={empUser} onChange={e => setEmpUser(e.target.value)} className="w-full p-3 border rounded-lg" required />
                     <input type="password" inputMode="numeric" placeholder="كلمة المرور (أرقام)" value={empPass} onChange={e => setEmpPass(e.target.value)} className="w-full p-3 border rounded-lg" required />
                     {error && <p className="text-red-500 text-xs">{error}</p>}
-                    <button className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold mt-2">إضافة</button>
+                    <button 
+                      type="submit"
+                      disabled={isLoading.addEmployee}
+                      className={`w-full bg-orange-500 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center gap-2 ${isLoading.addEmployee ? 'opacity-75 cursor-not-allowed' : ''}`}
+                    >
+                      {isLoading.addEmployee ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          جاري الإضافة...
+                        </>
+                      ) : (
+                        'إضافة'
+                      )}
+                    </button>
                     <button type="button" onClick={() => setShowEmpModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                 </form>
             </div>
@@ -382,7 +476,20 @@ const AdminDashboard: React.FC = () => {
                                     <input value={editUser} onChange={e => setEditUser(e.target.value)} className="w-full p-2 border rounded" placeholder="اسم المستخدم" />
                                     {error && <p className="text-red-500 text-xs">{error}</p>}
                                     <div className="flex gap-2">
-                                        <button onClick={handleUpdateInfo} className="bg-green-600 text-white px-3 py-1 rounded text-sm">حفظ</button>
+                                        <button 
+                                          onClick={handleUpdateInfo} 
+                                          disabled={isLoading.updateEmployee}
+                                          className={`bg-green-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1 ${isLoading.updateEmployee ? 'opacity-75 cursor-not-allowed' : ''}`}
+                                        >
+                                          {isLoading.updateEmployee ? (
+                                            <>
+                                              <Loader2 size={12} className="animate-spin" />
+                                              جاري...
+                                            </>
+                                          ) : (
+                                            'حفظ'
+                                          )}
+                                        </button>
                                         <button onClick={() => setEditInfoId(null)} className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm">إلغاء</button>
                                     </div>
                                 </div>
@@ -399,8 +506,13 @@ const AdminDashboard: React.FC = () => {
                                         <button onClick={() => setEditPassId(editPassId === emp.id ? null : emp.id)} className="p-2 bg-blue-100 text-blue-600 rounded-lg" title="تغيير كلمة المرور">
                                             <Key size={16} />
                                         </button>
-                                        <button onClick={() => handleDeleteEmployee(emp.id)} className="p-2 bg-red-100 text-red-600 rounded-lg" title="حذف الموظف">
-                                            <Trash2 size={16} />
+                                        <button 
+                                          onClick={() => handleDeleteEmployee(emp.id)} 
+                                          disabled={isLoading.deleteEmployee}
+                                          className={`p-2 bg-red-100 text-red-600 rounded-lg ${isLoading.deleteEmployee ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                                          title="حذف الموظف"
+                                        >
+                                          <Trash2 size={16} />
                                         </button>
                                     </div>
                                 </div>
@@ -416,7 +528,20 @@ const AdminDashboard: React.FC = () => {
                                         value={newPass}
                                         onChange={e => setNewPass(e.target.value)}
                                     />
-                                    <button onClick={() => handleChangePassword(emp.id)} className="bg-green-600 text-white px-3 rounded-lg text-sm">تغيير</button>
+                                    <button 
+                                      onClick={() => handleChangePassword(emp.id)} 
+                                      disabled={isLoading.changePassword}
+                                      className={`bg-green-600 text-white px-3 rounded-lg text-sm flex items-center gap-1 ${isLoading.changePassword ? 'opacity-75 cursor-not-allowed' : ''}`}
+                                    >
+                                      {isLoading.changePassword ? (
+                                        <>
+                                          <Loader2 size={12} className="animate-spin" />
+                                          ...
+                                        </>
+                                      ) : (
+                                        'تغيير'
+                                      )}
+                                    </button>
                                 </div>
                             )}
                         </div>
