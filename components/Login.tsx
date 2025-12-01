@@ -1,28 +1,44 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
-import { Lock, User as UserIcon, Info, Phone, MessageCircle, X } from 'lucide-react';
+import { Lock, User as UserIcon, Info, Phone, MessageCircle, X, Loader } from 'lucide-react';
 import Toast from './Toast';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showAbout, setShowAbout] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const { login, toast, hideToast, showToast } = useStore();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await login(username, password);
-    if (success) {
-      const savedUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      if (savedUser.role === 'super_admin') navigate('/super-admin');
-      else if (savedUser.role === 'admin') navigate('/admin');
-      else navigate('/employee');
-    } else {
-      showToast('بيانات الدخول غير صحيحة أو الاشتراك منتهي', 'error');
+    
+    // التحقق من أن الحقول ليست فارغة
+    if (!username.trim() || !password.trim()) {
+      showToast('يرجى ملء جميع الحقول', 'error');
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      const success = await login(username, password);
+      if (success) {
+        const savedUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        if (savedUser.role === 'super_admin') navigate('/super-admin');
+        else if (savedUser.role === 'admin') navigate('/admin');
+        else navigate('/employee');
+      } else {
+        showToast('بيانات الدخول غير صحيحة أو الاشتراك منتهي', 'error');
+      }
+    } catch (error) {
+      showToast('حدث خطأ أثناء تسجيل الدخول', 'error');
+      console.error('Login error:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -63,6 +79,7 @@ const Login: React.FC = () => {
                 className="w-full pl-3 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 placeholder="اسم المستخدم"
                 required
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -84,15 +101,24 @@ const Login: React.FC = () => {
                 className="w-full pl-3 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 placeholder="••••••••"
                 required
+                disabled={isLoading}
               />
             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors"
+            disabled={isLoading}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-3 rounded-lg shadow-md transition-colors flex items-center justify-center gap-2"
           >
-            دخول
+            {isLoading ? (
+              <>
+                <Loader size={20} className="animate-spin" />
+                <span>جاري تسجيل الدخول...</span>
+              </>
+            ) : (
+              <span>دخول</span>
+            )}
           </button>
         </form>
       </div>
@@ -101,7 +127,8 @@ const Login: React.FC = () => {
       <div className="mt-8">
         <button 
           onClick={() => setShowAbout(true)}
-          className="flex items-center gap-2 bg-white px-6 py-3 rounded-full shadow-md text-blue-600 font-bold hover:bg-blue-50 transition-colors"
+          disabled={isLoading}
+          className="flex items-center gap-2 bg-white px-6 py-3 rounded-full shadow-md text-blue-600 font-bold hover:bg-blue-50 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
         >
           <Info size={20} />
           <span>من نحن</span>
@@ -115,6 +142,7 @@ const Login: React.FC = () => {
             <button 
               onClick={() => setShowAbout(false)}
               className="absolute left-4 top-4 text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-1"
+              disabled={isLoading}
             >
               <X size={20} />
             </button>
