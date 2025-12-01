@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2 } from 'lucide-react';
+import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, Copy, CheckCircle2 } from 'lucide-react';
 import { User } from '../types';
-import html2canvas from 'html2canvas';
 
 const AdminDashboard: React.FC = () => {
   const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies } = useStore();
@@ -16,6 +15,7 @@ const AdminDashboard: React.FC = () => {
   const [showManageEmpModal, setShowManageEmpModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [copied, setCopied] = useState(false);
   
   // States for loading and operations
   const [isLoading, setIsLoading] = useState({
@@ -75,53 +75,77 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleShareRatesImage = async () => {
-    const element = document.getElementById('rate-card-content');
-    if (!element || isSharing) return;
+  const generateRatesText = () => {
+    const date = new Date().toLocaleDateString('ar-EG', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    
+    return `💱 *نشرة أسعار الصرف - ${company?.name}*
+
+📅 ${date}
+
+💰 *أسعار الصرف:*
+• سوداني ← مصري: ${rateData?.sd_to_eg_rate} 
+• مصري ← سوداني: ${rateData?.eg_to_sd_rate}
+
+🏪 *أسعار الجملة:*
+• سعر الجملة: ${rateData?.wholesale_rate}
+• حد الجملة: ${rateData?.wholesale_threshold?.toLocaleString() || 0} جنيه مصري
+
+💳 عمولة المحفظة الإلكترونية: ${rateData?.ewallet_commission}%
+
+📞 للاستفسار: [رقم الهاتف هنا]
+
+#أسعار_الصرف #${company?.name?.replace(/\s/g, '')}`;
+  };
+
+  const handleShareRatesText = async () => {
+    if (isSharing) return;
 
     setIsSharing(true);
+    setCopied(false);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      const canvas = await html2canvas(element, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        allowTaint: true
-      });
-
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-
-      if (blob) {
-        const fileName = `rates_${new Date().toISOString().split('T')[0]}.png`;
-        const file = new File([blob], fileName, { type: 'image/png' });
-        
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: 'نشرة أسعار الصرف',
-              text: `نشرة أسعار الصرف - ${company?.name}`,
-            });
-          } catch (error) {
-            console.log('Share cancelled');
-          }
-        } else {
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+      const ratesText = generateRatesText();
+      
+      // محاولة المشاركة عبر Web Share API
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: `أسعار الصرف - ${company?.name}`,
+            text: ratesText,
+          });
+          return;
+        } catch (error) {
+          console.log('Web Share cancelled or failed');
         }
       }
+      
+      // نسخ إلى الحافظة كبديل
+      await navigator.clipboard.writeText(ratesText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+      
     } catch (error) {
-      console.error('Error generating image', error);
-      alert('حدث خطأ أثناء إنشاء الصورة.');
+      console.error('Error sharing rates:', error);
+      setError('حدث خطأ أثناء مشاركة الأسعار');
     } finally {
       setIsSharing(false);
+    }
+  };
+
+  const handleCopyToClipboard = async () => {
+    try {
+      const ratesText = generateRatesText();
+      await navigator.clipboard.writeText(ratesText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      setError('حدث خطأ أثناء النسخ');
     }
   };
 
@@ -290,90 +314,82 @@ const AdminDashboard: React.FC = () => {
         />
       </div>
 
-      {/* Share Rate Modal (Image Preview) */}
+      {/* Share Rate Modal (Text) */}
       {showShareModal && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 overflow-y-auto">
-            <div className="w-full max-w-sm my-auto">
-                <div id="rate-card-content" className="bg-gradient-to-br from-blue-700 to-blue-900 rounded-3xl shadow-2xl overflow-hidden text-white relative">
-                    {/* Background Pattern */}
-                    <div className="absolute top-0 left-0 w-full h-full opacity-10">
-                        <div className="absolute top-[-50px] left-[-50px] w-40 h-40 bg-white rounded-full blur-3xl"></div>
-                        <div className="absolute bottom-[-50px] right-[-50px] w-40 h-40 bg-blue-400 rounded-full blur-3xl"></div>
-                    </div>
+          <div className="w-full max-w-md my-auto">
+            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+              {/* Header */}
+              <div className="bg-blue-600 text-white p-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold">مشاركة أسعار الصرف</h2>
+                  <button 
+                    onClick={() => setShowShareModal(false)}
+                    className="text-white/80 hover:text-white transition"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+                <p className="text-blue-200 text-sm mt-1">سيتم مشاركة الأسعار كنص يمكن نسخه ومشاركته</p>
+              </div>
 
-                    <div className="relative z-10 p-8 text-center">
-                        {/* Header */}
-                        <div className="flex flex-col items-center justify-center mb-6">
-                            {company?.logo ? (
-                                <img src={company.logo} alt="Logo" className="h-20 w-20 bg-white rounded-2xl p-1 object-contain mb-4 shadow-lg" crossOrigin="anonymous"/>
-                            ) : (
-                                <div className="h-20 w-20 bg-white/20 rounded-2xl flex items-center justify-center mb-4 text-3xl font-bold">
-                                    {company?.name.charAt(0)}
-                                </div>
-                            )}
-                            <h2 className="text-2xl font-extrabold tracking-wide">{company?.name}</h2>
-                            <p className="text-blue-200 text-sm mt-1 font-medium">نشرة أسعار الصرف اليومية</p>
-                        </div>
+              {/* Rates Text Preview */}
+              <div className="p-6 bg-gray-50 max-h-96 overflow-y-auto">
+                <div className="bg-white border border-gray-200 rounded-lg p-4 text-right whitespace-pre-line leading-7">
+                  {generateRatesText()}
+                </div>
+              </div>
 
-                        {/* Rates Grid */}
-                        <div className="space-y-4">
-                            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-blue-100 text-sm">سوداني {'->'} مصري</span>
-                                    <span className="text-3xl font-extrabold text-white">{rateData?.sd_to_eg_rate}</span>
-                                </div>
-                            </div>
+              {/* Actions */}
+              <div className="p-6 border-t border-gray-200">
+                <div className="flex flex-col gap-3">
+                  <button 
+                    onClick={handleShareRatesText}
+                    disabled={isSharing}
+                    className={`bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition ${
+                      isSharing ? 'opacity-75 cursor-not-allowed' : 'hover:bg-blue-700 active:scale-95'
+                    }`}
+                  >
+                    {isSharing ? (
+                      <>
+                        <Loader2 size={20} className="animate-spin" />
+                        <span>جاري المعالجة...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Share2 size={20} />
+                        <span>مشاركة الأسعار</span>
+                      </>
+                    )}
+                  </button>
 
-                            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-blue-100 text-sm">مصري {'->'} سوداني</span>
-                                    <span className="text-3xl font-extrabold text-white">{rateData?.eg_to_sd_rate}</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        {/* Wholesale Info */}
-                        <div className="mt-6 pt-4 border-t border-white/10">
-                            <div className="flex justify-between text-sm mb-2">
-                                <span className="text-blue-200">سعر الجملة</span>
-                                <span className="font-bold text-yellow-400 text-lg">{rateData?.wholesale_rate}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-blue-200">حد الجملة</span>
-                                <span className="font-bold text-white">{rateData?.wholesale_threshold?.toLocaleString() || 0} EGP</span>
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="text-center text-[10px] text-blue-300 mt-6 font-mono bg-black/20 py-2 rounded-full">
-                            {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                        </div>
-                    </div>
+                  <button 
+                    onClick={handleCopyToClipboard}
+                    disabled={isSharing}
+                    className={`border border-blue-600 text-blue-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition ${
+                      isSharing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50 active:scale-95'
+                    }`}
+                  >
+                    {copied ? (
+                      <>
+                        <CheckCircle2 size={20} className="text-green-600" />
+                        <span className="text-green-600">تم النسخ!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={20} />
+                        <span>نسخ إلى الحافظة</span>
+                      </>
+                    )}
+                  </button>
                 </div>
 
-                <div className="mt-6 flex gap-3">
-                    <button onClick={() => setShowShareModal(false)} className="bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-50 transition">
-                        <X size={24} />
-                    </button>
-                    <button 
-                        onClick={handleShareRatesImage}
-                        disabled={isSharing}
-                        className={`flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition ${isSharing ? 'opacity-75 cursor-not-allowed' : 'hover:bg-blue-700 active:scale-95'}`}
-                    >
-                        {isSharing ? (
-                            <>
-                                <Loader2 size={20} className="animate-spin" />
-                                <span>جاري المعالجة...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Share2 size={20} />
-                                <span>مشاركة (ملصق)</span>
-                            </>
-                        )}
-                    </button>
-                </div>
+                <p className="text-center text-gray-500 text-xs mt-4">
+                  يمكنك مشاركة هذا النص عبر واتساب، تيليجرام، أو أي تطبيق مراسلة آخر
+                </p>
+              </div>
             </div>
+          </div>
         </div>
       )}
 
