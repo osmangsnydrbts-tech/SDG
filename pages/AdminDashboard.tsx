@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X } from 'lucide-react';
+import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2 } from 'lucide-react';
 import { User } from '../types';
+import html2canvas from 'html2canvas';
 
 const AdminDashboard: React.FC = () => {
   const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies } = useStore();
@@ -15,7 +16,9 @@ const AdminDashboard: React.FC = () => {
   const [showEmpModal, setShowEmpModal] = useState(false);
   const [showManageEmpModal, setShowManageEmpModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   
+  // States for sub-modals in Manage Employees
   const [editPassId, setEditPassId] = useState<number | null>(null);
   const [editInfoId, setEditInfoId] = useState<User | null>(null);
 
@@ -32,9 +35,11 @@ const AdminDashboard: React.FC = () => {
   const [empPass, setEmpPass] = useState('');
   const [error, setError] = useState('');
 
-  // Emp Edit Form
+  // Emp Edit Form (Info)
   const [editName, setEditName] = useState('');
   const [editUser, setEditUser] = useState('');
+
+  // Emp Pass Change
   const [newPass, setNewPass] = useState('');
 
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee' && u.is_active);
@@ -53,39 +58,53 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleShareRates = async () => {
-    if (!rateData || !company) return;
+  const handleShareRatesImage = async () => {
+    const element = document.getElementById('rate-card-content');
+    if (!element || isSharing) return;
 
-    const text = `
-*${company.name}*
-نشرة أسعار الصرف اليومية
-📅 ${new Date().toLocaleDateString('ar-EG')}
+    setIsSharing(true);
 
-💱 *الأسعار الحالية:*
-🇸🇩 سوداني -> 🇪🇬 مصري: *${rateData.sd_to_eg_rate}*
-🇪🇬 مصري -> 🇸🇩 سوداني: *${rateData.eg_to_sd_rate}*
+    try {
+      await new Promise(resolve => setTimeout(resolve, 200));
 
-📦 *الجملة:*
-السعر: ${rateData.wholesale_rate}
-أقل كمية: ${rateData.wholesale_threshold.toLocaleString()} EGP
-    `.trim();
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        allowTaint: true
+      });
 
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'نشرة أسعار الصرف',
-          text: text,
-        });
-      } catch (error) {
-        console.log('Share cancelled');
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+
+      if (blob) {
+        const fileName = `rates_${new Date().toISOString().split('T')[0]}.png`;
+        const file = new File([blob], fileName, { type: 'image/png' });
+        
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: 'نشرة أسعار الصرف',
+              text: `نشرة أسعار الصرف - ${company?.name}`,
+            });
+          } catch (error) {
+            console.log('Share cancelled');
+          }
+        } else {
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
       }
-    } else {
-      try {
-        await navigator.clipboard.writeText(text);
-        alert('تم نسخ النشرة إلى الحافظة');
-      } catch (err) {
-        console.error('Failed to copy', err);
-      }
+    } catch (error) {
+      console.error('Error generating image', error);
+      alert('حدث خطأ أثناء إنشاء الصورة.');
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -203,59 +222,94 @@ const AdminDashboard: React.FC = () => {
         />
       </div>
 
-      {/* Share Modal */}
+      {/* Share Rate Modal (Image Preview) */}
       {showShareModal && (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-            <div className="w-full max-w-sm">
-                <div id="rate-card-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-                    <div className="bg-blue-600 p-6 text-white text-center">
-                        {company?.logo && <img src={company.logo} alt="Logo" className="h-16 w-16 mx-auto bg-white rounded-lg p-1 object-contain mb-3" crossOrigin="anonymous"/>}
-                        <h2 className="text-2xl font-bold">{company?.name}</h2>
-                        <p className="text-blue-200 text-sm mt-1">نشرة أسعار الصرف اليومية</p>
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 overflow-y-auto">
+            <div className="w-full max-w-sm my-auto">
+                <div id="rate-card-content" className="bg-gradient-to-br from-blue-700 to-blue-900 rounded-3xl shadow-2xl overflow-hidden text-white relative">
+                    {/* Background Pattern */}
+                    <div className="absolute top-0 left-0 w-full h-full opacity-10">
+                        <div className="absolute top-[-50px] left-[-50px] w-40 h-40 bg-white rounded-full blur-3xl"></div>
+                        <div className="absolute bottom-[-50px] right-[-50px] w-40 h-40 bg-blue-400 rounded-full blur-3xl"></div>
                     </div>
-                    <div className="p-6 space-y-4">
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                            <span className="text-gray-500 font-medium">سوداني {'->'} مصري</span>
-                            <span className="text-3xl font-bold text-gray-800">{rateData?.sd_to_eg_rate}</span>
+
+                    <div className="relative z-10 p-8 text-center">
+                        {/* Header */}
+                        <div className="flex flex-col items-center justify-center mb-6">
+                            {company?.logo ? (
+                                <img src={company.logo} alt="Logo" className="h-20 w-20 bg-white rounded-2xl p-1 object-contain mb-4 shadow-lg" crossOrigin="anonymous"/>
+                            ) : (
+                                <div className="h-20 w-20 bg-white/20 rounded-2xl flex items-center justify-center mb-4 text-3xl font-bold">
+                                    {company?.name.charAt(0)}
+                                </div>
+                            )}
+                            <h2 className="text-2xl font-extrabold tracking-wide">{company?.name}</h2>
+                            <p className="text-blue-200 text-sm mt-1 font-medium">نشرة أسعار الصرف اليومية</p>
                         </div>
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                            <span className="text-gray-500 font-medium">مصري {'->'} سوداني</span>
-                            <span className="text-3xl font-bold text-gray-800">{rateData?.eg_to_sd_rate}</span>
+
+                        {/* Rates Grid */}
+                        <div className="space-y-4">
+                            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-blue-100 text-sm">سوداني {'->'} مصري</span>
+                                    <span className="text-3xl font-extrabold text-white">{rateData?.sd_to_eg_rate}</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-blue-100 text-sm">مصري {'->'} سوداني</span>
+                                    <span className="text-3xl font-extrabold text-white">{rateData?.eg_to_sd_rate}</span>
+                                </div>
+                            </div>
                         </div>
                         
-                        <div className="border-t pt-4 mt-2">
+                        {/* Wholesale Info */}
+                        <div className="mt-6 pt-4 border-t border-white/10">
                             <div className="flex justify-between text-sm mb-2">
-                                <span className="text-gray-500">سعر الجملة</span>
-                                <span className="font-bold text-blue-600">{rateData?.wholesale_rate}</span>
+                                <span className="text-blue-200">سعر الجملة</span>
+                                <span className="font-bold text-yellow-400 text-lg">{rateData?.wholesale_rate}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-gray-500">أقل كمية للجملة</span>
-                                <span className="font-bold text-gray-800">{rateData?.wholesale_threshold.toLocaleString()} EGP</span>
+                                <span className="text-blue-200">حد الجملة</span>
+                                <span className="font-bold text-white">{rateData?.wholesale_threshold.toLocaleString()} EGP</span>
                             </div>
                         </div>
 
-                        <div className="text-center text-xs text-gray-400 mt-4 pt-4 border-t">
+                        {/* Footer */}
+                        <div className="text-center text-[10px] text-blue-300 mt-6 font-mono bg-black/20 py-2 rounded-full">
                             {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         </div>
                     </div>
                 </div>
 
-                <div className="mt-4 flex gap-3">
-                    <button onClick={() => setShowShareModal(false)} className="bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-50">
+                <div className="mt-6 flex gap-3">
+                    <button onClick={() => setShowShareModal(false)} className="bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-50 transition">
                         <X size={24} />
                     </button>
                     <button 
-                        onClick={handleShareRates}
-                        className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg"
+                        onClick={handleShareRatesImage}
+                        disabled={isSharing}
+                        className={`flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition ${isSharing ? 'opacity-75' : 'hover:bg-blue-700 active:scale-95'}`}
                     >
-                        <Share2 size={20} /> مشاركة (نص)
+                        {isSharing ? (
+                            <>
+                                <Loader2 size={20} className="animate-spin" />
+                                <span>جاري المعالجة...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Share2 size={20} />
+                                <span>مشاركة (ملصق)</span>
+                            </>
+                        )}
                     </button>
                 </div>
             </div>
         </div>
       )}
 
-      {/* Rate Update Modal */}
+      {/* Rate Modal */}
       {showRateModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-sm p-6">
