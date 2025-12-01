@@ -21,8 +21,8 @@ const Treasury: React.FC = () => {
   // Get Main Treasury
   const mainTreasury = treasuries.find(t => t.company_id === currentUser?.company_id && !t.employee_id);
   
-  // Get Employees
-  const employees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee');
+  // Get Employees (Active Only)
+  const employees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee' && u.is_active);
 
   const openActionModal = (action: 'feed' | 'withdraw', target: 'main' | 'employee', empId?: number) => {
       setModalActionType(action);
@@ -170,6 +170,7 @@ const Treasury: React.FC = () => {
                       </div>
                   );
               })}
+              {employees.length === 0 && <p className="text-center text-gray-500 py-4">لا يوجد موظفين نشطين</p>}
           </div>
       )}
 
