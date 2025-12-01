@@ -103,7 +103,7 @@ const Treasury: React.FC = () => {
             onClick={() => setActiveTab('employee')}
             className={`flex-1 py-3 text-sm font-bold rounded-lg transition ${activeTab === 'employee' ? 'bg-gray-100 text-gray-900 shadow-sm' : 'text-gray-500'}`}
         >
-            توزيع العهد (الموظفين)
+            تغذية حساب موظف
         </button>
       </div>
 
