@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Copy } from 'lucide-react';
+import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X } from 'lucide-react';
 import { User } from '../types';
 
 const AdminDashboard: React.FC = () => {
@@ -211,7 +211,7 @@ const AdminDashboard: React.FC = () => {
       {showShareModal && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
-                <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                <div id="rate-card-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden">
                     <div className="bg-blue-600 p-6 text-white text-center">
                         {company?.logo && <img src={company.logo} alt="Logo" className="h-16 w-16 mx-auto bg-white rounded-lg p-1 object-contain mb-3" crossOrigin="anonymous"/>}
                         <h2 className="text-2xl font-bold">{company?.name}</h2>
