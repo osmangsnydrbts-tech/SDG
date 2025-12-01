@@ -10,7 +10,6 @@ const Exchange: React.FC = () => {
   const [amount, setAmount] = useState<string>('');
   const [formattedAmount, setFormattedAmount] = useState<string>('');
   const [result, setResult] = useState<number>(0);
-  const [roundedResult, setRoundedResult] = useState<number>(0); // نتيجة مدورة
   const [receipt, setReceipt] = useState('');
   const [isWholesale, setIsWholesale] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -57,17 +56,6 @@ const Exchange: React.FC = () => {
     return decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
   }, []);
 
-  // دالة لتقريب النتيجة (تقريب لأقرب جنيه)
-  const roundToNearestPound = useCallback((value: number): number => {
-    if (value === 0) return 0;
-    
-    // تقريب لأقرب جنيه (لأسفل)
-    return Math.floor(value);
-    
-    // أو يمكنك استخدام Math.round(value) للتقريب لأقرب جنيه
-    // return Math.round(value);
-  }, []);
-
   // تحديث المبلغ المنسق عند تغيير القيمة
   useEffect(() => {
     const formatted = formatAmount(amount);
@@ -77,15 +65,12 @@ const Exchange: React.FC = () => {
   useEffect(() => {
     if (!rates || !amount) {
       setResult(0);
-      setRoundedResult(0);
       setIsWholesale(false);
       return;
     }
 
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount)) return;
-
-    let calculatedResult = 0;
 
     if (direction === 'SDG_TO_EGP') {
       let finalRate = rates.sd_to_eg_rate;
@@ -98,16 +83,12 @@ const Exchange: React.FC = () => {
       } else {
         setIsWholesale(false);
       }
-      calculatedResult = calculatedEgp;
+      setResult(calculatedEgp);
     } else {
       setIsWholesale(false);
-      calculatedResult = numAmount * rates.eg_to_sd_rate;
+      setResult(numAmount * rates.eg_to_sd_rate);
     }
-    
-    setResult(calculatedResult);
-    // تقريب النتيجة لأقرب جنيه (عدم عرض مبلغ أقل من جنيه)
-    setRoundedResult(roundToNearestPound(calculatedResult));
-  }, [amount, direction, rates, roundToNearestPound]);
+  }, [amount, direction, rates]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
@@ -135,17 +116,12 @@ const Exchange: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // استخدم القيمة المدورة في المعاملة إذا كنت تريد ذلك
-      const amountToUse = direction === 'SDG_TO_EGP' ? parseFloat(amount) : roundedResult;
-      const receiptAmount = direction === 'SDG_TO_EGP' ? roundedResult : parseFloat(amount);
-      
       const res = await performExchange(
         currentUser.id,
         currentUser.company_id,
         direction === 'SDG_TO_EGP' ? 'SDG' : 'EGP',
         parseFloat(amount),
-        receipt,
-        { roundedAmount: roundedResult } // إرسال المبلغ المدور كبيانات إضافية
+        receipt
       );
 
       if (res.success) {
@@ -207,7 +183,6 @@ const Exchange: React.FC = () => {
           {direction === 'SDG_TO_EGP' && (
              <p className="text-xs text-gray-400">حد الجملة: {rates.wholesale_threshold.toLocaleString()} EGP</p>
           )}
-          <p className="text-xs text-gray-400 mt-1">※ المبالغ تقرب لأقرب جنيه</p>
         </div>
 
         <form onSubmit={handleExchange} className="space-y-4">
@@ -223,7 +198,7 @@ const Exchange: React.FC = () => {
               required
               dir="ltr"
             />
-            <p className="text-xs text-gray-400 mt-1">يمكن إدخال المنازل العشرية مثل: 1500.50</p>
+            <p className="text-xs text-gray-400 mt-1"></p>
           </div>
 
           <div className="bg-blue-600 text-white p-4 rounded-xl flex justify-between items-center shadow-md">
@@ -231,32 +206,8 @@ const Exchange: React.FC = () => {
               <Calculator size={20} />
               <span className="font-medium">الصافي للعميل</span>
             </div>
-            <div className="text-right">
-              <span className="text-2xl font-bold block">
-                {roundedResult.toLocaleString(undefined, { 
-                  minimumFractionDigits: 0, 
-                  maximumFractionDigits: 0 
-                })}
-              </span>
-              {/* عرض القيمة الحقيقية بخط صغير للشفافية */}
-              {result !== roundedResult && (
-                <span className="text-sm text-blue-200 block">
-                  (السابق: {result.toLocaleString(undefined, { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })})
-                </span>
-              )}
-            </div>
+            <span className="text-2xl font-bold">{result.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
-
-          {result !== roundedResult && (
-            <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
-              <p className="text-sm text-yellow-700 text-center">
-                تم تقريب المبلغ من <span className="font-bold">{result.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> إلى <span className="font-bold">{roundedResult.toLocaleString()}</span>
-              </p>
-            </div>
-          )}
 
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">رقم الإشعار</label>
