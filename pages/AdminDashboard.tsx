@@ -2,9 +2,8 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2 } from 'lucide-react';
+import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Copy } from 'lucide-react';
 import { User } from '../types';
-import html2canvas from 'html2canvas';
 
 const AdminDashboard: React.FC = () => {
   const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies } = useStore();
@@ -16,7 +15,6 @@ const AdminDashboard: React.FC = () => {
   const [showEmpModal, setShowEmpModal] = useState(false);
   const [showManageEmpModal, setShowManageEmpModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
   
   // States for sub-modals in Manage Employees
   const [editPassId, setEditPassId] = useState<number | null>(null);
@@ -59,52 +57,39 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleShareRates = async () => {
-    const element = document.getElementById('rate-card-content');
-    if (!element || isSharing) return;
+    if (!rateData || !company) return;
 
-    setIsSharing(true);
+    const text = `
+*${company.name}*
+نشرة أسعار الصرف اليومية
+📅 ${new Date().toLocaleDateString('ar-EG')}
 
-    try {
-      await new Promise(resolve => setTimeout(resolve, 200));
+💱 *الأسعار الحالية:*
+🇸🇩 سوداني -> 🇪🇬 مصري: *${rateData.sd_to_eg_rate}*
+🇪🇬 مصري -> 🇸🇩 سوداني: *${rateData.eg_to_sd_rate}*
 
-      const canvas = await html2canvas(element, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        allowTaint: true,
-      });
+📦 *الجملة:*
+السعر: ${rateData.wholesale_rate}
+أقل كمية: ${rateData.wholesale_threshold.toLocaleString()} EGP
+    `.trim();
 
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
-
-      if (blob) {
-        const fileName = `rates_${new Date().toISOString().split('T')[0]}.jpg`;
-        const file = new File([blob], fileName, { type: 'image/jpeg' });
-        
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: 'نشرة أسعار الصرف',
-              text: `أسعار الصرف اليوم - ${company?.name}`,
-            });
-          } catch (error) {
-            console.warn('Sharing cancelled', error);
-          }
-        } else {
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'نشرة أسعار الصرف',
+          text: text,
+        });
+      } catch (error) {
+        console.log('Share cancelled');
       }
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ أثناء المشاركة');
-    } finally {
-      setIsSharing(false);
+    } else {
+      // Fallback to clipboard
+      try {
+        await navigator.clipboard.writeText(text);
+        alert('تم نسخ النشرة إلى الحافظة');
+      } catch (err) {
+        console.error('Failed to copy', err);
+      }
     }
   };
 
@@ -222,11 +207,11 @@ const AdminDashboard: React.FC = () => {
         />
       </div>
 
-      {/* Share Rate Modal */}
+      {/* Share Rate Modal (Preview) */}
       {showShareModal && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
-                <div id="rate-card-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
                     <div className="bg-blue-600 p-6 text-white text-center">
                         {company?.logo && <img src={company.logo} alt="Logo" className="h-16 w-16 mx-auto bg-white rounded-lg p-1 object-contain mb-3" crossOrigin="anonymous"/>}
                         <h2 className="text-2xl font-bold">{company?.name}</h2>
@@ -265,10 +250,9 @@ const AdminDashboard: React.FC = () => {
                     </button>
                     <button 
                         onClick={handleShareRates}
-                        disabled={isSharing}
                         className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg"
                     >
-                        {isSharing ? <Loader2 className="animate-spin" size={20} /> : <><Share2 size={20} /> مشاركة النشرة</>}
+                        <Share2 size={20} /> مشاركة (نص)
                     </button>
                 </div>
             </div>
