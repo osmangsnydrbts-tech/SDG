@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { FileText, Download, Filter, Calculator, Search, Eye, Trash2, Calendar, ListFilter } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
