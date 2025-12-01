@@ -16,7 +16,6 @@ const AdminDashboard: React.FC = () => {
   const [showManageEmpModal, setShowManageEmpModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   
-  // States for sub-modals in Manage Employees
   const [editPassId, setEditPassId] = useState<number | null>(null);
   const [editInfoId, setEditInfoId] = useState<User | null>(null);
 
@@ -33,11 +32,9 @@ const AdminDashboard: React.FC = () => {
   const [empPass, setEmpPass] = useState('');
   const [error, setError] = useState('');
 
-  // Emp Edit Form (Info)
+  // Emp Edit Form
   const [editName, setEditName] = useState('');
   const [editUser, setEditUser] = useState('');
-
-  // Emp Pass Change
   const [newPass, setNewPass] = useState('');
 
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee' && u.is_active);
@@ -83,7 +80,6 @@ const AdminDashboard: React.FC = () => {
         console.log('Share cancelled');
       }
     } else {
-      // Fallback to clipboard
       try {
         await navigator.clipboard.writeText(text);
         alert('تم نسخ النشرة إلى الحافظة');
@@ -207,7 +203,7 @@ const AdminDashboard: React.FC = () => {
         />
       </div>
 
-      {/* Share Rate Modal (Preview) */}
+      {/* Share Modal */}
       {showShareModal && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
@@ -259,7 +255,7 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Rate Modal */}
+      {/* Rate Update Modal */}
       {showRateModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-sm p-6">
@@ -377,6 +373,10 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Subscription Info Footer */}
+      <div className="text-center text-xs text-gray-400 pt-4">
+          ينتهي الاشتراك في: {company ? new Date(company.subscription_end).toLocaleDateString('ar-EG') : '-'}
+      </div>
     </div>
   );
 };
