@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useStore } from '../context/StoreContext';
 import { ArrowDownCircle, ArrowUpCircle, AlertCircle, CheckCircle2, UserCheck, Banknote, Loader2 } from 'lucide-react';
 
@@ -23,6 +22,62 @@ const Treasury: React.FC = () => {
   
   // Get Employees (Active Only)
   const employees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee' && u.is_active);
+
+  // دالة لتنسيق الأرقام بفواصل الألوف
+  const formatNumberWithCommas = useCallback((num: number | string): string => {
+    const numValue = typeof num === 'string' ? parseFloat(num) : num;
+    if (isNaN(numValue)) return '0';
+    
+    return numValue.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }, []);
+
+  // دالة لتحويل النص المدخل مع الفواصل إلى رقم
+  const parseFormattedAmount = useCallback((value: string): string => {
+    // إزالة الفواصل للتحويل إلى رقم
+    const cleanedValue = value.replace(/,/g, '');
+    
+    // التحقق إذا كان الرقم صالحًا
+    if (cleanedValue === '' || cleanedValue === '.') return cleanedValue;
+    
+    const num = parseFloat(cleanedValue);
+    if (isNaN(num)) return '';
+    
+    return num.toString();
+  }, []);
+
+  // معالجة تغيير قيمة المبلغ المدخل
+  const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    
+    // السماح فقط بالأرقام والنقطة
+    value = value.replace(/[^\d.]/g, '');
+    
+    // منع أكثر من نقطة عشرية واحدة
+    const parts = value.split('.');
+    if (parts.length > 2) {
+      value = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    // الحد من منزلتين عشريتين
+    if (parts.length === 2 && parts[1].length > 2) {
+      value = parts[0] + '.' + parts[1].substring(0, 2);
+    }
+    
+    setAmount(value);
+  }, []);
+
+  // معالجة فقدان التركيز على حقل المبلغ (تنسيق القيمة)
+  const handleAmountBlur = useCallback(() => {
+    if (amount) {
+      const num = parseFloat(amount);
+      if (!isNaN(num)) {
+        setAmount(num.toFixed(2));
+      }
+    }
+  }, [amount]);
 
   const openActionModal = (action: 'feed' | 'withdraw', target: 'main' | 'employee', empId?: number) => {
       setModalActionType(action);
@@ -74,7 +129,7 @@ const Treasury: React.FC = () => {
   const getFormattedAmount = () => {
       const val = parseFloat(amount);
       if (isNaN(val)) return '0.00';
-      return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return formatNumberWithCommas(val.toFixed(2));
   };
 
   return (
@@ -83,11 +138,15 @@ const Treasury: React.FC = () => {
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white p-5 rounded-2xl shadow-lg">
           <p className="text-blue-200 text-sm mb-1">الخزينة الرئيسية (EGP)</p>
-          <h3 className="text-2xl font-bold">{mainTreasury?.egp_balance.toLocaleString()}</h3>
+          <h3 className="text-2xl font-bold">
+            {mainTreasury ? formatNumberWithCommas(mainTreasury.egp_balance) : '0'}
+          </h3>
         </div>
         <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 text-white p-5 rounded-2xl shadow-lg">
           <p className="text-emerald-200 text-sm mb-1">الخزينة الرئيسية (SDG)</p>
-          <h3 className="text-2xl font-bold">{mainTreasury?.sdg_balance.toLocaleString()}</h3>
+          <h3 className="text-2xl font-bold">
+            {mainTreasury ? formatNumberWithCommas(mainTreasury.sdg_balance) : '0'}
+          </h3>
         </div>
       </div>
 
@@ -148,8 +207,12 @@ const Treasury: React.FC = () => {
                                   </div>
                               </div>
                               <div className="text-right text-xs">
-                                  <div className="font-bold text-gray-800">{t?.egp_balance.toLocaleString()} EGP</div>
-                                  <div className="text-gray-500">{t?.sdg_balance.toLocaleString()} SDG</div>
+                                  <div className="font-bold text-gray-800">
+                                    {t ? formatNumberWithCommas(t.egp_balance) : '0'} EGP
+                                  </div>
+                                  <div className="text-gray-500">
+                                    {t ? formatNumberWithCommas(t.sdg_balance) : '0'} SDG
+                                  </div>
                               </div>
                           </div>
                           
@@ -197,10 +260,11 @@ const Treasury: React.FC = () => {
                               <Banknote className="text-gray-400" />
                           </div>
                           <input 
-                              type="number" 
+                              type="text" 
                               inputMode="decimal"
                               value={amount}
-                              onChange={(e) => setAmount(e.target.value)}
+                              onChange={handleAmountChange}
+                              onBlur={handleAmountBlur}
                               className="w-full pr-12 pl-4 py-4 text-2xl font-bold border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                               placeholder="0.00"
                               autoFocus
