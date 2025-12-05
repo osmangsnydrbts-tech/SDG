@@ -321,21 +321,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           .select('id')
           .eq('company_id', companyId);
 
-        if (companyEmployees && companyEmployees.length > 0) {
-          const employeeIds = companyEmployees.map(emp => emp.id);
-          
-          // حذف الخزائن المرتبطة بالموظفين
-          await supabase
-            .from('treasuries')
-            .delete()
-            .eq('company_id', companyId);
-            
-          // حذف الخزائن المرتبطة بالشركة نفسها
-          await supabase
-            .from('treasuries')
-            .delete()
-            .eq('company_id', companyId);
-        }
+        // حذف الخزائن المرتبطة بالشركة (بما في ذلك خزائن الموظفين)
+        await supabase
+          .from('treasuries')
+          .delete()
+          .eq('company_id', companyId);
 
         // 6. حذف المحافظ الإلكترونية (e_wallets)
         await supabase
@@ -366,7 +356,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } catch (error) {
         console.error('Error during permanent company deletion:', error);
         showToast('حدث خطأ أثناء حذف الشركة', 'error');
-        return { success: false, message: `حدث خطأ أثناء حذف الشركة: ${error.message}` };
+        return { success: false, message: `حدث خطأ أثناء حذف الشركة: ${(error as Error).message}` };
       }
     } else {
       // الحذف المؤقت (تعطيل فقط)
