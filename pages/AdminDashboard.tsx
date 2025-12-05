@@ -97,9 +97,7 @@ const AdminDashboard: React.FC = () => {
 
 💳 عمولة المحفظة الإلكترونية: ${rateData?.ewallet_commission}%
 
-📞 للاستفسار: [رقم الهاتف هنا]
-
-#أسعار_الصرف #${company?.name?.replace(/\s/g, '')}`;
+${company?.name?.replace(/\s/g, '')}`;
   };
 
   const handleShareRatesText = async () => {
