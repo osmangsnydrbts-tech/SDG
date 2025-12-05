@@ -315,12 +315,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           .eq('company_id', companyId);
 
         // 5. حذف الخزائن (treasuries) - هذه قد تحتوي على قيود مع الموظفين
-        // أولاً، احصل على جميع موظفي الشركة
-        const { data: companyEmployees } = await supabase
-          .from('users')
-          .select('id')
-          .eq('company_id', companyId);
-
         // حذف الخزائن المرتبطة بالشركة (بما في ذلك خزائن الموظفين)
         await supabase
           .from('treasuries')
