@@ -28,7 +28,7 @@ interface StoreData {
   addCompany: (name: string, username: string, password: string, days: number, logo?: string) => Promise<{ success: boolean; message: string }>;
   updateCompany: (id: number, data: Partial<Company> & { password?: string }) => Promise<{ success: boolean; message: string }>;
   renewSubscription: (companyId: number, days: number) => Promise<void>;
-  deleteCompany: (companyId: number, permanentDelete?: boolean) => Promise<{ success: boolean; message: string }>;
+  deleteCompany: (companyId: number) => Promise<void>;
   toggleCompanyStatus: (companyId: number) => Promise<void>; 
   updateExchangeRate: (companyId: number, rates: Partial<ExchangeRate>) => Promise<void>;
   addEmployee: (companyId: number, fullName: string, username: string, password: string) => Promise<{ success: boolean; message: string }>;
@@ -107,10 +107,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Fetch Data from Supabase
   const fetchData = async () => {
     try {
-      const { data: companiesData } = await supabase.from('companies').select('*').order('id', { ascending: false });
+      const { data: companiesData } = await supabase.from('companies').select('*');
       if (companiesData) setCompanies(companiesData);
 
-      const { data: usersData } = await supabase.from('users').select('*').order('id', { ascending: false });
+      const { data: usersData } = await supabase.from('users').select('*');
       if (usersData) setUsers(usersData);
 
       const { data: treasuriesData } = await supabase.from('treasuries').select('*');
@@ -119,16 +119,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const { data: ratesData } = await supabase.from('exchange_rates').select('*');
       if (ratesData) setExchangeRates(ratesData);
 
-      const { data: txData } = await supabase.from('transactions').select('*').order('created_at', { ascending: false });
+      const { data: txData } = await supabase.from('transactions').select('*');
       if (txData) setTransactions(txData);
 
-      const { data: merchData } = await supabase.from('merchants').select('*').order('id', { ascending: false });
+      const { data: merchData } = await supabase.from('merchants').select('*');
       if (merchData) setMerchants(merchData);
 
-      const { data: entriesData } = await supabase.from('merchant_entries').select('*').order('created_at', { ascending: false });
+      const { data: entriesData } = await supabase.from('merchant_entries').select('*');
       if (entriesData) setMerchantEntries(entriesData);
 
-      const { data: walletsData } = await supabase.from('e_wallets').select('*').order('id', { ascending: false });
+      const { data: walletsData } = await supabase.from('e_wallets').select('*');
       if (walletsData) setEWallets(walletsData);
 
     } catch (error) {
@@ -276,89 +276,62 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     showToast('تم تجديد الاشتراك', 'success');
   };
 
-  const deleteCompany = async (companyId: number, permanentDelete: boolean = false) => {
-    if (permanentDelete) {
-      try {
-        // الحذف بالترتيب الصحيح لتجنب أخطاء القيود المرجعية
-        
-        // 1. أولاً حذف المعاملات المرتبطة بالشركة (بما في ذلك المعاملات المرتبطة بالمحافظ)
-        const { error: txError } = await supabase
-          .from('transactions')
-          .delete()
-          .eq('company_id', companyId);
-        
-        if (txError) {
-          console.error('Error deleting transactions:', txError);
-          // ربما بعض المعاملات مرتبطة بالمحافظ الإلكترونية، فلنحاول حذفها مباشرة
-          await supabase
-            .from('transactions')
-            .delete()
-            .or(`company_id.eq.${companyId},e_wallet_id.in.(select id from e_wallets where company_id = ${companyId})`);
-        }
+  const deleteCompany = async (companyId: number) => {
+    try {
+      // 1. حذف العمليات (transactions) المرتبطة بالشركة
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('company_id', companyId);
 
-        // 2. حذف قيود التجار (merchant_entries)
-        await supabase
-          .from('merchant_entries')
-          .delete()
-          .eq('company_id', companyId);
+      // 2. حذف قيود التجار (merchant_entries) المرتبطة بالشركة
+      await supabase
+        .from('merchant_entries')
+        .delete()
+        .eq('company_id', companyId);
 
-        // 3. حذف التجار (merchants)
-        await supabase
-          .from('merchants')
-          .delete()
-          .eq('company_id', companyId);
+      // 3. حذف التجار (merchants) المرتبطين بالشركة
+      await supabase
+        .from('merchants')
+        .delete()
+        .eq('company_id', companyId);
 
-        // 4. حذف أسعار الصرف (exchange_rates)
-        await supabase
-          .from('exchange_rates')
-          .delete()
-          .eq('company_id', companyId);
+      // 4. حذف المحافظ الإلكترونية (e_wallets) المرتبطة بالشركة
+      await supabase
+        .from('e_wallets')
+        .delete()
+        .eq('company_id', companyId);
 
-        // 5. حذف الخزائن (treasuries) - هذه قد تحتوي على قيود مع الموظفين
-        // حذف الخزائن المرتبطة بالشركة (بما في ذلك خزائن الموظفين)
-        await supabase
-          .from('treasuries')
-          .delete()
-          .eq('company_id', companyId);
+      // 5. حذف الخزائن (treasuries) المرتبطة بالشركة
+      await supabase
+        .from('treasuries')
+        .delete()
+        .eq('company_id', companyId);
 
-        // 6. حذف المحافظ الإلكترونية (e_wallets)
-        await supabase
-          .from('e_wallets')
-          .delete()
-          .eq('company_id', companyId);
+      // 6. حذف أسعار الصرف (exchange_rates) المرتبطة بالشركة
+      await supabase
+        .from('exchange_rates')
+        .delete()
+        .eq('company_id', companyId);
 
-        // 7. حذف جميع المستخدمين المرتبطين بالشركة
-        await supabase
-          .from('users')
-          .delete()
-          .eq('company_id', companyId);
+      // 7. حذف المستخدمين (users) المرتبطين بالشركة
+      await supabase
+        .from('users')
+        .delete()
+        .eq('company_id', companyId);
 
-        // 8. أخيراً، حذف الشركة نفسها
-        const { error: companyDeleteError } = await supabase
-          .from('companies')
-          .delete()
-          .eq('id', companyId);
+      // 8. أخيراً حذف الشركة نفسها (companies)
+      await supabase
+        .from('companies')
+        .delete()
+        .eq('id', companyId);
 
-        if (companyDeleteError) {
-          console.error('Error deleting company:', companyDeleteError);
-          throw new Error(`فشل حذف الشركة: ${companyDeleteError.message}`);
-        }
-
-        await fetchData();
-        showToast('تم حذف الشركة نهائياً من النظام', 'success');
-        return { success: true, message: 'تم حذف الشركة نهائياً من النظام' };
-      } catch (error) {
-        console.error('Error during permanent company deletion:', error);
-        showToast('حدث خطأ أثناء حذف الشركة', 'error');
-        return { success: false, message: `حدث خطأ أثناء حذف الشركة: ${(error as Error).message}` };
-      }
-    } else {
-      // الحذف المؤقت (تعطيل فقط)
-      await supabase.from('companies').update({ is_active: false }).eq('id', companyId);
-      await supabase.from('users').update({ is_active: false }).eq('company_id', companyId);
       await fetchData();
-      showToast('تم تعطيل الشركة بنجاح', 'success');
-      return { success: true, message: 'تم تعطيل الشركة بنجاح' };
+      showToast('تم حذف الشركة وجميع بياناتها نهائياً', 'success');
+    } catch (error) {
+      console.error('Error deleting company:', error);
+      showToast('حدث خطأ أثناء حذف الشركة', 'error');
+      throw error;
     }
   };
 
