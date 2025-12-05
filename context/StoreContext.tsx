@@ -277,40 +277,96 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteCompany = async (companyId: number, permanentDelete: boolean = false) => {
-    // إذا كان الخيار للحذف النهائي
     if (permanentDelete) {
       try {
-        // 1. حذف جميع العمليات المرتبطة بالشركة
-        await supabase.from('transactions').delete().eq('company_id', companyId);
+        // الحذف بالترتيب الصحيح لتجنب أخطاء القيود المرجعية
         
-        // 2. حذف جميع قيود التجار المرتبطة بالشركة
-        await supabase.from('merchant_entries').delete().eq('company_id', companyId);
+        // 1. أولاً حذف المعاملات المرتبطة بالشركة (بما في ذلك المعاملات المرتبطة بالمحافظ)
+        const { error: txError } = await supabase
+          .from('transactions')
+          .delete()
+          .eq('company_id', companyId);
         
-        // 3. حذف جميع التجار المرتبطين بالشركة
-        await supabase.from('merchants').delete().eq('company_id', companyId);
-        
-        // 4. حذف جميع المحافظ الإلكترونية المرتبطة بالشركة
-        await supabase.from('e_wallets').delete().eq('company_id', companyId);
-        
-        // 5. حذف أسعار الصرف المرتبطة بالشركة
-        await supabase.from('exchange_rates').delete().eq('company_id', companyId);
-        
-        // 6. حذف جميع الخزائن المرتبطة بالشركة
-        await supabase.from('treasuries').delete().eq('company_id', companyId);
-        
+        if (txError) {
+          console.error('Error deleting transactions:', txError);
+          // ربما بعض المعاملات مرتبطة بالمحافظ الإلكترونية، فلنحاول حذفها مباشرة
+          await supabase
+            .from('transactions')
+            .delete()
+            .or(`company_id.eq.${companyId},e_wallet_id.in.(select id from e_wallets where company_id = ${companyId})`);
+        }
+
+        // 2. حذف قيود التجار (merchant_entries)
+        await supabase
+          .from('merchant_entries')
+          .delete()
+          .eq('company_id', companyId);
+
+        // 3. حذف التجار (merchants)
+        await supabase
+          .from('merchants')
+          .delete()
+          .eq('company_id', companyId);
+
+        // 4. حذف أسعار الصرف (exchange_rates)
+        await supabase
+          .from('exchange_rates')
+          .delete()
+          .eq('company_id', companyId);
+
+        // 5. حذف الخزائن (treasuries) - هذه قد تحتوي على قيود مع الموظفين
+        // أولاً، احصل على جميع موظفي الشركة
+        const { data: companyEmployees } = await supabase
+          .from('users')
+          .select('id')
+          .eq('company_id', companyId);
+
+        if (companyEmployees && companyEmployees.length > 0) {
+          const employeeIds = companyEmployees.map(emp => emp.id);
+          
+          // حذف الخزائن المرتبطة بالموظفين
+          await supabase
+            .from('treasuries')
+            .delete()
+            .eq('company_id', companyId);
+            
+          // حذف الخزائن المرتبطة بالشركة نفسها
+          await supabase
+            .from('treasuries')
+            .delete()
+            .eq('company_id', companyId);
+        }
+
+        // 6. حذف المحافظ الإلكترونية (e_wallets)
+        await supabase
+          .from('e_wallets')
+          .delete()
+          .eq('company_id', companyId);
+
         // 7. حذف جميع المستخدمين المرتبطين بالشركة
-        await supabase.from('users').delete().eq('company_id', companyId);
-        
+        await supabase
+          .from('users')
+          .delete()
+          .eq('company_id', companyId);
+
         // 8. أخيراً، حذف الشركة نفسها
-        await supabase.from('companies').delete().eq('id', companyId);
-        
+        const { error: companyDeleteError } = await supabase
+          .from('companies')
+          .delete()
+          .eq('id', companyId);
+
+        if (companyDeleteError) {
+          console.error('Error deleting company:', companyDeleteError);
+          throw new Error(`فشل حذف الشركة: ${companyDeleteError.message}`);
+        }
+
         await fetchData();
         showToast('تم حذف الشركة نهائياً من النظام', 'success');
         return { success: true, message: 'تم حذف الشركة نهائياً من النظام' };
       } catch (error) {
         console.error('Error during permanent company deletion:', error);
         showToast('حدث خطأ أثناء حذف الشركة', 'error');
-        return { success: false, message: 'حدث خطأ أثناء حذف الشركة' };
+        return { success: false, message: `حدث خطأ أثناء حذف الشركة: ${error.message}` };
       }
     } else {
       // الحذف المؤقت (تعطيل فقط)
