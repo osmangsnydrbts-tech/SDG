@@ -1,11 +1,12 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, Copy, CheckCircle2 } from 'lucide-react';
-import { User } from '../types';
+import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock } from 'lucide-react';
+import { User, Transaction } from '../types';
 
 const AdminDashboard: React.FC = () => {
-  const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies } = useStore();
+  const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies, treasuries, transactions, showToast } = useStore();
   const navigate = useNavigate();
   const rateData = exchangeRates.find(r => r.company_id === currentUser?.company_id);
   const company = companies.find(c => c.id === currentUser?.company_id);
@@ -14,21 +15,15 @@ const AdminDashboard: React.FC = () => {
   const [showEmpModal, setShowEmpModal] = useState(false);
   const [showManageEmpModal, setShowManageEmpModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
-  // States for loading and operations
-  const [isLoading, setIsLoading] = useState({
-    updateRates: false,
-    addEmployee: false,
-    updateEmployee: false,
-    changePassword: false,
-    deleteEmployee: false
-  });
-  
-  // States for sub-modals in Manage Employees
   const [editPassId, setEditPassId] = useState<number | null>(null);
   const [editInfoId, setEditInfoId] = useState<User | null>(null);
+
+  // New States for Employee Report & Secure Delete
+  const [selectedEmpReport, setSelectedEmpReport] = useState<User | null>(null);
+  const [empToDelete, setEmpToDelete] = useState<number | null>(null);
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   // Rate Form
   const [sdRate, setSdRate] = useState(rateData?.sd_to_eg_rate || 74);
@@ -43,208 +38,149 @@ const AdminDashboard: React.FC = () => {
   const [empPass, setEmpPass] = useState('');
   const [error, setError] = useState('');
 
-  // Emp Edit Form (Info)
+  // Emp Edit Form
   const [editName, setEditName] = useState('');
   const [editUser, setEditUser] = useState('');
-
-  // Emp Pass Change
   const [newPass, setNewPass] = useState('');
 
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee' && u.is_active);
 
   const handleUpdateRates = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(!currentUser?.company_id || isLoading.updateRates) return;
-    
-    setIsLoading(prev => ({...prev, updateRates: true}));
-    
-    try {
-      await updateExchangeRate(currentUser.company_id, {
-        sd_to_eg_rate: sdRate,
-        eg_to_sd_rate: egRate,
-        wholesale_rate: wholesale,
-        wholesale_threshold: threshold,
-        ewallet_commission: commission
-      });
-      setShowRateModal(false);
-    } catch (error) {
-      console.error('Error updating rates:', error);
-      setError('حدث خطأ أثناء تحديث الأسعار');
-    } finally {
-      setIsLoading(prev => ({...prev, updateRates: false}));
+    if(currentUser?.company_id) {
+        setIsProcessing(true);
+        await updateExchangeRate(currentUser.company_id, {
+            sd_to_eg_rate: sdRate,
+            eg_to_sd_rate: egRate,
+            wholesale_rate: wholesale,
+            wholesale_threshold: threshold,
+            ewallet_commission: commission
+        });
+        setIsProcessing(false);
+        setShowRateModal(false);
     }
   };
 
-  const generateRatesText = () => {
-    const date = new Date().toLocaleDateString('ar-EG', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
-    
-    return `💱 *نشرة أسعار الصرف - ${company?.name}*
+  const handleShareRates = async () => {
+    if (!rateData || !company) return;
 
-📅 ${date}
+    const phones = company.phone_numbers ? `\n📞 للتواصل: ${company.phone_numbers}` : '';
 
-💰 *أسعار الصرف:*
-• سوداني ← مصري: ${rateData?.sd_to_eg_rate} 
-• مصري ← سوداني: ${rateData?.eg_to_sd_rate}
+    const text = `
+*${company.name}*
+نشرة أسعار الصرف اليومية
+📅 ${new Date().toLocaleDateString('ar-EG')}
 
-🏪 *أسعار الجملة:*
-• سعر الجملة: ${rateData?.wholesale_rate}
-• حد الجملة: ${rateData?.wholesale_threshold?.toLocaleString() || 0} جنيه مصري
+💱 *الأسعار الحالية:*
+🇸🇩 سوداني -> 🇪🇬 مصري: *${rateData.sd_to_eg_rate}*
+🇪🇬 مصري -> 🇸🇩 سوداني: *${rateData.eg_to_sd_rate}*
 
-💳 عمولة المحفظة الإلكترونية: ${rateData?.ewallet_commission}%
+📦 *الجملة:*
+السعر: ${rateData.wholesale_rate}
+أقل كمية: ${rateData.wholesale_threshold.toLocaleString()} EGP
+${phones}
+    `.trim();
 
-${company?.name}`;
-  };
-
-  const handleShareRatesText = async () => {
-    if (isSharing) return;
-
-    setIsSharing(true);
-    setCopied(false);
-
-    try {
-      const ratesText = generateRatesText();
-      
-      // محاولة المشاركة عبر Web Share API
-      if (navigator.share) {
-        try {
-          await navigator.share({
-            title: `أسعار الصرف - ${company?.name}`,
-            text: ratesText,
-          });
-          return;
-        } catch (error) {
-          console.log('Web Share cancelled or failed');
-        }
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'نشرة أسعار الصرف',
+          text: text,
+        });
+      } catch (error) {
+        console.log('Share cancelled');
       }
-      
-      // نسخ إلى الحافظة كبديل
-      await navigator.clipboard.writeText(ratesText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
-      
-    } catch (error) {
-      console.error('Error sharing rates:', error);
-      setError('حدث خطأ أثناء مشاركة الأسعار');
-    } finally {
-      setIsSharing(false);
-    }
-  };
-
-  const handleCopyToClipboard = async () => {
-    try {
-      const ratesText = generateRatesText();
-      await navigator.clipboard.writeText(ratesText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
-    } catch (error) {
-      console.error('Error copying to clipboard:', error);
-      setError('حدث خطأ أثناء النسخ');
+    } else {
+      try {
+        await navigator.clipboard.writeText(text);
+        alert('تم نسخ النشرة إلى الحافظة');
+      } catch (err) {
+        console.error('Failed to copy', err);
+      }
     }
   };
 
   const handleAddEmployee = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if(isLoading.addEmployee) return;
-    
-    setError('');
-    if(currentUser?.company_id) {
-      setIsLoading(prev => ({...prev, addEmployee: true}));
-      
-      try {
-        const res = await addEmployee(currentUser.company_id, empName, empUser, empPass);
-        if (res.success) {
-          setShowEmpModal(false);
-          setEmpName(''); 
-          setEmpUser(''); 
-          setEmpPass('');
-        } else {
-          setError(res.message);
-        }
-      } catch (error) {
-        console.error('Error adding employee:', error);
-        setError('حدث خطأ أثناء إضافة الموظف');
-      } finally {
-        setIsLoading(prev => ({...prev, addEmployee: false}));
+      e.preventDefault();
+      setError('');
+      if(currentUser?.company_id) {
+          setIsProcessing(true);
+          const res = await addEmployee(currentUser.company_id, empName, empUser, empPass);
+          if (res.success) {
+            setShowEmpModal(false);
+            setEmpName(''); setEmpUser(''); setEmpPass('');
+          } else {
+            setError(res.message);
+          }
+          setIsProcessing(false);
       }
-    }
   };
 
   const openEditInfo = (user: User) => {
-    setEditInfoId(user);
-    setEditName(user.full_name);
-    setEditUser(user.username);
-    setError('');
+      setEditInfoId(user);
+      setEditName(user.full_name);
+      setEditUser(user.username);
+      setError('');
   };
 
   const handleUpdateInfo = async () => {
-    if (!editInfoId || isLoading.updateEmployee) return;
-    
-    setIsLoading(prev => ({...prev, updateEmployee: true}));
-    
-    try {
+      if (!editInfoId) return;
+      setIsProcessing(true);
       const res = await updateEmployee(editInfoId.id, { full_name: editName, username: editUser });
       if (res.success) {
-        setEditInfoId(null);
+          setEditInfoId(null);
       } else {
-        setError(res.message);
+          setError(res.message);
       }
-    } catch (error) {
-      console.error('Error updating employee:', error);
-      setError('حدث خطأ أثناء تحديث بيانات الموظف');
-    } finally {
-      setIsLoading(prev => ({...prev, updateEmployee: false}));
-    }
+      setIsProcessing(false);
   };
 
   const handleChangePassword = async (id: number) => {
-    if (newPass.length < 3 || isLoading.changePassword) return;
-    
-    setIsLoading(prev => ({...prev, changePassword: true}));
-    
-    try {
+      if (newPass.length < 3) return;
+      setIsProcessing(true);
       await updateEmployeePassword(id, newPass);
+      setIsProcessing(false);
       setEditPassId(null);
       setNewPass('');
-    } catch (error) {
-      console.error('Error changing password:', error);
-      setError('حدث خطأ أثناء تغيير كلمة المرور');
-    } finally {
-      setIsLoading(prev => ({...prev, changePassword: false}));
-    }
   };
 
-  const handleDeleteEmployee = async (id: number) => {
-    if (isLoading.deleteEmployee) return;
-    
-    if (window.confirm('هل أنت متأكد من حذف هذا الموظف؟')) {
-      setIsLoading(prev => ({...prev, deleteEmployee: true}));
+  const initiateDeleteEmployee = (id: number) => {
+      setEmpToDelete(id);
+      setConfirmPassword('');
+      setError('');
+  };
+
+  const confirmDeleteEmployee = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!empToDelete || !currentUser) return;
       
-      try {
-        await deleteEmployee(id);
-      } catch (error) {
-        console.error('Error deleting employee:', error);
-        setError('حدث خطأ أثناء حذف الموظف');
-      } finally {
-        setIsLoading(prev => ({...prev, deleteEmployee: false}));
+      // Simple security check (Checking current user password vs input)
+      // Note: In a real app, verify against server. Here we compare with local state.
+      if (confirmPassword === currentUser.password) {
+        setIsProcessing(true);
+        await deleteEmployee(empToDelete);
+        setIsProcessing(false);
+        setEmpToDelete(null);
+        setConfirmPassword('');
+      } else {
+          setError('كلمة المرور غير صحيحة');
       }
-    }
   };
 
-  const QuickAction = ({ icon: Icon, label, onClick, color, disabled = false }: any) => (
-    <button 
-      onClick={onClick} 
-      disabled={disabled}
-      className={`${color} ${disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'} text-white p-4 rounded-xl shadow-md flex flex-col items-center justify-center gap-2 transition`}
-    >
+  const QuickAction = ({ icon: Icon, label, onClick, color }: any) => (
+    <button onClick={onClick} className={`${color} text-white p-4 rounded-xl shadow-md flex flex-col items-center justify-center gap-2 active:scale-95 transition`}>
       <Icon size={28} />
       <span className="font-bold text-sm">{label}</span>
     </button>
   );
+
+  // Helper for Employee Report
+  const getEmpStats = (empId: number) => {
+      const treasury = treasuries.find(t => t.employee_id === empId);
+      const txs = transactions.filter(t => t.employee_id === empId).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const recentTxs = txs.slice(0, 5);
+      return { treasury, recentTxs, totalTxs: txs.length };
+  };
 
   return (
     <div className="space-y-6">
@@ -252,10 +188,7 @@ ${company?.name}`;
         <div className="relative z-10">
           <div className="flex justify-between items-start mb-2">
              <p className="text-blue-200">أسعار الصرف الحالية</p>
-             <button 
-               onClick={() => setShowShareModal(true)} 
-               className="bg-white/20 p-2 rounded-full hover:bg-white/30 transition"
-             >
+             <button onClick={() => setShowShareModal(true)} className="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
                  <Share2 size={20} />
              </button>
           </div>
@@ -312,86 +245,62 @@ ${company?.name}`;
         />
       </div>
 
-      {/* Share Rate Modal (Text) */}
+      {/* Share Modal */}
       {showShareModal && (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-md my-auto">
-            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-              {/* Header */}
-              <div className="bg-blue-600 text-white p-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-bold">مشاركة أسعار الصرف</h2>
-                  <button 
-                    onClick={() => setShowShareModal(false)}
-                    className="text-white/80 hover:text-white transition"
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-                <p className="text-blue-200 text-sm mt-1">سيتم مشاركة الأسعار كنص يمكن نسخه ومشاركته</p>
-              </div>
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+            <div className="w-full max-w-sm">
+                <div id="rate-card-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                    <div className="bg-blue-600 p-6 text-white text-center">
+                        {company?.logo && <img src={company.logo} alt="Logo" className="h-16 w-16 mx-auto bg-white rounded-lg p-1 object-contain mb-3" crossOrigin="anonymous"/>}
+                        <h2 className="text-2xl font-bold">{company?.name}</h2>
+                        <p className="text-blue-200 text-sm mt-1">نشرة أسعار الصرف اليومية</p>
+                        {company?.phone_numbers && (
+                           <p className="text-blue-100 text-xs mt-2 font-mono" dir="ltr">{company.phone_numbers}</p>
+                        )}
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span className="text-gray-500 font-medium">سوداني {'->'} مصري</span>
+                            <span className="text-3xl font-bold text-gray-800">{rateData?.sd_to_eg_rate}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span className="text-gray-500 font-medium">مصري {'->'} سوداني</span>
+                            <span className="text-3xl font-bold text-gray-800">{rateData?.eg_to_sd_rate}</span>
+                        </div>
+                        
+                        <div className="border-t pt-4 mt-2">
+                            <div className="flex justify-between text-sm mb-2">
+                                <span className="text-gray-500">سعر الجملة</span>
+                                <span className="font-bold text-blue-600">{rateData?.wholesale_rate}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-500">أقل كمية للجملة</span>
+                                <span className="font-bold text-gray-800">{rateData?.wholesale_threshold.toLocaleString()} EGP</span>
+                            </div>
+                        </div>
 
-              {/* Rates Text Preview */}
-              <div className="p-6 bg-gray-50 max-h-96 overflow-y-auto">
-                <div className="bg-white border border-gray-200 rounded-lg p-4 text-right whitespace-pre-line leading-7">
-                  {generateRatesText()}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="p-6 border-t border-gray-200">
-                <div className="flex flex-col gap-3">
-                  <button 
-                    onClick={handleShareRatesText}
-                    disabled={isSharing}
-                    className={`bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition ${
-                      isSharing ? 'opacity-75 cursor-not-allowed' : 'hover:bg-blue-700 active:scale-95'
-                    }`}
-                  >
-                    {isSharing ? (
-                      <>
-                        <Loader2 size={20} className="animate-spin" />
-                        <span>جاري المعالجة...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Share2 size={20} />
-                        <span>مشاركة الأسعار</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button 
-                    onClick={handleCopyToClipboard}
-                    disabled={isSharing}
-                    className={`border border-blue-600 text-blue-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition ${
-                      isSharing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50 active:scale-95'
-                    }`}
-                  >
-                    {copied ? (
-                      <>
-                        <CheckCircle2 size={20} className="text-green-600" />
-                        <span className="text-green-600">تم النسخ!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={20} />
-                        <span>نسخ إلى الحافظة</span>
-                      </>
-                    )}
-                  </button>
+                        <div className="text-center text-xs text-gray-400 mt-4 pt-4 border-t">
+                            {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </div>
+                    </div>
                 </div>
 
-                <p className="text-center text-gray-500 text-xs mt-4">
-                  يمكنك مشاركة هذا النص عبر واتساب، تيليجرام، أو أي تطبيق مراسلة آخر
-                </p>
-              </div>
+                <div className="mt-4 flex gap-3">
+                    <button onClick={() => setShowShareModal(false)} className="bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-50">
+                        <X size={24} />
+                    </button>
+                    <button 
+                        onClick={handleShareRates}
+                        className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg"
+                    >
+                        <Share2 size={20} /> مشاركة (نص)
+                    </button>
+                </div>
             </div>
-          </div>
         </div>
       )}
 
-      {/* Rate Modal */}
+      {/* Rate Update Modal */}
       {showRateModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-sm p-6">
@@ -422,19 +331,8 @@ ${company?.name}`;
                         <input type="number" step="0.1" inputMode="decimal" value={commission} onChange={e => setCommission(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" placeholder="مثال: 1.0" />
                     </div>
 
-                    <button 
-                      type="submit"
-                      disabled={isLoading.updateRates}
-                      className={`w-full bg-blue-600 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center gap-2 ${isLoading.updateRates ? 'opacity-75 cursor-not-allowed' : ''}`}
-                    >
-                      {isLoading.updateRates ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          جاري الحفظ...
-                        </>
-                      ) : (
-                        'حفظ التغييرات'
-                      )}
+                    <button disabled={isProcessing} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center">
+                        {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'حفظ التغييرات'}
                     </button>
                     <button type="button" onClick={() => setShowRateModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                 </form>
@@ -452,19 +350,8 @@ ${company?.name}`;
                     <input type="text" placeholder="اسم المستخدم" value={empUser} onChange={e => setEmpUser(e.target.value)} className="w-full p-3 border rounded-lg" required />
                     <input type="password" inputMode="numeric" placeholder="كلمة المرور (أرقام)" value={empPass} onChange={e => setEmpPass(e.target.value)} className="w-full p-3 border rounded-lg" required />
                     {error && <p className="text-red-500 text-xs">{error}</p>}
-                    <button 
-                      type="submit"
-                      disabled={isLoading.addEmployee}
-                      className={`w-full bg-orange-500 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center gap-2 ${isLoading.addEmployee ? 'opacity-75 cursor-not-allowed' : ''}`}
-                    >
-                      {isLoading.addEmployee ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          جاري الإضافة...
-                        </>
-                      ) : (
-                        'إضافة'
-                      )}
+                    <button disabled={isProcessing} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center">
+                         {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'إضافة'}
                     </button>
                     <button type="button" onClick={() => setShowEmpModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                 </form>
@@ -483,34 +370,27 @@ ${company?.name}`;
                 
                 <div className="space-y-4">
                     {companyEmployees.map(emp => (
-                        <div key={emp.id} className="border p-3 rounded-xl bg-gray-50">
+                        <div key={emp.id} className="border p-3 rounded-xl bg-gray-50 transition hover:border-blue-300">
                             {editInfoId?.id === emp.id ? (
                                 <div className="space-y-2 mb-2">
                                     <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded" placeholder="الاسم" />
                                     <input value={editUser} onChange={e => setEditUser(e.target.value)} className="w-full p-2 border rounded" placeholder="اسم المستخدم" />
                                     {error && <p className="text-red-500 text-xs">{error}</p>}
                                     <div className="flex gap-2">
-                                        <button 
-                                          onClick={handleUpdateInfo} 
-                                          disabled={isLoading.updateEmployee}
-                                          className={`bg-green-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1 ${isLoading.updateEmployee ? 'opacity-75 cursor-not-allowed' : ''}`}
-                                        >
-                                          {isLoading.updateEmployee ? (
-                                            <>
-                                              <Loader2 size={12} className="animate-spin" />
-                                              جاري...
-                                            </>
-                                          ) : (
-                                            'حفظ'
-                                          )}
+                                        <button onClick={handleUpdateInfo} disabled={isProcessing} className="bg-green-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1 min-w-[60px] justify-center">
+                                            {isProcessing ? <Loader2 className="animate-spin" size={12}/> : 'حفظ'}
                                         </button>
                                         <button onClick={() => setEditInfoId(null)} className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm">إلغاء</button>
                                     </div>
                                 </div>
                             ) : (
                                 <div className="flex justify-between items-center">
-                                    <div>
-                                        <p className="font-bold">{emp.full_name}</p>
+                                    <div 
+                                        className="cursor-pointer flex-1" 
+                                        onClick={() => setSelectedEmpReport(emp)}
+                                        title="اضغط لعرض التقرير"
+                                    >
+                                        <p className="font-bold text-blue-700 hover:underline">{emp.full_name}</p>
                                         <p className="text-xs text-gray-500">user: {emp.username}</p>
                                     </div>
                                     <div className="flex gap-2">
@@ -520,13 +400,8 @@ ${company?.name}`;
                                         <button onClick={() => setEditPassId(editPassId === emp.id ? null : emp.id)} className="p-2 bg-blue-100 text-blue-600 rounded-lg" title="تغيير كلمة المرور">
                                             <Key size={16} />
                                         </button>
-                                        <button 
-                                          onClick={() => handleDeleteEmployee(emp.id)} 
-                                          disabled={isLoading.deleteEmployee}
-                                          className={`p-2 bg-red-100 text-red-600 rounded-lg ${isLoading.deleteEmployee ? 'opacity-50 cursor-not-allowed' : ''}`} 
-                                          title="حذف الموظف"
-                                        >
-                                          <Trash2 size={16} />
+                                        <button onClick={() => initiateDeleteEmployee(emp.id)} className="p-2 bg-red-100 text-red-600 rounded-lg" title="حذف الموظف">
+                                            <Trash2 size={16} />
                                         </button>
                                     </div>
                                 </div>
@@ -542,19 +417,8 @@ ${company?.name}`;
                                         value={newPass}
                                         onChange={e => setNewPass(e.target.value)}
                                     />
-                                    <button 
-                                      onClick={() => handleChangePassword(emp.id)} 
-                                      disabled={isLoading.changePassword}
-                                      className={`bg-green-600 text-white px-3 rounded-lg text-sm flex items-center gap-1 ${isLoading.changePassword ? 'opacity-75 cursor-not-allowed' : ''}`}
-                                    >
-                                      {isLoading.changePassword ? (
-                                        <>
-                                          <Loader2 size={12} className="animate-spin" />
-                                          ...
-                                        </>
-                                      ) : (
-                                        'تغيير'
-                                      )}
+                                    <button onClick={() => handleChangePassword(emp.id)} disabled={isProcessing} className="bg-green-600 text-white px-3 rounded-lg text-sm flex items-center min-w-[60px] justify-center">
+                                         {isProcessing ? <Loader2 className="animate-spin" size={14}/> : 'تغيير'}
                                     </button>
                                 </div>
                             )}
@@ -564,6 +428,108 @@ ${company?.name}`;
                 </div>
             </div>
         </div>
+      )}
+
+      {/* Employee Detail Report Modal */}
+      {selectedEmpReport && (
+          <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                  <div className="bg-blue-600 p-4 text-white flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                          <FileText size={20} />
+                          <h3 className="font-bold">تقرير الموظف</h3>
+                      </div>
+                      <button onClick={() => setSelectedEmpReport(null)} className="p-1 hover:bg-white/20 rounded-full"><X size={20}/></button>
+                  </div>
+                  
+                  <div className="p-5">
+                      <div className="text-center mb-6">
+                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 text-blue-600 font-bold text-xl">
+                              {selectedEmpReport.full_name.charAt(0)}
+                          </div>
+                          <h4 className="font-bold text-lg text-gray-800">{selectedEmpReport.full_name}</h4>
+                          <p className="text-xs text-gray-500">@{selectedEmpReport.username}</p>
+                      </div>
+
+                      {(() => {
+                          const stats = getEmpStats(selectedEmpReport.id);
+                          return (
+                              <div className="space-y-4">
+                                  <div className="grid grid-cols-2 gap-3">
+                                      <div className="bg-gray-50 p-3 rounded-xl border text-center">
+                                          <span className="text-xs text-gray-500 block">رصيد (EGP)</span>
+                                          <span className="font-bold text-lg">{stats.treasury?.egp_balance.toLocaleString()}</span>
+                                      </div>
+                                      <div className="bg-gray-50 p-3 rounded-xl border text-center">
+                                          <span className="text-xs text-gray-500 block">رصيد (SDG)</span>
+                                          <span className="font-bold text-lg">{stats.treasury?.sdg_balance.toLocaleString()}</span>
+                                      </div>
+                                  </div>
+
+                                  <div className="border-t pt-3">
+                                      <p className="text-xs font-bold text-gray-500 mb-2">آخر العمليات ({stats.totalTxs})</p>
+                                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                          {stats.recentTxs.map(tx => (
+                                              <div key={tx.id} className="flex justify-between text-xs bg-gray-50 p-2 rounded border border-gray-100">
+                                                  <span className={tx.from_currency === 'SDG' ? 'text-orange-600' : 'text-blue-600'}>
+                                                      {tx.type === 'exchange' ? 'صرف' : 'حركة'} {tx.from_amount.toLocaleString()} {tx.from_currency}
+                                                  </span>
+                                                  <span className="text-gray-400">{new Date(tx.created_at).toLocaleDateString()}</span>
+                                              </div>
+                                          ))}
+                                          {stats.recentTxs.length === 0 && <p className="text-center text-gray-400 text-xs py-2">لا توجد عمليات</p>}
+                                      </div>
+                                  </div>
+                              </div>
+                          );
+                      })()}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {empToDelete && (
+          <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-xs p-6 shadow-2xl">
+                  <div className="text-center mb-4">
+                      <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <Lock size={24} className="text-red-600" />
+                      </div>
+                      <h3 className="font-bold text-gray-800">تأكيد الحذف</h3>
+                      <p className="text-xs text-gray-500 mt-1">لحذف الموظف، يرجى إدخال كلمة مرور المدير</p>
+                  </div>
+                  
+                  <form onSubmit={confirmDeleteEmployee}>
+                      <input 
+                          type="password" 
+                          autoFocus
+                          placeholder="كلمة مرور المدير" 
+                          className="w-full p-3 border rounded-lg mb-2 text-center"
+                          value={confirmPassword}
+                          onChange={e => setConfirmPassword(e.target.value)}
+                      />
+                      {error && <p className="text-red-500 text-xs text-center mb-2">{error}</p>}
+                      
+                      <div className="flex gap-2">
+                          <button 
+                              type="submit" 
+                              disabled={isProcessing}
+                              className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold flex justify-center"
+                          >
+                              {isProcessing ? <Loader2 className="animate-spin" size={16}/> : 'حذف نهائي'}
+                          </button>
+                          <button 
+                              type="button" 
+                              onClick={() => { setEmpToDelete(null); setConfirmPassword(''); }}
+                              className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg font-bold"
+                          >
+                              إلغاء
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
       )}
 
       {/* Subscription Info Footer */}
