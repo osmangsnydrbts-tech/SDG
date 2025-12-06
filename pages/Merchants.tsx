@@ -30,8 +30,17 @@ const Merchants: React.FC = () => {
   };
 
   const handleAmountChange = (value: string) => {
+    // إزالة أي مسافات من المدخلات
+    const trimmedValue = value.trim();
+    
     // السماح فقط بالأرقام والنقطة العشرية
-    const cleanedValue = value.replace(/[^0-9.]/g, '');
+    const cleanedValue = trimmedValue.replace(/[^0-9.]/g, '');
+    
+    // التحقق من أن المدخل لا يبدأ بنقطة
+    if (cleanedValue === '.') {
+      setAmount('0.');
+      return;
+    }
     
     // التأكد من وجود نقطة عشرية واحدة فقط
     const parts = cleanedValue.split('.');
@@ -39,8 +48,33 @@ const Merchants: React.FC = () => {
       return; // لا تقبل أكثر من نقطة عشرية واحدة
     }
     
-    // السماح بحد أقصى 3 منازل عشرية (يمكن تعديل الرقم حسب الحاجة)
+    // السماح بحد أقصى 3 منازل عشرية
     if (parts[1] && parts[1].length > 3) {
+      // إذا كان المستخدم يحاول إضافة أكثر من 3 منازل عشرية، نقبل أول 3 فقط
+      const truncatedDecimal = parts[1].substring(0, 3);
+      setAmount(`${parts[0]}.${truncatedDecimal}`);
+      return;
+    }
+    
+    // عدم السماح بأكثر من 10 أرقام قبل العلامة العشرية
+    if (parts[0].length > 10) {
+      return;
+    }
+    
+    // السماح بإدخال الصفر كقيمة أولية
+    if (cleanedValue === '0' || cleanedValue === '00') {
+      setAmount('0');
+      return;
+    }
+    
+    // إزالة الأصفار البادئة غير الضرورية (لكن الاحتفاظ بصفر واحد إذا كان الرقم عشري)
+    if (parts[0].length > 1 && parts[0].startsWith('0') && !parts[0].startsWith('0.')) {
+      const withoutLeadingZeros = parts[0].replace(/^0+/, '');
+      if (parts[1]) {
+        setAmount(`${withoutLeadingZeros}.${parts[1]}`);
+      } else {
+        setAmount(withoutLeadingZeros);
+      }
       return;
     }
     
@@ -59,16 +93,32 @@ const Merchants: React.FC = () => {
       return;
     }
     
+    // التحقق من أن المبلغ يحتوي على قيمة صالحة
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       setAmountError('يرجى إدخال مبلغ صحيح أكبر من الصفر');
       return;
     }
     
-    // التقريب إلى منزلتين عشريتين
-    const roundedAmount = Math.round(numAmount * 100) / 100;
+    // إذا كان المستخدم أدخل نقطة فقط في النهاية، نضيف صفر
+    let finalAmount = amount;
+    if (amount.endsWith('.')) {
+      finalAmount = amount + '00';
+    }
     
+    // التقريب إلى منزلتين عشريتين
+    const roundedAmount = Math.round(parseFloat(finalAmount) * 100) / 100;
+    
+    // التحقق من أن الرقم النهائي صالح
+    if (isNaN(roundedAmount) || roundedAmount <= 0) {
+      setAmountError('يرجى إدخال مبلغ صحيح');
+      return;
+    }
+    
+    // إضافة القيد
     addMerchantEntry(showEntryModal, entryType, currency, roundedAmount);
+    
+    // إعادة تعيين الحقول
     setShowEntryModal(null);
     setAmount('');
     setAmountError('');
@@ -99,6 +149,27 @@ const Merchants: React.FC = () => {
   // دالة لحساب الرصيد الإجمالي
   const getTotalBalance = (merchant: any) => {
     return fmt(merchant.egp_balance + (merchant.sdg_balance || 0));
+  };
+
+  // دالة لتنسيق المبلغ المدخل في الـ input لعرضه بشكل أفضل
+  const formatInputAmount = (value: string) => {
+    if (!value) return '';
+    
+    // إذا كان يحتوي على نقطة عشرية، نتركه كما هو
+    if (value.includes('.')) {
+      return value;
+    }
+    
+    // إذا كان رقمًا صحيحًا كبيرًا، يمكن إضافة فواصل للقراءة
+    const num = parseFloat(value);
+    if (!isNaN(num) && num >= 1000) {
+      return num.toLocaleString('ar-EG', {
+        maximumFractionDigits: 0,
+        useGrouping: true
+      });
+    }
+    
+    return value;
   };
 
   return (
@@ -307,7 +378,7 @@ const Merchants: React.FC = () => {
                     type="text"
                     inputMode="decimal"
                     placeholder="0.00"
-                    value={amount}
+                    value={formatInputAmount(amount)}
                     onChange={(e) => handleAmountChange(e.target.value)}
                     className={`w-full p-3 border rounded-lg text-lg font-bold text-right ${
                       amountError
@@ -321,7 +392,10 @@ const Merchants: React.FC = () => {
                   </div>
                 </div>
                 {amountError && <p className="text-red-500 text-sm mt-1">{amountError}</p>}
-                <p className="text-xs text-gray-500 mt-1">يمكن إدخال المنازل العشرية (مثال: 1500.75)</p>
+                <div className="flex justify-between items-center mt-1">
+                  <p className="text-xs text-gray-500">يمكن إدخال المنازل العشرية (مثال: 1500.75)</p>
+                  <p className="text-xs text-gray-500">الحد الأقصى: 3 منازل عشرية</p>
+                </div>
               </div>
 
               <div className="flex gap-2 pt-2">
