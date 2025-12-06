@@ -29,6 +29,7 @@ const Merchants: React.FC = () => {
     }
   };
 
+  // دالة معالجة إدخال المبلغ مع تحكم دقيق في المنازل العشرية
   const handleAmountChange = (value: string) => {
     // إزالة أي مسافات من المدخلات
     const trimmedValue = value.trim();
@@ -36,23 +37,33 @@ const Merchants: React.FC = () => {
     // السماح فقط بالأرقام والنقطة العشرية
     const cleanedValue = trimmedValue.replace(/[^0-9.]/g, '');
     
+    // إذا كانت القيمة فارغة بعد التنظيف
+    if (cleanedValue === '') {
+      setAmount('');
+      setAmountError('');
+      return;
+    }
+    
     // التحقق من أن المدخل لا يبدأ بنقطة
     if (cleanedValue === '.') {
       setAmount('0.');
+      setAmountError('');
       return;
     }
     
     // التأكد من وجود نقطة عشرية واحدة فقط
     const parts = cleanedValue.split('.');
     if (parts.length > 2) {
-      return; // لا تقبل أكثر من نقطة عشرية واحدة
+      // لا تقبل أكثر من نقطة عشرية واحدة
+      return;
     }
     
-    // السماح بحد أقصى 3 منازل عشرية
-    if (parts[1] && parts[1].length > 3) {
-      // إذا كان المستخدم يحاول إضافة أكثر من 3 منازل عشرية، نقبل أول 3 فقط
-      const truncatedDecimal = parts[1].substring(0, 3);
+    // السماح بحد أقصى 2 منزلتين عشريتين (تم التغيير من 3 إلى 2)
+    if (parts[1] && parts[1].length > 2) {
+      // إذا كان المستخدم يحاول إضافة أكثر من منزلتين عشريتين، نقبل أول 2 فقط
+      const truncatedDecimal = parts[1].substring(0, 2);
       setAmount(`${parts[0]}.${truncatedDecimal}`);
+      setAmountError('');
       return;
     }
     
@@ -64,10 +75,11 @@ const Merchants: React.FC = () => {
     // السماح بإدخال الصفر كقيمة أولية
     if (cleanedValue === '0' || cleanedValue === '00') {
       setAmount('0');
+      setAmountError('');
       return;
     }
     
-    // إزالة الأصفار البادئة غير الضرورية (لكن الاحتفاظ بصفر واحد إذا كان الرقم عشري)
+    // إزالة الأصفار البادئة غير الضرورية
     if (parts[0].length > 1 && parts[0].startsWith('0') && !parts[0].startsWith('0.')) {
       const withoutLeadingZeros = parts[0].replace(/^0+/, '');
       if (parts[1]) {
@@ -75,11 +87,41 @@ const Merchants: React.FC = () => {
       } else {
         setAmount(withoutLeadingZeros);
       }
+      setAmountError('');
       return;
     }
     
+    // منع الأرقام السالبة (يتم التحكم بالسالب من خلال نوع القيد)
+    if (cleanedValue.includes('-')) {
+      return;
+    }
+    
+    // السماح بالأرقام العادية
     setAmount(cleanedValue);
     setAmountError('');
+  };
+
+  // دالة تقصير المنازل العشرية إلى منزلتين
+  const truncateToTwoDecimals = (numStr: string): string => {
+    const parts = numStr.split('.');
+    
+    // إذا لم يكن هناك جزء عشري أو كان فارغًا
+    if (parts.length < 2 || !parts[1]) {
+      return numStr;
+    }
+    
+    // إذا كان الجزء العشري بطول 1، نضيف صفرًا
+    if (parts[1].length === 1) {
+      return `${parts[0]}.${parts[1]}0`;
+    }
+    
+    // إذا كان الجزء العشري بطول 2 أو أكثر، نأخذ أول منزلتين
+    if (parts[1].length >= 2) {
+      const truncatedDecimal = parts[1].substring(0, 2);
+      return `${parts[0]}.${truncatedDecimal}`;
+    }
+    
+    return numStr;
   };
 
   const handleEntry = (e: React.FormEvent) => {
@@ -100,18 +142,27 @@ const Merchants: React.FC = () => {
       return;
     }
     
-    // إذا كان المستخدم أدخل نقطة فقط في النهاية، نضيف صفر
-    let finalAmount = amount;
+    // تطبيق تقصير المنازل العشرية
+    let finalAmount = truncateToTwoDecimals(amount);
+    
+    // إذا كان المستخدم أدخل نقطة فقط في النهاية، نضيف صفرين
     if (amount.endsWith('.')) {
       finalAmount = amount + '00';
     }
     
-    // التقريب إلى منزلتين عشريتين
+    // التحويل إلى رقم مع التقريب إلى منزلتين عشريتين
     const roundedAmount = Math.round(parseFloat(finalAmount) * 100) / 100;
     
     // التحقق من أن الرقم النهائي صالح
     if (isNaN(roundedAmount) || roundedAmount <= 0) {
       setAmountError('يرجى إدخال مبلغ صحيح');
+      return;
+    }
+    
+    // التحقق من أن المبلغ لا يحتوي على أكثر من منزلتين عشريتين
+    const decimalPart = finalAmount.split('.')[1];
+    if (decimalPart && decimalPart.length > 2) {
+      setAmountError('الحد الأقصى للمنازل العشرية هو منزلتين');
       return;
     }
     
@@ -170,6 +221,16 @@ const Merchants: React.FC = () => {
     }
     
     return value;
+  };
+
+  // دالة لإظهار التحذير عند محاولة إدخال أكثر من منزلتين عشريتين
+  const showDecimalWarning = () => {
+    if (!amount) return false;
+    
+    const parts = amount.split('.');
+    if (parts.length < 2) return false;
+    
+    return parts[1].length > 2;
   };
 
   return (
@@ -381,7 +442,7 @@ const Merchants: React.FC = () => {
                     value={formatInputAmount(amount)}
                     onChange={(e) => handleAmountChange(e.target.value)}
                     className={`w-full p-3 border rounded-lg text-lg font-bold text-right ${
-                      amountError
+                      amountError || showDecimalWarning()
                         ? 'border-red-500 focus:ring-red-500'
                         : 'border-gray-300 focus:ring-indigo-500'
                     } focus:ring-2 focus:border-transparent`}
@@ -392,9 +453,12 @@ const Merchants: React.FC = () => {
                   </div>
                 </div>
                 {amountError && <p className="text-red-500 text-sm mt-1">{amountError}</p>}
+                {showDecimalWarning() && !amountError && (
+                  <p className="text-orange-500 text-sm mt-1">سيتم تقصير المنازل العشرية إلى منزلتين</p>
+                )}
                 <div className="flex justify-between items-center mt-1">
                   <p className="text-xs text-gray-500">يمكن إدخال المنازل العشرية (مثال: 1500.75)</p>
-                  <p className="text-xs text-gray-500">الحد الأقصى: 3 منازل عشرية</p>
+                  <p className="text-xs text-gray-500">الحد الأقصى: منزلتين عشريتين</p>
                 </div>
               </div>
 
