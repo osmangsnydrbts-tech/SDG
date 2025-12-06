@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Plus, User, ArrowUpRight, ArrowDownLeft, Trash2 } from 'lucide-react';
@@ -16,120 +15,338 @@ const Merchants: React.FC = () => {
   const [entryType, setEntryType] = useState<'credit' | 'debit'>('debit');
   const [currency, setCurrency] = useState<'EGP' | 'SDG'>('EGP');
   const [amount, setAmount] = useState('');
+  const [amountError, setAmountError] = useState('');
 
   const companyMerchants = merchants.filter(m => m.company_id === currentUser?.company_id && m.is_active);
 
   const handleAddMerchant = (e: React.FormEvent) => {
-      e.preventDefault();
-      if(currentUser?.company_id) {
-          addMerchant(currentUser.company_id, name, phone);
-          setShowAddModal(false);
-          setName(''); setPhone('');
-      }
+    e.preventDefault();
+    if (currentUser?.company_id) {
+      addMerchant(currentUser.company_id, name, phone);
+      setShowAddModal(false);
+      setName('');
+      setPhone('');
+    }
+  };
+
+  const handleAmountChange = (value: string) => {
+    // السماح فقط بالأرقام والنقطة العشرية
+    const cleanedValue = value.replace(/[^0-9.]/g, '');
+    
+    // التأكد من وجود نقطة عشرية واحدة فقط
+    const parts = cleanedValue.split('.');
+    if (parts.length > 2) {
+      return; // لا تقبل أكثر من نقطة عشرية واحدة
+    }
+    
+    // السماح بحد أقصى 3 منازل عشرية (يمكن تعديل الرقم حسب الحاجة)
+    if (parts[1] && parts[1].length > 3) {
+      return;
+    }
+    
+    setAmount(cleanedValue);
+    setAmountError('');
   };
 
   const handleEntry = (e: React.FormEvent) => {
-      e.preventDefault();
-      if(showEntryModal) {
-          addMerchantEntry(showEntryModal, entryType, currency, parseFloat(amount));
-          setShowEntryModal(null);
-          setAmount('');
-      }
+    e.preventDefault();
+    
+    if (!showEntryModal) return;
+    
+    // التحقق من صحة المبلغ
+    if (!amount.trim()) {
+      setAmountError('يرجى إدخال المبلغ');
+      return;
+    }
+    
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      setAmountError('يرجى إدخال مبلغ صحيح أكبر من الصفر');
+      return;
+    }
+    
+    // التقريب إلى منزلتين عشريتين
+    const roundedAmount = Math.round(numAmount * 100) / 100;
+    
+    addMerchantEntry(showEntryModal, entryType, currency, roundedAmount);
+    setShowEntryModal(null);
+    setAmount('');
+    setAmountError('');
   };
 
   const handleDeleteMerchant = (id: number) => {
-      if (window.confirm('هل أنت متأكد من حذف هذا التاجر؟')) {
-          deleteMerchant(id);
-      }
+    if (window.confirm('هل أنت متأكد من حذف هذا التاجر؟')) {
+      deleteMerchant(id);
+    }
   };
 
-  const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // دالة تنسيق الأرقام مع فواصل الآلاف ومنزلتين عشريتين
+  const fmt = (n: number) => {
+    if (n === null || n === undefined) return '0.00';
+    
+    return n.toLocaleString('ar-EG', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      useGrouping: true
+    });
+  };
+
+  // دالة لإظهار عملة المتجر
+  const getCurrencySymbol = (curr: 'EGP' | 'SDG') => {
+    return curr === 'EGP' ? 'ج.م' : 'ج.س';
+  };
+
+  // دالة لحساب الرصيد الإجمالي
+  const getTotalBalance = (merchant: any) => {
+    return fmt(merchant.egp_balance + (merchant.sdg_balance || 0));
+  };
 
   return (
     <div className="space-y-4">
-        <button onClick={() => setShowAddModal(true)} className="w-full bg-indigo-600 text-white p-3 rounded-xl flex items-center justify-center gap-2 font-bold shadow-md">
-            <Plus size={20} /> إضافة تاجر جديد
-        </button>
+      <button
+        onClick={() => setShowAddModal(true)}
+        className="w-full bg-indigo-600 text-white p-3 rounded-xl flex items-center justify-center gap-2 font-bold shadow-md hover:bg-indigo-700 transition-colors"
+      >
+        <Plus size={20} /> إضافة تاجر جديد
+      </button>
 
-        <div className="space-y-3">
-            {companyMerchants.map(m => (
-                <div key={m.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                    <div className="flex justify-between items-start mb-3">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-indigo-50 p-2 rounded-full text-indigo-600"><User size={20}/></div>
-                            <div>
-                                <h3 className="font-bold">{m.name}</h3>
-                                <p className="text-xs text-gray-500">{m.phone}</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => setShowEntryModal(m.id)} className="text-xs bg-gray-100 px-3 py-1 rounded-lg font-bold hover:bg-gray-200">
-                                تسجيل قيد
-                            </button>
-                            <button onClick={() => handleDeleteMerchant(m.id)} className="p-1 bg-red-50 text-red-500 rounded-lg hover:bg-red-100">
-                                <Trash2 size={18} />
-                            </button>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm bg-gray-50 p-3 rounded-lg">
-                        <div className="flex justify-between">
-                            <span className="text-gray-500">مصري</span>
-                            <span className={`font-bold ${m.egp_balance < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                {fmt(m.egp_balance)}
-                            </span>
-                        </div>
-                        <div className="flex justify-between border-r pr-2 border-gray-200">
-                            <span className="text-gray-500">سوداني</span>
-                            <span className={`font-bold ${m.sdg_balance < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                {fmt(m.sdg_balance)}
-                            </span>
-                        </div>
-                    </div>
+      <div className="space-y-3">
+        {companyMerchants.map((m) => (
+          <div key={m.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex items-center gap-3">
+                <div className="bg-indigo-50 p-2 rounded-full text-indigo-600">
+                  <User size={20} />
                 </div>
-            ))}
-            {companyMerchants.length === 0 && <p className="text-center text-gray-500 py-8">لا يوجد تجار</p>}
+                <div>
+                  <h3 className="font-bold text-gray-800">{m.name}</h3>
+                  <p className="text-xs text-gray-500">{m.phone || 'لا يوجد رقم هاتف'}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowEntryModal(m.id);
+                    setAmount('');
+                    setAmountError('');
+                  }}
+                  className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg font-bold hover:bg-indigo-100 transition-colors"
+                >
+                  تسجيل قيد
+                </button>
+                <button
+                  onClick={() => handleDeleteMerchant(m.id)}
+                  className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors"
+                  title="حذف التاجر"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            </div>
+            
+            <div className="mb-3 p-3 bg-blue-50 rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">الرصيد الإجمالي</span>
+                <span className={`font-bold text-lg ${(m.egp_balance + (m.sdg_balance || 0)) < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                  {getTotalBalance(m)}
+                </span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 text-sm bg-gray-50 p-3 rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 flex items-center gap-1">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                  مصري
+                </span>
+                <span className={`font-bold ${m.egp_balance < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                  {fmt(m.egp_balance)} <span className="text-xs text-gray-500">ج.م</span>
+                </span>
+              </div>
+              <div className="flex justify-between items-center border-r pr-2 border-gray-200">
+                <span className="text-gray-500 flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  سوداني
+                </span>
+                <span className={`font-bold ${m.sdg_balance < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                  {fmt(m.sdg_balance)} <span className="text-xs text-gray-500">ج.س</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+        {companyMerchants.length === 0 && (
+          <div className="text-center py-8">
+            <div className="bg-gray-50 p-6 rounded-xl">
+              <User size={48} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500 mb-2">لا يوجد تجار</p>
+              <p className="text-sm text-gray-400">ابدأ بإضافة تاجر جديد</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Add Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-lg">إضافة تاجر</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleAddMerchant} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">اسم التاجر</label>
+                <input
+                  type="text"
+                  placeholder="أدخل اسم التاجر"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">رقم الهاتف</label>
+                <input
+                  type="tel"
+                  placeholder="رقم الهاتف (اختياري)"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition-colors"
+                >
+                  حفظ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-200 transition-colors"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
+      )}
 
-        {/* Add Modal */}
-        {showAddModal && (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl w-full max-w-sm p-6">
-                    <h3 className="font-bold mb-4">إضافة تاجر</h3>
-                    <form onSubmit={handleAddMerchant} className="space-y-3">
-                        <input type="text" placeholder="اسم التاجر" value={name} onChange={e => setName(e.target.value)} className="w-full p-3 border rounded-lg" required />
-                        <input type="tel" placeholder="رقم الهاتف (اختياري)" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-3 border rounded-lg" />
-                        <button className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold mt-2">حفظ</button>
-                        <button type="button" onClick={() => setShowAddModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
-                    </form>
-                </div>
+      {/* Entry Modal */}
+      {showEntryModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-lg">تسجيل قيد جديد</h3>
+              <button
+                onClick={() => {
+                  setShowEntryModal(null);
+                  setAmount('');
+                  setAmountError('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
             </div>
-        )}
+            <form onSubmit={handleEntry} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">نوع القيد</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEntryType('debit')}
+                    className={`flex-1 p-3 border rounded-lg flex flex-col items-center gap-2 transition-all ${
+                      entryType === 'debit'
+                        ? 'bg-red-50 border-red-500 text-red-600'
+                        : 'border-gray-300 hover:border-red-300'
+                    }`}
+                  >
+                    <ArrowDownLeft size={20} />
+                    <span>عليه (مدين)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntryType('credit')}
+                    className={`flex-1 p-3 border rounded-lg flex flex-col items-center gap-2 transition-all ${
+                      entryType === 'credit'
+                        ? 'bg-green-50 border-green-500 text-green-600'
+                        : 'border-gray-300 hover:border-green-300'
+                    }`}
+                  >
+                    <ArrowUpRight size={20} />
+                    <span>له (دائن)</span>
+                  </button>
+                </div>
+              </div>
 
-        {/* Entry Modal */}
-        {showEntryModal && (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl w-full max-w-sm p-6">
-                    <h3 className="font-bold mb-4">تسجيل قيد جديد</h3>
-                    <form onSubmit={handleEntry} className="space-y-3">
-                        <div className="flex gap-2">
-                            <button type="button" onClick={() => setEntryType('debit')} className={`flex-1 p-2 border rounded-lg flex flex-col items-center gap-1 ${entryType === 'debit' ? 'bg-red-50 border-red-500 text-red-600' : ''}`}>
-                                <ArrowDownLeft size={16}/> عليه (مدين)
-                            </button>
-                            <button type="button" onClick={() => setEntryType('credit')} className={`flex-1 p-2 border rounded-lg flex flex-col items-center gap-1 ${entryType === 'credit' ? 'bg-green-50 border-green-500 text-green-600' : ''}`}>
-                                <ArrowUpRight size={16}/> له (دائن)
-                            </button>
-                        </div>
-                        <select value={currency} onChange={e => setCurrency(e.target.value as any)} className="w-full p-3 border rounded-lg">
-                            <option value="EGP">EGP</option>
-                            <option value="SDG">SDG</option>
-                        </select>
-                        <input type="number" inputMode="decimal" placeholder="المبلغ" value={amount} onChange={e => setAmount(e.target.value)} className="w-full p-3 border rounded-lg text-lg font-bold" required />
-                        <button className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold mt-2">تسجيل</button>
-                        <button type="button" onClick={() => setShowEntryModal(null)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
-                    </form>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">العملة</label>
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value as 'EGP' | 'SDG')}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="EGP">جنيه مصري (EGP)</option>
+                  <option value="SDG">جنيه سوداني (SDG)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  المبلغ <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) => handleAmountChange(e.target.value)}
+                    className={`w-full p-3 border rounded-lg text-lg font-bold text-right ${
+                      amountError
+                        ? 'border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 focus:ring-indigo-500'
+                    } focus:ring-2 focus:border-transparent`}
+                    required
+                  />
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                    {getCurrencySymbol(currency)}
+                  </div>
                 </div>
-            </div>
-        )}
+                {amountError && <p className="text-red-500 text-sm mt-1">{amountError}</p>}
+                <p className="text-xs text-gray-500 mt-1">يمكن إدخال المنازل العشرية (مثال: 1500.75)</p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 bg-gray-900 text-white py-3 rounded-lg font-bold hover:bg-gray-800 transition-colors"
+                >
+                  تسجيل القيد
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEntryModal(null);
+                    setAmount('');
+                    setAmountError('');
+                  }}
+                  className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-200 transition-colors"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
