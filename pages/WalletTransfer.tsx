@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { CheckCircle, Loader2, Wallet, ArrowDown, ArrowUp } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
