@@ -29,10 +29,10 @@ const Merchants: React.FC = () => {
     }
   };
 
-  // دالة معالجة إدخال المبلغ مع تحكم دقيق في المنازل العشرية
+  // دالة معالجة إدخال المبلغ مع تحكم دقيق - الإصدار المحسن
   const handleAmountChange = (value: string) => {
-    // إزالة أي مسافات من المدخلات
-    const trimmedValue = value.trim();
+    // إزالة أي مسافات والفواصل من المدخلات
+    const trimmedValue = value.trim().replace(/,/g, '');
     
     // السماح فقط بالأرقام والنقطة العشرية
     const cleanedValue = trimmedValue.replace(/[^0-9.]/g, '');
@@ -58,7 +58,7 @@ const Merchants: React.FC = () => {
       return;
     }
     
-    // السماح بحد أقصى 2 منزلتين عشريتين (تم التغيير من 3 إلى 2)
+    // السماح بحد أقصى 2 منزلتين عشريتين
     if (parts[1] && parts[1].length > 2) {
       // إذا كان المستخدم يحاول إضافة أكثر من منزلتين عشريتين، نقبل أول 2 فقط
       const truncatedDecimal = parts[1].substring(0, 2);
@@ -67,8 +67,8 @@ const Merchants: React.FC = () => {
       return;
     }
     
-    // عدم السماح بأكثر من 10 أرقام قبل العلامة العشرية
-    if (parts[0].length > 10) {
+    // السماح بحد أقصى 15 رقمًا قبل العلامة العشرية (تريليونات)
+    if (parts[0].length > 15) {
       return;
     }
     
@@ -91,7 +91,7 @@ const Merchants: React.FC = () => {
       return;
     }
     
-    // منع الأرقام السالبة (يتم التحكم بالسالب من خلال نوع القيد)
+    // منع الأرقام السالبة
     if (cleanedValue.includes('-')) {
       return;
     }
@@ -136,14 +136,14 @@ const Merchants: React.FC = () => {
     }
     
     // التحقق من أن المبلغ يحتوي على قيمة صالحة
-    const numAmount = parseFloat(amount);
+    const numAmount = parseFloat(amount.replace(/,/g, ''));
     if (isNaN(numAmount) || numAmount <= 0) {
       setAmountError('يرجى إدخال مبلغ صحيح أكبر من الصفر');
       return;
     }
     
     // تطبيق تقصير المنازل العشرية
-    let finalAmount = truncateToTwoDecimals(amount);
+    let finalAmount = truncateToTwoDecimals(amount.replace(/,/g, ''));
     
     // إذا كان المستخدم أدخل نقطة فقط في النهاية، نضيف صفرين
     if (amount.endsWith('.')) {
@@ -166,6 +166,12 @@ const Merchants: React.FC = () => {
       return;
     }
     
+    // التحقق من أن المبلغ لا يتجاوز الحد الأقصى (تريليون)
+    if (roundedAmount > 1000000000000) {
+      setAmountError('المبلغ كبير جدًا (الحد الأقصى: 1 تريليون)');
+      return;
+    }
+    
     // إضافة القيد
     addMerchantEntry(showEntryModal, entryType, currency, roundedAmount);
     
@@ -185,7 +191,7 @@ const Merchants: React.FC = () => {
   const fmt = (n: number) => {
     if (n === null || n === undefined) return '0.00';
     
-    return n.toLocaleString('ar-EG', {
+    return n.toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
       useGrouping: true
@@ -194,7 +200,7 @@ const Merchants: React.FC = () => {
 
   // دالة لإظهار عملة المتجر
   const getCurrencySymbol = (curr: 'EGP' | 'SDG') => {
-    return curr === 'EGP' ? 'ج.م' : 'ج.س';
+    return curr === 'EGP' ? '£' : 'SDG';
   };
 
   // دالة لحساب الرصيد الإجمالي
@@ -202,32 +208,48 @@ const Merchants: React.FC = () => {
     return fmt(merchant.egp_balance + (merchant.sdg_balance || 0));
   };
 
-  // دالة لتنسيق المبلغ المدخل في الـ input لعرضه بشكل أفضل
+  // دالة لتنسيق المبلغ المدخل في الـ input لعرضه بشكل أفضل - محسنة
   const formatInputAmount = (value: string) => {
     if (!value) return '';
     
-    // إذا كان يحتوي على نقطة عشرية، نتركه كما هو
-    if (value.includes('.')) {
-      return value;
+    // إزالة الفواصل الموجودة مسبقًا
+    const cleanValue = value.replace(/,/g, '');
+    
+    // إذا كان يحتوي على نقطة عشرية
+    if (cleanValue.includes('.')) {
+      const parts = cleanValue.split('.');
+      
+      // تنسيق الجزء الصحيح بفواصل الآلاف
+      const integerPart = parts[0] ? parseInt(parts[0], 10).toLocaleString('en-US') : '0';
+      
+      // إعادة بناء القيمة مع النقطة العشرية
+      if (parts.length > 1) {
+        // إذا كان هناك جزء عشري
+        const decimalPart = parts[1].substring(0, 2); // تأخذ أول منزلتين فقط
+        return `${integerPart}.${decimalPart}`;
+      }
+      
+      return integerPart;
     }
     
-    // إذا كان رقمًا صحيحًا كبيرًا، يمكن إضافة فواصل للقراءة
-    const num = parseFloat(value);
-    if (!isNaN(num) && num >= 1000) {
-      return num.toLocaleString('ar-EG', {
+    // إذا كان رقمًا صحيحًا كبيرًا
+    const num = parseFloat(cleanValue);
+    if (!isNaN(num)) {
+      return num.toLocaleString('en-US', {
         maximumFractionDigits: 0,
         useGrouping: true
       });
     }
     
-    return value;
+    return cleanValue;
   };
 
   // دالة لإظهار التحذير عند محاولة إدخال أكثر من منزلتين عشريتين
   const showDecimalWarning = () => {
     if (!amount) return false;
     
-    const parts = amount.split('.');
+    const cleanAmount = amount.replace(/,/g, '');
+    const parts = cleanAmount.split('.');
     if (parts.length < 2) return false;
     
     return parts[1].length > 2;
@@ -292,7 +314,7 @@ const Merchants: React.FC = () => {
                   مصري
                 </span>
                 <span className={`font-bold ${m.egp_balance < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                  {fmt(m.egp_balance)} <span className="text-xs text-gray-500">ج.م</span>
+                  {fmt(m.egp_balance)} <span className="text-xs text-gray-500">£</span>
                 </span>
               </div>
               <div className="flex justify-between items-center border-r pr-2 border-gray-200">
@@ -301,7 +323,7 @@ const Merchants: React.FC = () => {
                   سوداني
                 </span>
                 <span className={`font-bold ${m.sdg_balance < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                  {fmt(m.sdg_balance)} <span className="text-xs text-gray-500">ج.س</span>
+                  {fmt(m.sdg_balance)} <span className="text-xs text-gray-500">SDG</span>
                 </span>
               </div>
             </div>
@@ -338,6 +360,8 @@ const Merchants: React.FC = () => {
                   onChange={(e) => setName(e.target.value)}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
+                  dir="rtl"
+                  lang="ar"
                 />
               </div>
               <div>
@@ -348,6 +372,7 @@ const Merchants: React.FC = () => {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  dir="ltr"
                 />
               </div>
               <div className="flex gap-2 pt-2">
@@ -447,6 +472,9 @@ const Merchants: React.FC = () => {
                         : 'border-gray-300 focus:ring-indigo-500'
                     } focus:ring-2 focus:border-transparent`}
                     required
+                    dir="ltr" // إجبار الاتجاه من اليسار لليمين
+                    lang="en" // إجبار اللغة الإنجليزية
+                    style={{ fontFamily: 'monospace' }} // استخدام خط ثابت للأرقام
                   />
                   <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
                     {getCurrencySymbol(currency)}
@@ -457,7 +485,7 @@ const Merchants: React.FC = () => {
                   <p className="text-orange-500 text-sm mt-1">سيتم تقصير المنازل العشرية إلى منزلتين</p>
                 )}
                 <div className="flex justify-between items-center mt-1">
-                  <p className="text-xs text-gray-500">يمكن إدخال المنازل العشرية (مثال: 1500.75)</p>
+                  <p className="text-xs text-gray-500">يمكن إدخال المبالغ الكبيرة (مثال: 1,000,000.50)</p>
                   <p className="text-xs text-gray-500">الحد الأقصى: منزلتين عشريتين</p>
                 </div>
               </div>
