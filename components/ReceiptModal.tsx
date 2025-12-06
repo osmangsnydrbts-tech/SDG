@@ -23,7 +23,8 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     setIsSharing(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Wait for UI to stabilize
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
@@ -31,19 +32,24 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
         useCORS: true,
         logging: false,
         allowTaint: true,
-        scrollY: -window.scrollY,
-        windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight,
-        x: 0,
-        y: 0
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: document.documentElement.offsetWidth,
+        windowHeight: document.documentElement.offsetHeight,
+        onclone: (clonedDoc) => {
+            const clonedElement = clonedDoc.getElementById('receipt-content');
+            if (clonedElement) {
+                clonedElement.style.transform = 'none';
+                clonedElement.style.overflow = 'visible';
+            }
+        }
       });
 
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
 
       if (blob) {
         const fileName = `receipt_${transaction.receipt_number || transaction.id}.jpg`;
         const file = new File([blob], fileName, { type: 'image/jpeg' });
-        let shared = false;
         
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
@@ -52,13 +58,10 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
               title: 'إشعار عملية',
               text: `إشعار عملية - ${company.name}`,
             });
-            shared = true;
           } catch (error) {
-            console.warn('Sharing cancelled or failed', error);
+            console.log('Sharing failed or cancelled', error);
           }
-        } 
-
-        if (!shared) {
+        } else {
           const link = document.createElement('a');
           link.href = URL.createObjectURL(blob);
           link.download = fileName;
@@ -69,7 +72,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
       }
     } catch (error) {
       console.error('Error generating image', error);
-      alert('حدث خطأ أثناء إنشاء الصورة.');
+      alert('حدث خطأ أثناء إنشاء الصورة. حاول مرة أخرى.');
     } finally {
       setIsSharing(false);
     }
@@ -78,6 +81,8 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
   const getTransactionType = (t: Transaction) => {
     if (t.type === 'exchange') return 'عملية صرف عملة';
     if (t.type === 'e_wallet') return 'تحويل محفظة إلكترونية';
+    if (t.type === 'wallet_deposit') return 'إيداع في محفظة';
+    if (t.type === 'wallet_withdrawal') return 'سحب من محفظة';
     if (t.type === 'treasury_feed') return 'إيداع نقدي';
     if (t.type === 'treasury_withdraw') return 'سحب نقدي';
     if (t.type === 'wallet_feed') return 'تغذية محفظة';
@@ -92,104 +97,97 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto font-sans">
-      <div className="w-full max-w-sm my-auto">
+    <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto">
+      <div className="w-full max-w-md my-auto">
         
         {/* Printable Area */}
-        <div 
-          id="receipt-content" 
-          className="bg-white rounded-xl shadow-2xl overflow-hidden relative p-6 text-center" 
-          dir="rtl"
-          style={{ fontFamily: "'Tajawal', sans-serif" }}
-        >
+        <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative">
           
-          {/* 1. Logo (Center) */}
-          <div className="flex justify-center mb-3">
-            {company.logo ? (
-              <img 
-                src={company.logo} 
-                alt="Logo" 
-                className="h-20 w-20 object-contain rounded-xl border border-gray-100 bg-white p-1" 
-                crossOrigin="anonymous" 
-              />
-            ) : (
-              <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-2xl border border-blue-200">
-                  {company.name.charAt(0)}
-              </div>
-            )}
+          {/* Header */}
+          <div className="bg-gray-50 p-6 border-b border-gray-100 flex flex-col items-center justify-center text-center">
+            <div className="flex flex-row-reverse items-center justify-center gap-3 w-full flex-nowrap">
+                <h2 className="text-xl font-extrabold text-gray-800 text-right whitespace-nowrap overflow-visible">
+                  {company.name}
+                </h2>
+                {company.logo ? (
+                  <img 
+                    src={company.logo} 
+                    alt="Logo" 
+                    className="h-14 w-14 object-contain rounded-lg bg-white border border-gray-200 p-0.5 shrink-0" 
+                    crossOrigin="anonymous" 
+                  />
+                ) : (
+                  <div className="h-14 w-14 bg-blue-100 rounded-full flex items-center justify-center shrink-0 text-blue-600 font-bold text-xl">
+                     {company.name.charAt(0)}
+                  </div>
+                )}
+            </div>
+            <p className="text-gray-400 text-xs mt-3 font-medium tracking-wide">إشعار معاملة مالية</p>
           </div>
 
-          {/* 2. Company Name (Center) */}
-          <h2 className="text-lg font-bold text-gray-800 mb-1 leading-tight">
-            {company.name}
-          </h2>
-
-          {/* 3. Transaction Type (Center) */}
-          <h3 className="text-blue-600 font-bold text-base mb-6 pb-4 border-b border-dashed border-gray-200">
-            {getTransactionType(transaction)}
-          </h3>
-
-          {/* 4. Details Body */}
-          <div className="space-y-5 mb-6">
+          {/* Content */}
+          <div className="p-6 space-y-5 bg-white">
             
-            {/* Amount Received */}
-            <div>
-              <p className="text-gray-500 text-xs mb-1">المبلغ المستلم من العميل</p>
-              <div className="text-gray-900 font-bold text-xl dir-ltr">
-                {formatAmount(transaction.from_amount)} <span className="text-sm font-medium">{transaction.from_currency}</span>
-              </div>
+            <div className="text-center border-b border-dashed border-gray-200 pb-4">
+               <h3 className="text-lg font-bold text-blue-700 mb-1">{getTransactionType(transaction)}</h3>
+               <p className="text-xs text-gray-500">رقم الإشعار: <span className="font-mono font-bold text-gray-700 text-sm">{transaction.receipt_number || `#${transaction.id}`}</span></p>
+               <p className="text-xs text-gray-500 mt-1" dir="ltr">
+                  {new Date(transaction.created_at).toLocaleDateString('ar-EG')} - {new Date(transaction.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
+               </p>
             </div>
 
-            {/* Exchange Rate (If exists) - Side by Side */}
-            {transaction.type === 'exchange' && transaction.rate && (
-              <div className="flex justify-center items-center gap-2 bg-gray-50 py-2 rounded-lg mx-4">
-                <span className="text-gray-500 text-xs">سعر الصرف:</span>
-                <span className="text-gray-800 font-bold text-base">{transaction.rate}</span>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span className="text-gray-600 font-medium">
+                    {transaction.type === 'wallet_withdrawal' ? 'المبلغ المسحوب من المحفظة' : 'المبلغ'}
+                </span>
+                <span className="font-bold text-gray-900 text-lg" dir="ltr">
+                  {formatAmount(transaction.from_amount)} {transaction.from_currency}
+                </span>
               </div>
-            )}
 
-            {/* Amount Delivered */}
-            {transaction.to_amount && (
-              <div>
-                <p className="text-gray-500 text-xs mb-1">المبلغ المسلم للعميل</p>
-                <div className="text-blue-700 font-extrabold text-2xl dir-ltr">
-                  {formatAmount(transaction.to_amount)} <span className="text-base font-bold">{transaction.to_currency}</span>
+              {transaction.type === 'exchange' && transaction.rate && (
+                <div className="flex justify-between items-center px-2">
+                  <span className="text-gray-500">سعر الصرف</span>
+                  <span className="font-bold text-gray-800">{transaction.rate}</span>
                 </div>
+              )}
+
+              {transaction.to_amount && (
+                <div className="flex justify-between items-center p-4 bg-blue-600 rounded-lg shadow-sm text-white">
+                  <span className="text-blue-100 font-bold">
+                    {transaction.type === 'wallet_withdrawal' ? 'المبلغ المضاف للخزينة (مع الربح)' : 
+                     transaction.type === 'wallet_deposit' ? 'المبلغ المضاف للمحفظة (مع الربح)' :
+                     'المبلغ المسلم للعميل'}
+                  </span>
+                  <span className="font-extrabold text-2xl" dir="ltr">
+                    {formatAmount(transaction.to_amount)} {transaction.to_currency}
+                  </span>
+                </div>
+              )}
+
+              {transaction.commission && transaction.commission > 0 && (
+                 <div className="flex justify-between items-center px-2 pt-1">
+                  <span className="text-gray-500">العمولة/الربح</span>
+                  <span className="font-bold text-red-500">{transaction.commission.toLocaleString()} EGP</span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-6 mt-2 border-t border-gray-100">
+              <div className="flex justify-between items-center text-xs text-gray-500 mb-4">
+                <span>الموظف المسؤول:</span>
+                <span className="font-bold text-gray-700">{employee?.full_name}</span>
               </div>
-            )}
-
-            {/* Commission (If exists) */}
-            {transaction.commission && transaction.commission > 0 && (
-               <div>
-                 <p className="text-gray-400 text-[10px]">العمولة</p>
-                 <p className="text-red-500 font-bold text-sm">{transaction.commission.toLocaleString()} EGP</p>
-               </div>
-            )}
-
-          </div>
-
-          {/* 5. Footer Info */}
-          <div className="border-t border-gray-100 pt-4 text-xs text-gray-500 space-y-2">
-            <div className="flex justify-between px-2">
-               <span>التاريخ:</span>
-               <span className="font-bold dir-ltr">
-                 {new Date(transaction.created_at).toLocaleDateString('ar-EG')}
-               </span>
-            </div>
-            <div className="flex justify-between px-2">
-               <span>رقم الإشعار:</span>
-               <span className="font-mono font-bold text-gray-700">{transaction.receipt_number || `#${transaction.id}`}</span>
-            </div>
-            <div className="flex justify-between px-2">
-               <span>الموظف:</span>
-               <span className="font-bold text-gray-700">{employee?.full_name}</span>
+              <div className="text-center text-xs text-gray-400 font-light">
+                 شكراً لتعاملكم معنا
+              </div>
             </div>
           </div>
-
         </div>
 
-        {/* Action Buttons */}
-        <div className="mt-5 flex gap-3">
+        {/* Actions */}
+        <div className="mt-6 flex gap-3">
           <button onClick={onClose} className="bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors">
             <X size={24} />
           </button>
@@ -207,7 +205,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             ) : (
               <>
                 <Share2 size={20} />
-                <span>مشاركة الإشعار</span>
+                <span>مشاركة الإشعار (صورة)</span>
               </>
             )}
           </button>
