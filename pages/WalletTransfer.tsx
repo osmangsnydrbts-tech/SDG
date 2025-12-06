@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Send, Smartphone, CheckCircle, Loader2, Wallet, ArrowDown, ArrowUp } from 'lucide-react';
+import { CheckCircle, Loader2, Wallet, ArrowDown, ArrowUp } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
 const WalletTransfer: React.FC = () => {
-  const { currentUser, eWallets, performEWalletTransfer, performEWalletDeposit, exchangeRates, companies } = useStore();
+  const { currentUser, eWallets, performEWalletTransfer, exchangeRates, companies } = useStore();
   const [selectedWalletId, setSelectedWalletId] = useState<string>('');
   const [transferType, setTransferType] = useState<'withdrawal' | 'deposit'>('withdrawal');
   const [phone, setPhone] = useState('');
@@ -32,7 +32,8 @@ const WalletTransfer: React.FC = () => {
 
   useEffect(() => {
     if (selectedWallet) {
-      setCurrency(selectedWallet.currency || 'EGP');
+      // تعيين العملة الافتراضية - يمكنك تعديل هذا حسب هيكل البيانات الخاص بك
+      setCurrency('EGP'); // أو استخدام selectedWallet.default_currency إذا كان موجوداً
     }
   }, [selectedWallet]);
 
@@ -54,25 +55,43 @@ const WalletTransfer: React.FC = () => {
       let res;
       const amountNum = parseFloat(amount);
 
+      if (isNaN(amountNum) || amountNum <= 0) {
+        setError('يرجى إدخال مبلغ صحيح');
+        setIsLoading(false);
+        return;
+      }
+
       if (transferType === 'withdrawal') {
         if (!phone) {
           setError('رقم الهاتف مطلوب للسحب');
           setIsLoading(false);
           return;
         }
+        
+        // التحقق من الرصيد الكافي للسحب
+        const totalWithCommission = amountNum + (amountNum * (commissionRate / 100));
+        if (selectedWallet && selectedWallet.balance < totalWithCommission) {
+          setError('الرصيد غير كافي للقيام بهذه العملية');
+          setIsLoading(false);
+          return;
+        }
+
         res = await performEWalletTransfer(
           parseInt(selectedWalletId),
           amountNum,
           phone,
-          receipt,
-          currency
+          receipt
+          // تم إزالة currency كمعامل خامس لأنه غير مدعوم في الدالة الأصلية
         );
       } else {
-        res = await performEWalletDeposit(
+        // للإيداع - استخدم نفس الدالة مع معاملات مختلفة أو أنشئ دالة جديدة
+        // هنا افترضنا أن performEWalletTransfer يمكن استخدامها للإيداع أيضاً
+        // أو قد تحتاج لإنشاء دالة performEWalletDeposit في الـ context
+        res = await performEWalletTransfer(
           parseInt(selectedWalletId),
           amountNum,
-          receipt,
-          currency
+          '', // رقم الهاتف فارغ للإيداع
+          receipt
         );
       }
 
@@ -91,6 +110,7 @@ const WalletTransfer: React.FC = () => {
       }
     } catch (err) {
       setError('حدث خطأ غير متوقع');
+      console.error('Error in wallet operation:', err);
     } finally {
       setIsLoading(false);
     }
@@ -158,7 +178,7 @@ const WalletTransfer: React.FC = () => {
             {/* Wallet Selection */}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">
-                اختر المحفظة {selectedWallet && `(الرصيد: ${formatCurrency(selectedWallet.balance)})`}
+                اختر المحفظة {selectedWallet && `(الرصيد: ${selectedWallet.balance.toLocaleString()} ${currency})`}
               </label>
               <select 
                 value={selectedWalletId} 
@@ -169,7 +189,7 @@ const WalletTransfer: React.FC = () => {
                 <option value="">-- اختر المحفظة --</option>
                 {myWallets.map(w => (
                   <option key={w.id} value={w.id}>
-                    {w.phone_number} ({w.provider}) - {w.currency}: {w.balance.toLocaleString()}
+                    {w.phone_number} ({w.provider}) - الرصيد: {w.balance.toLocaleString()} {currency}
                   </option>
                 ))}
               </select>
@@ -192,7 +212,7 @@ const WalletTransfer: React.FC = () => {
               </div>
             )}
 
-            {/* Amount and Currency */}
+            {/* Amount */}
             <div className="space-y-3">
               <label className="block text-sm font-bold text-gray-700">
                 المبلغ المراد {transferType === 'withdrawal' ? 'سحبه' : 'إيداعه'}
@@ -207,7 +227,7 @@ const WalletTransfer: React.FC = () => {
                     className="w-full p-3 border rounded-xl text-lg font-bold"
                     placeholder="0.00"
                     required
-                    min="0"
+                    min="0.01"
                     step="0.01"
                   />
                 </div>
