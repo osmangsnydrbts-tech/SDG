@@ -54,11 +54,21 @@ interface StoreData {
   deleteEWallet: (id: number) => Promise<void>;
   feedEWallet: (walletId: number, amount: number) => Promise<{ success: boolean; message: string }>;
   
-  performEWalletTransfer: (
-      walletId: number, 
-      amount: number, 
-      recipientPhone: string, 
-      receipt: string
+  // تعديل الدوال الخاصة بالمعاملات الإلكترونية
+  performEWalletWithdraw: (
+    walletId: number, 
+    amount: number, 
+    currency: 'EGP' | 'SDG', 
+    receipt: string,
+    employeeId: number
+  ) => Promise<{ success: boolean; message: string; transaction?: Transaction }>;
+  
+  performEWalletDeposit: (
+    walletId: number, 
+    amount: number, 
+    currency: 'EGP' | 'SDG', 
+    receipt: string,
+    employeeId: number
   ) => Promise<{ success: boolean; message: string; transaction?: Transaction }>;
   
   manageTreasury: (
@@ -78,7 +88,7 @@ interface StoreData {
 const StoreContext = createContext<StoreData | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // State Initialization
+  // State Initialization (نفس الكود السابق)
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('currentUser');
     return saved ? JSON.parse(saved) : null;
@@ -104,7 +114,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setToast(null);
   };
 
-  // Fetch Data from Supabase
+  // Fetch Data from Supabase (نفس الكود السابق)
   const fetchData = async () => {
     try {
       const { data: companiesData } = await supabase.from('companies').select('*');
@@ -151,11 +161,172 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => localStorage.setItem('currentUser', JSON.stringify(currentUser)), [currentUser]);
 
+  // Functions (نفس الكود السابق حتى دالة performEWalletTransfer القديمة)
+  
+  // دالة سحب من المحفظة الإلكترونية
+  const performEWalletWithdraw = async (
+    walletId: number, 
+    amount: number, 
+    currency: 'EGP' | 'SDG', 
+    receipt: string,
+    employeeId: number
+  ) => {
+    const wallet = eWallets.find(w => w.id === walletId);
+    if (!wallet) return { success: false, message: 'المحفظة غير موجودة' };
+
+    // الحصول على خزينة الموظف
+    const employeeTreasury = treasuries.find(t => t.employee_id === employeeId);
+    if (!employeeTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+
+    // 1. التحقق من عدم تكرار العملية
+    if (receipt) {
+      const duplicate = transactions.find(t => 
+        t.company_id === wallet.company_id && 
+        t.receipt_number === receipt && 
+        t.from_amount === amount &&
+        t.type === 'e_wallet_withdraw'
+      );
+      if (duplicate) {
+        return { success: false, message: 'عفواً، العملية مكررة! يوجد إشعار سابق بنفس الرقم والمبلغ.' };
+      }
+    }
+
+    // 2. التحقق من رصيد المحفظة الإلكترونية
+    if (wallet.balance < amount) {
+      return { success: false, message: 'رصيد المحفظة الإلكترونية غير كافي للسحب' };
+    }
+
+    // 3. حساب العمولة
+    const rates = exchangeRates.find(r => r.company_id === wallet.company_id);
+    const commissionRate = rates?.ewallet_commission || 1;
+    const commission = amount * (commissionRate / 100);
+    const totalAmount = amount + commission;
+
+    // 4. خصم من المحفظة الإلكترونية (بالإضافة للعمولة)
+    const newWalletBalance = wallet.balance - totalAmount;
+    await supabase.from('e_wallets').update({
+      balance: newWalletBalance
+    }).eq('id', walletId);
+
+    // 5. إضافة إلى خزينة الموظف (المبلغ فقط بدون العمولة)
+    const balanceKey = currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
+    const newEmployeeBalance = employeeTreasury[balanceKey] + amount;
+    await supabase.from('treasuries').update({
+      [balanceKey]: newEmployeeBalance
+    }).eq('id', employeeTreasury.id);
+
+    // 6. تسجيل العملية
+    const { data: newTx, error } = await supabase.from('transactions').insert({
+      company_id: wallet.company_id,
+      employee_id: employeeId,
+      type: 'e_wallet_withdraw',
+      from_currency: 'E_WALLET',
+      to_currency: currency,
+      from_amount: amount,
+      to_amount: amount,
+      commission: commission,
+      receipt_number: receipt,
+      description: `سحب من المحفظة الإلكترونية إلى خزينة الموظف`,
+      created_at: new Date().toISOString(),
+      e_wallet_id: walletId
+    }).select().single();
+
+    if (error) return { success: false, message: error.message };
+
+    await fetchData();
+    showToast('تم السحب من المحفظة الإلكترونية بنجاح', 'success');
+    return { 
+      success: true, 
+      message: `تم السحب بنجاح. المبلغ: ${amount} ${currency}. العمولة: ${commission} ${currency}`,
+      transaction: newTx 
+    };
+  };
+
+  // دالة إيداع إلى المحفظة الإلكترونية
+  const performEWalletDeposit = async (
+    walletId: number, 
+    amount: number, 
+    currency: 'EGP' | 'SDG', 
+    receipt: string,
+    employeeId: number
+  ) => {
+    const wallet = eWallets.find(w => w.id === walletId);
+    if (!wallet) return { success: false, message: 'المحفظة غير موجودة' };
+
+    // الحصول على خزينة الموظف
+    const employeeTreasury = treasuries.find(t => t.employee_id === employeeId);
+    if (!employeeTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+
+    // 1. التحقق من عدم تكرار العملية
+    if (receipt) {
+      const duplicate = transactions.find(t => 
+        t.company_id === wallet.company_id && 
+        t.receipt_number === receipt && 
+        t.from_amount === amount &&
+        t.type === 'e_wallet_deposit'
+      );
+      if (duplicate) {
+        return { success: false, message: 'عفواً، العملية مكررة! يوجد إشعار سابق بنفس الرقم والمبلغ.' };
+      }
+    }
+
+    // 2. التحقق من رصيد خزينة الموظف
+    const balanceKey = currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
+    if (employeeTreasury[balanceKey] < amount) {
+      return { success: false, message: `رصيد خزينة الموظف غير كافي للإيداع. الرصيد الحالي: ${employeeTreasury[balanceKey]} ${currency}` };
+    }
+
+    // 3. حساب العمولة
+    const rates = exchangeRates.find(r => r.company_id === wallet.company_id);
+    const commissionRate = rates?.ewallet_commission || 1;
+    const commission = amount * (commissionRate / 100);
+    const totalAmount = amount - commission; // المبلغ الذي سيتم إيداعه بعد خصم العمولة
+
+    // 4. خصم من خزينة الموظف (بالإضافة للعمولة)
+    const newEmployeeBalance = employeeTreasury[balanceKey] - amount;
+    await supabase.from('treasuries').update({
+      [balanceKey]: newEmployeeBalance
+    }).eq('id', employeeTreasury.id);
+
+    // 5. إضافة إلى المحفظة الإلكترونية (بعد خصم العمولة)
+    const newWalletBalance = wallet.balance + totalAmount;
+    await supabase.from('e_wallets').update({
+      balance: newWalletBalance
+    }).eq('id', walletId);
+
+    // 6. تسجيل العملية
+    const { data: newTx, error } = await supabase.from('transactions').insert({
+      company_id: wallet.company_id,
+      employee_id: employeeId,
+      type: 'e_wallet_deposit',
+      from_currency: currency,
+      to_currency: 'E_WALLET',
+      from_amount: amount,
+      to_amount: totalAmount,
+      commission: commission,
+      receipt_number: receipt,
+      description: `إيداع من خزينة الموظف إلى المحفظة الإلكترونية`,
+      created_at: new Date().toISOString(),
+      e_wallet_id: walletId
+    }).select().single();
+
+    if (error) return { success: false, message: error.message };
+
+    await fetchData();
+    showToast('تم الإيداع إلى المحفظة الإلكترونية بنجاح', 'success');
+    return { 
+      success: true, 
+      message: `تم الإيداع بنجاح. المبلغ المصروف: ${amount} ${currency}. العمولة: ${commission} ${currency}. المبلغ المضاف للمحفظة: ${totalAmount}`,
+      transaction: newTx 
+    };
+  };
+
+  // باقي الدوال (نفس الكود السابق)
   const isUsernameTaken = (username: string, excludeId?: number) => {
       return users.some(u => u.username.toLowerCase() === username.toLowerCase() && u.is_active && u.id !== excludeId);
   };
 
-  // --- ACTIONS ---
+  // --- ACTIONS --- (نفس الكود السابق)
 
   const login = async (username: string, pass: string) => {
     const { data: user } = await supabase
@@ -635,60 +806,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return { success: true, message: 'تم تغذية المحفظة بنجاح' };
   };
 
-  const performEWalletTransfer = async (walletId: number, amount: number, recipientPhone: string, receipt: string) => {
-      const wallet = eWallets.find(w => w.id === walletId);
-      if (!wallet) return { success: false, message: 'Wallet not found' };
-      
-      const user = users.find(u => u.id === wallet.employee_id);
-      if (!user) return { success: false, message: 'User not found' };
-
-      // 1. DUPLICATE CHECK
-      if (receipt) {
-        const duplicate = transactions.find(t => 
-            t.company_id === user.company_id && 
-            t.receipt_number === receipt && 
-            t.from_amount === amount &&
-            t.type === 'e_wallet'
-        );
-        if (duplicate) {
-            return { success: false, message: 'عفواً، العملية مكررة! يوجد إشعار سابق بنفس الرقم والمبلغ.' };
-        }
-      }
-
-      const rates = exchangeRates.find(r => r.company_id === wallet.company_id);
-      const commissionRate = rates?.ewallet_commission || 1; 
-      const commission = amount * (commissionRate / 100);
-
-      if (wallet.balance < amount) {
-          return { success: false, message: `رصيد المحفظة غير كافي` };
-      }
-
-      await supabase.from('e_wallets').update({
-          balance: wallet.balance - amount
-      }).eq('id', walletId);
-
-      const { data: newTx, error } = await supabase.from('transactions').insert({
-          company_id: user.company_id!,
-          employee_id: wallet.employee_id,
-          type: 'e_wallet',
-          from_currency: 'E_WALLET',
-          to_currency: 'EGP',
-          from_amount: amount,
-          to_amount: amount,
-          commission: commission,
-          receipt_number: receipt,
-          description: `To: ${recipientPhone} via ${wallet.provider}`,
-          created_at: new Date().toISOString(),
-          e_wallet_id: walletId
-      }).select().single();
-
-      if (error) return { success: false, message: error.message };
-
-      await fetchData();
-      showToast('تم التحويل بنجاح', 'success');
-      return { success: true, message: 'تم التحويل بنجاح', transaction: newTx };
-  };
-
   const manageTreasury = async (
     type: 'feed' | 'withdraw', 
     target: 'main' | 'employee', 
@@ -781,7 +898,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       toast, showToast, hideToast,
       login, logout, addCompany, updateCompany, renewSubscription, deleteCompany, toggleCompanyStatus, updateExchangeRate, 
       addEmployee, updateEmployee, updateEmployeePassword, deleteEmployee,
-      performExchange, deleteTransaction, addMerchant, deleteMerchant, addMerchantEntry, addEWallet, deleteEWallet, performEWalletTransfer, manageTreasury, feedEWallet,
+      performExchange, deleteTransaction, addMerchant, deleteMerchant, addMerchantEntry, addEWallet, deleteEWallet,
+      performEWalletWithdraw, performEWalletDeposit, // الدوال الجديدة
+      manageTreasury, feedEWallet,
       exportDatabase, importDatabase
     }}>
       {children}
