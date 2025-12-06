@@ -5,12 +5,20 @@ import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
 const WalletTransfer: React.FC = () => {
-  const { currentUser, eWallets, performEWalletTransfer, exchangeRates, companies } = useStore();
+  const { 
+    currentUser, 
+    eWallets, 
+    performEWalletWithdraw, 
+    performEWalletDeposit,
+    exchangeRates, 
+    companies, 
+    treasuries 
+  } = useStore();
+  
   const [selectedWalletId, setSelectedWalletId] = useState<string>('');
   const [transferType, setTransferType] = useState<'withdrawal' | 'deposit'>('withdrawal');
-  const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<string>('EGP');
+  const [currency, setCurrency] = useState<'EGP' | 'SDG'>('EGP');
   const [receipt, setReceipt] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -19,10 +27,17 @@ const WalletTransfer: React.FC = () => {
   // Receipt State
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
 
+  // محافظ المستخدم الحالية
   const myWallets = eWallets.filter(w => 
     w.company_id === currentUser?.company_id && 
     w.is_active && 
     w.employee_id === currentUser?.id
+  );
+
+  // خزينة الموظف الحالية
+  const myTreasury = treasuries.find(t => 
+    t.employee_id === currentUser?.id && 
+    t.company_id === currentUser?.company_id
   );
 
   const rates = exchangeRates.find(r => r.company_id === currentUser?.company_id);
@@ -30,12 +45,32 @@ const WalletTransfer: React.FC = () => {
   const company = companies.find(c => c.id === currentUser?.company_id);
   const selectedWallet = myWallets.find(w => w.id.toString() === selectedWalletId);
 
-  useEffect(() => {
-    if (selectedWallet) {
-      // تعيين العملة الافتراضية - يمكنك تعديل هذا حسب هيكل البيانات الخاص بك
-      setCurrency('EGP'); // أو استخدام selectedWallet.default_currency إذا كان موجوداً
+  // حساب الرصيد المتاح بناءً على نوع العملية
+  const getAvailableBalance = () => {
+    if (!myTreasury) return 0;
+    
+    if (transferType === 'withdrawal') {
+      // للسحب: رصيد المحفظة الإلكترونية
+      return selectedWallet ? selectedWallet.balance : 0;
+    } else {
+      // للإيداع: رصيد خزينة الموظف للعملة المحددة
+      return currency === 'EGP' ? myTreasury.egp_balance : myTreasury.sdg_balance;
     }
-  }, [selectedWallet]);
+  };
+
+  // حساب الإجمالي مع العمولة
+  const calculateTotalWithCommission = () => {
+    const val = parseFloat(amount);
+    if (isNaN(val)) return 0;
+    
+    if (transferType === 'withdrawal') {
+      // للسحب: المبلغ + العمولة
+      return val + (val * (commissionRate / 100));
+    } else {
+      // للإيداع: المبلغ - العمولة (المبلغ الذي سيصل للمحفظة)
+      return val - (val * (commissionRate / 100));
+    }
+  };
 
   const handleOperation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,8 +86,13 @@ const WalletTransfer: React.FC = () => {
       return;
     }
 
+    if (!myTreasury) {
+      setError('خزينة الموظف غير موجودة');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      let res;
       const amountNum = parseFloat(amount);
 
       if (isNaN(amountNum) || amountNum <= 0) {
@@ -61,46 +101,47 @@ const WalletTransfer: React.FC = () => {
         return;
       }
 
+      let res;
+
       if (transferType === 'withdrawal') {
-        if (!phone) {
-          setError('رقم الهاتف مطلوب للسحب');
-          setIsLoading(false);
-          return;
-        }
-        
-        // التحقق من الرصيد الكافي للسحب
+        // التحقق من رصيد المحفظة الإلكترونية للسحب
         const totalWithCommission = amountNum + (amountNum * (commissionRate / 100));
         if (selectedWallet && selectedWallet.balance < totalWithCommission) {
-          setError('الرصيد غير كافي للقيام بهذه العملية');
+          setError(`الرصيد غير كافي للقيام بهذه العملية. الرصيد الحالي: ${selectedWallet.balance.toLocaleString()}`);
           setIsLoading(false);
           return;
         }
 
-        res = await performEWalletTransfer(
+        // تنفيذ السحب من المحفظة
+        res = await performEWalletWithdraw(
           parseInt(selectedWalletId),
           amountNum,
-          phone,
-          receipt
-          // تم إزالة currency كمعامل خامس لأنه غير مدعوم في الدالة الأصلية
+          currency,
+          receipt,
+          currentUser!.id
         );
       } else {
-        // للإيداع - استخدم نفس الدالة مع معاملات مختلفة أو أنشئ دالة جديدة
-        // هنا افترضنا أن performEWalletTransfer يمكن استخدامها للإيداع أيضاً
-        // أو قد تحتاج لإنشاء دالة performEWalletDeposit في الـ context
-        res = await performEWalletTransfer(
+        // التحقق من رصيد خزينة الموظف للإيداع
+        const currentBalance = currency === 'EGP' ? myTreasury.egp_balance : myTreasury.sdg_balance;
+        if (currentBalance < amountNum) {
+          setError(`رصيد خزينة الموظف غير كافي. الرصيد الحالي: ${currentBalance.toLocaleString()} ${currency}`);
+          setIsLoading(false);
+          return;
+        }
+
+        // تنفيذ الإيداع للمحفظة
+        res = await performEWalletDeposit(
           parseInt(selectedWalletId),
           amountNum,
-          '', // رقم الهاتف فارغ للإيداع
-          receipt
+          currency,
+          receipt,
+          currentUser!.id
         );
       }
 
       if (res.success) {
         setMsg(res.message);
         setAmount('');
-        if (transferType === 'withdrawal') {
-          setPhone('');
-        }
         setReceipt('');
         if (res.transaction) {
           setLastTransaction(res.transaction);
@@ -116,18 +157,24 @@ const WalletTransfer: React.FC = () => {
     }
   };
 
-  const calculateTotalWithCommission = () => {
-    const val = parseFloat(amount);
+  const formatCurrency = (value: number, curr: string = currency) => {
+    return `${value.toLocaleString()} ${curr}`;
+  };
+
+  const getBalanceAfterOperation = () => {
+    const val = parseFloat(amount || '0');
     if (isNaN(val)) return 0;
-    return val + (val * (commissionRate / 100));
-  };
-
-  const getAvailableBalance = () => {
-    return selectedWallet ? selectedWallet.balance : 0;
-  };
-
-  const formatCurrency = (value: number) => {
-    return `${value.toLocaleString()} ${currency}`;
+    
+    if (transferType === 'withdrawal') {
+      // رصيد المحفظة بعد السحب
+      const walletBalance = selectedWallet ? selectedWallet.balance : 0;
+      const totalDeduction = val + (val * (commissionRate / 100));
+      return walletBalance - totalDeduction;
+    } else {
+      // رصيد خزينة الموظف بعد الإيداع
+      const treasuryBalance = getAvailableBalance();
+      return treasuryBalance - val;
+    }
   };
 
   return (
@@ -141,6 +188,10 @@ const WalletTransfer: React.FC = () => {
         {myWallets.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             لا توجد محافظ إلكترونية مخصصة لك. يرجى التواصل مع المدير.
+          </div>
+        ) : !myTreasury ? (
+          <div className="text-center py-8 text-gray-500">
+            خزينة الموظف غير موجودة. يرجى التواصل مع المدير.
           </div>
         ) : (
           <form onSubmit={handleOperation} className="space-y-6">
@@ -157,7 +208,7 @@ const WalletTransfer: React.FC = () => {
               >
                 <ArrowUp size={24} className={transferType === 'withdrawal' ? 'text-red-600' : 'text-gray-400'} />
                 <span className="font-bold">سحب</span>
-                <span className="text-sm text-gray-500">من المحفظة</span>
+                <span className="text-sm text-gray-500">من المحفظة إلى الخزينة</span>
               </button>
               
               <button
@@ -171,14 +222,26 @@ const WalletTransfer: React.FC = () => {
               >
                 <ArrowDown size={24} className={transferType === 'deposit' ? 'text-green-600' : 'text-gray-400'} />
                 <span className="font-bold">إيداع</span>
-                <span className="text-sm text-gray-500">للمحفظة</span>
+                <span className="text-sm text-gray-500">من الخزينة إلى المحفظة</span>
               </button>
+            </div>
+
+            {/* Current Balances Display */}
+            <div className="bg-gray-50 p-4 rounded-xl space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">رصيد خزينة الموظف (EGP):</span>
+                <span className="font-bold">{myTreasury.egp_balance.toLocaleString()} EGP</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">رصيد خزينة الموظف (SDG):</span>
+                <span className="font-bold">{myTreasury.sdg_balance.toLocaleString()} SDG</span>
+              </div>
             </div>
 
             {/* Wallet Selection */}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">
-                اختر المحفظة {selectedWallet && `(الرصيد: ${selectedWallet.balance.toLocaleString()} ${currency})`}
+                اختر المحفظة {selectedWallet && `(الرصيد: ${selectedWallet.balance.toLocaleString()})`}
               </label>
               <select 
                 value={selectedWalletId} 
@@ -189,33 +252,16 @@ const WalletTransfer: React.FC = () => {
                 <option value="">-- اختر المحفظة --</option>
                 {myWallets.map(w => (
                   <option key={w.id} value={w.id}>
-                    {w.phone_number} ({w.provider}) - الرصيد: {w.balance.toLocaleString()} {currency}
+                    {w.phone_number} ({w.provider}) - الرصيد: {w.balance.toLocaleString()}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Recipient Phone (For Withdrawal Only) */}
-            {transferType === 'withdrawal' && (
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">
-                  رقم المرسل إليه
-                </label>
-                <input 
-                  type="tel" 
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  className="w-full p-3 border rounded-xl"
-                  placeholder="01xxxxxxxxx"
-                  required={transferType === 'withdrawal'}
-                />
-              </div>
-            )}
-
-            {/* Amount */}
+            {/* Amount and Currency */}
             <div className="space-y-3">
               <label className="block text-sm font-bold text-gray-700">
-                المبلغ المراد {transferType === 'withdrawal' ? 'سحبه' : 'إيداعه'}
+                المبلغ المراد {transferType === 'withdrawal' ? 'سحبه من المحفظة' : 'إيداعه للمحفظة'}
               </label>
               <div className="flex gap-3">
                 <div className="flex-1">
@@ -234,13 +280,11 @@ const WalletTransfer: React.FC = () => {
                 <div className="w-32">
                   <select 
                     value={currency}
-                    onChange={e => setCurrency(e.target.value)}
+                    onChange={e => setCurrency(e.target.value as 'EGP' | 'SDG')}
                     className="w-full p-3 border rounded-xl bg-white"
                   >
                     <option value="EGP">EGP</option>
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="SAR">SAR</option>
+                    <option value="SDG">SDG</option>
                   </select>
                 </div>
               </div>
@@ -251,7 +295,7 @@ const WalletTransfer: React.FC = () => {
               {transferType === 'withdrawal' ? (
                 <>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">مبلغ السحب:</span>
+                    <span className="text-gray-500">مبلغ السحب من المحفظة:</span>
                     <span className="font-bold">{formatCurrency(parseFloat(amount || '0'))}</span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -267,24 +311,46 @@ const WalletTransfer: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">الرصيد بعد العملية:</span>
+                    <span className="text-gray-500">المبلغ المضاف إلى خزينة الموظف:</span>
+                    <span className="font-bold text-green-600">
+                      {formatCurrency(parseFloat(amount || '0'))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">رصيد المحفظة بعد العملية:</span>
                     <span className="font-bold">
-                      {formatCurrency(getAvailableBalance() - calculateTotalWithCommission())}
+                      {formatCurrency(getBalanceAfterOperation())}
                     </span>
                   </div>
                 </>
               ) : (
                 <>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">مبلغ الإيداع:</span>
+                    <span className="text-gray-500">مبلغ الإيداع للمحفظة:</span>
+                    <span className="font-bold">{formatCurrency(parseFloat(amount || '0'))}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">العمولة ({commissionRate}%):</span>
+                    <span className="font-bold text-red-500">
+                      {formatCurrency(parseFloat(amount || '0') * (commissionRate / 100))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">صافي المبلغ للمحفظة:</span>
                     <span className="font-bold text-green-600">
-                      {formatCurrency(parseFloat(amount || '0'))}
+                      {formatCurrency(calculateTotalWithCommission())}
                     </span>
                   </div>
                   <div className="border-t pt-2 mt-2 flex justify-between">
-                    <span className="font-bold text-gray-800">الرصيد بعد الإيداع:</span>
-                    <span className="font-bold text-green-700 text-lg">
-                      {formatCurrency(getAvailableBalance() + parseFloat(amount || '0'))}
+                    <span className="font-bold text-gray-800">إجمالي الخصم من خزينة الموظف:</span>
+                    <span className="font-bold text-red-600 text-lg">
+                      {formatCurrency(parseFloat(amount || '0'))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">رصيد خزينة الموظف بعد العملية:</span>
+                    <span className="font-bold">
+                      {formatCurrency(getBalanceAfterOperation())}
                     </span>
                   </div>
                 </>
@@ -337,11 +403,11 @@ const WalletTransfer: React.FC = () => {
                 </>
               ) : transferType === 'withdrawal' ? (
                 <>
-                  <ArrowUp size={20} /> تنفيذ السحب
+                  <ArrowUp size={20} /> تنفيذ السحب من المحفظة
                 </>
               ) : (
                 <>
-                  <ArrowDown size={20} /> تنفيذ الإيداع
+                  <ArrowDown size={20} /> تنفيذ الإيداع للمحفظة
                 </>
               )}
             </button>
