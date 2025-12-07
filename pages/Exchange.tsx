@@ -30,22 +30,17 @@ const Exchange: React.FC = () => {
       return;
     }
 
-    const numAmount = parseFloat(amount);
+    // Round input logic to match Store logic
+    const numAmount = Math.round(parseFloat(amount));
     if (isNaN(numAmount)) return;
 
     if (direction === 'SDG_TO_EGP') {
-      // Logic: Try dividing by Wholesale Rate first.
-      // If the resulting EGP amount >= Threshold, use Wholesale Rate.
-      // Otherwise, use Retail Rate.
-      
       const potentialWholesaleResult = numAmount / rates.wholesale_rate;
       
       if (potentialWholesaleResult >= rates.wholesale_threshold) {
-        // Qualifies for Wholesale
         setIsWholesale(true);
         setResult(Math.round(potentialWholesaleResult));
       } else {
-        // Does not qualify, use Retail/Standard Rate
         setIsWholesale(false);
         setResult(Math.round(numAmount / rates.sd_to_eg_rate));
       }
@@ -68,7 +63,7 @@ const Exchange: React.FC = () => {
         currentUser.id,
         currentUser.company_id,
         direction === 'SDG_TO_EGP' ? 'SDG' : 'EGP',
-        parseFloat(amount),
+        parseFloat(amount), // Store will round this
         receipt
       );
 
