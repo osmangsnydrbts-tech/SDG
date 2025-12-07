@@ -24,7 +24,7 @@ interface StoreData {
   hideToast: () => void;
 
   // Actions
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<{ success: boolean; role?: string }>;
   logout: () => void;
   addCompany: (name: string, username: string, password: string, days: number, logo?: string) => Promise<{ success: boolean; message: string }>;
   updateCompany: (id: number, data: Partial<Company> & { password?: string }) => Promise<{ success: boolean; message: string }>;
@@ -172,14 +172,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (user.role !== 'super_admin' && user.company_id) {
         const { data: company } = await supabase.from('companies').select('*').eq('id', user.company_id).single();
         if (!company || !company.is_active || new Date(company.subscription_end) < new Date()) {
-          return false;
+          return { success: false };
         }
       }
+      // Set State
       setCurrentUser(user);
+      
+      // Update local storage immediately to ensure sync for navigation
+      localStorage.setItem('currentUser', JSON.stringify(user));
+      
       showToast(`مرحباً ${user.full_name}`, 'success');
-      return true;
+      return { success: true, role: user.role };
     }
-    return false;
+    return { success: false };
   };
 
   const logout = () => {
