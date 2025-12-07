@@ -202,12 +202,6 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
                 <span className="font-bold text-gray-700">{employee?.full_name}</span>
               </div>
               
-              {company.phone_numbers && (
-                  <div className="text-center text-xs text-gray-500 mb-2" dir="ltr">
-                      {company.phone_numbers}
-                  </div>
-              )}
-
               <div className="text-center text-xs text-gray-400 font-light">
                  شكراً لتعاملكم معنا
               </div>
@@ -246,4 +240,3 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
 };
 
 export default ReceiptModal;
-    
