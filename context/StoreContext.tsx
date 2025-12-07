@@ -380,6 +380,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteEmployee = async (userId: number) => {
+    // Delete Treasury associated with employee if hard delete is required, 
+    // but typically we just deactivate. The prompt asked for "Secure Deletion".
+    // We will stick to deactivation for employees to keep history, or if requested "Permanent" for companies.
+    // The prompt says "Delete Company permanently", but for employee "Ask for password when deleting".
     await supabase.from('users').update({ is_active: false }).eq('id', userId);
     await fetchData();
     showToast('تم حذف الموظف', 'success');
@@ -643,7 +647,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const transactionType = type === 'withdraw' ? 'wallet_withdrawal' : 'wallet_deposit';
 
       if (type === 'withdraw') {
-          // Withdrawal: Deduct from Wallet, Add to Employee Treasury
+          // Withdrawal: 
+          // 1. Deduct from E-Wallet Treasury (Balance)
+          // 2. Add Amount + Commission to Employee Treasury
+          
           if (wallet.balance < amount) {
               return { success: false, message: `رصيد المحفظة غير كافي للسحب` };
           }
@@ -654,14 +661,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }).eq('id', walletId);
 
           // Add Amount + Commission to Employee Cash
+          // "واضافة المبلغ المسحوب +العملة يتم اضافتها الي خذينة الموظف"
           const totalToAdd = amount + commission;
           await supabase.from('treasuries').update({
             egp_balance: empTreasury.egp_balance + totalToAdd
           }).eq('id', empTreasury.id);
 
       } else {
-          // Deposit: Add Amount + Commission to Wallet
-          // Implicitly implies employee took cash, but user specified updating wallet.
+          // Deposit:
+          // "اذا ايداع يتم اضافة المبلغ + العملة الي خذينة المحفظة الالكترونية"
+          // This implies the wallet balance increases by Amount + Commission.
+          // Note: Usually a deposit means the employee is sending money, so wallet balance should decrease?
+          // BUT the prompt is very specific: "Add Amount + Currency to Wallet Treasury".
+          // This likely describes an "Incoming Transfer" to the wallet, not an outgoing one to a customer.
+          // Or it describes the "Top-up" of the wallet which generates a commission.
+          // I will follow the literal instruction: Add to Wallet Balance.
+          
           const totalToAdd = amount + commission;
           await supabase.from('e_wallets').update({
             balance: wallet.balance + totalToAdd
@@ -675,7 +690,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           from_currency: 'EGP',
           to_currency: 'EGP',
           from_amount: amount,
-          to_amount: amount + commission, // Storing total impact or just amount is debatable, using total here for ref
+          to_amount: amount + commission, // Storing total impact including commission
           commission: commission,
           receipt_number: receipt,
           description: `${type === 'withdraw' ? 'سحب' : 'إيداع'} - ${recipientPhone} via ${wallet.provider}`,
