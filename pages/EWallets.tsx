@@ -79,7 +79,7 @@ const EWallets: React.FC = () => {
                     <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
                          <div>
                              <span className="text-xs text-gray-500 block">الرصيد الحالي</span>
-                             <span className="font-bold text-lg">{w.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP</span>
+                             <span className="font-bold text-lg">{w.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
                          </div>
                          <button 
                             onClick={() => setShowFeedModal(w.id)}
