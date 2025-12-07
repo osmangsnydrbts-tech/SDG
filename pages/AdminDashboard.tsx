@@ -77,8 +77,7 @@ const AdminDashboard: React.FC = () => {
 
 📦 *الجملة:*
 السعر: ${rateData.wholesale_rate}
-أقل كمية: ${rateData.wholesale_threshold.toLocaleString()} EGP
-${phones}
+أقل كمية: ${rateData.wholesale_threshold.toLocaleString()} EGP${phones}
     `.trim();
 
     if (navigator.share) {
@@ -155,7 +154,6 @@ ${phones}
       if (!empToDelete || !currentUser) return;
       
       // Simple security check (Checking current user password vs input)
-      // Note: In a real app, verify against server. Here we compare with local state.
       if (confirmPassword === currentUser.password) {
         setIsProcessing(true);
         await deleteEmployee(empToDelete);
