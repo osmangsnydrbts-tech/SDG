@@ -204,7 +204,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       logo
     }).select().single();
 
-    if (compError || !company) return { success: false, message: 'فشل إنشاء الشركة' };
+    if (compError || !company) {
+      console.error("Error adding company:", compError);
+      return { success: false, message: 'فشل إنشاء الشركة: ' + (compError?.message || '') };
+    }
 
     await supabase.from('users').insert({
       username,
@@ -248,7 +251,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const { password, ...companyData } = data;
 
       const { error } = await supabase.from('companies').update(companyData).eq('id', id);
-      if (error) return { success: false, message: error.message };
+      if (error) {
+        console.error("Error updating company:", error);
+        return { success: false, message: error.message };
+      }
       
       // Update Admin User details
       const updateData: any = {};
@@ -346,6 +352,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       is_active: true
     }).select().single();
 
+    if (error) {
+        console.error("Error adding employee:", error);
+        return { success: false, message: 'حدث خطأ: ' + error.message };
+    }
+
     if (user) {
         await supabase.from('treasuries').insert({
             company_id: companyId,
@@ -357,7 +368,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         showToast('تم إضافة الموظف بنجاح', 'success');
         return { success: true, message: 'تم إضافة الموظف بنجاح' };
     }
-    return { success: false, message: 'حدث خطأ: ' + (error?.message || '') };
+    return { success: false, message: 'حدث خطأ غير متوقع' };
   };
 
   const updateEmployee = async (userId: number, data: { full_name: string; username: string; phone?: string }) => {
@@ -368,7 +379,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return { success: false, message: 'اسم المستخدم مسجل مسبقاً' };
       }
 
-      await supabase.from('users').update(data).eq('id', userId);
+      const { error } = await supabase.from('users').update(data).eq('id', userId);
+      if (error) {
+          console.error("Error updating employee:", error);
+          return { success: false, message: 'فشل التحديث: ' + error.message };
+      }
+
       await fetchData();
       showToast('تم تحديث بيانات الموظف', 'success');
       return { success: true, message: 'تم التحديث بنجاح' };
@@ -381,13 +397,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteEmployee = async (userId: number) => {
-    // Hard delete is handled at the database level usually or we just deactivate
-    // But per previous request "Ask for password when deleting", we simulate secure delete here
-    // For now we deactivate, but can be changed to delete() if requested.
-    // Assuming "Delete" means remove from list/access.
-    await supabase.from('users').delete().eq('id', userId); // Changing to hard delete as per "Permanent" company delete logic style if desired, or stick to deactivate?
-    // Let's stick to delete() since we implemented secure password check.
-    // Also need to delete treasury? 
+    await supabase.from('users').delete().eq('id', userId);
     await supabase.from('treasuries').delete().eq('employee_id', userId);
 
     await fetchData();
@@ -666,7 +676,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }).eq('id', walletId);
 
           // Add Amount + Commission to Employee Cash
-          // "واضافة المبلغ المسحوب +العملة يتم اضافتها الي خذينة الموظف"
           const totalToAdd = amount + commission;
           await supabase.from('treasuries').update({
             egp_balance: empTreasury.egp_balance + totalToAdd
@@ -674,7 +683,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       } else {
           // Deposit:
-          // "اذا ايداع يتم اضافة المبلغ + العملة الي خذينة المحفظة الالكترونية"
+          // Add Amount + Commission to Wallet Balance
           const totalToAdd = amount + commission;
           await supabase.from('e_wallets').update({
             balance: wallet.balance + totalToAdd
