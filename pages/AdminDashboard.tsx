@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock } from 'lucide-react';
-import { User, Transaction } from '../types';
+import { User } from '../types';
 
 const AdminDashboard: React.FC = () => {
   const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies, treasuries, transactions, showToast } = useStore();
@@ -36,11 +36,13 @@ const AdminDashboard: React.FC = () => {
   const [empName, setEmpName] = useState('');
   const [empUser, setEmpUser] = useState('');
   const [empPass, setEmpPass] = useState('');
+  const [empPhone, setEmpPhone] = useState('');
   const [error, setError] = useState('');
 
   // Emp Edit Form
   const [editName, setEditName] = useState('');
   const [editUser, setEditUser] = useState('');
+  const [editPhone, setEditPhone] = useState('');
   const [newPass, setNewPass] = useState('');
 
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee' && u.is_active);
@@ -104,10 +106,10 @@ const AdminDashboard: React.FC = () => {
       setError('');
       if(currentUser?.company_id) {
           setIsProcessing(true);
-          const res = await addEmployee(currentUser.company_id, empName, empUser, empPass);
+          const res = await addEmployee(currentUser.company_id, empName, empUser, empPass, empPhone);
           if (res.success) {
             setShowEmpModal(false);
-            setEmpName(''); setEmpUser(''); setEmpPass('');
+            setEmpName(''); setEmpUser(''); setEmpPass(''); setEmpPhone('');
           } else {
             setError(res.message);
           }
@@ -119,13 +121,14 @@ const AdminDashboard: React.FC = () => {
       setEditInfoId(user);
       setEditName(user.full_name);
       setEditUser(user.username);
+      setEditPhone(user.phone || '');
       setError('');
   };
 
   const handleUpdateInfo = async () => {
       if (!editInfoId) return;
       setIsProcessing(true);
-      const res = await updateEmployee(editInfoId.id, { full_name: editName, username: editUser });
+      const res = await updateEmployee(editInfoId.id, { full_name: editName, username: editUser, phone: editPhone });
       if (res.success) {
           setEditInfoId(null);
       } else {
@@ -330,7 +333,7 @@ const AdminDashboard: React.FC = () => {
                     </div>
 
                     <button disabled={isProcessing} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center">
-                        {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'حفظ التغييرات'}
+                         {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'تحديث'}
                     </button>
                     <button type="button" onClick={() => setShowRateModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                 </form>
@@ -342,14 +345,17 @@ const AdminDashboard: React.FC = () => {
       {showEmpModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-sm p-6">
-                <h3 className="text-lg font-bold mb-4 text-gray-800">إضافة موظف جديد</h3>
+                <h3 className="text-lg font-bold mb-4">إضافة موظف جديد</h3>
                 <form onSubmit={handleAddEmployee} className="space-y-3">
                     <input type="text" placeholder="الاسم الكامل" value={empName} onChange={e => setEmpName(e.target.value)} className="w-full p-3 border rounded-lg" required />
                     <input type="text" placeholder="اسم المستخدم" value={empUser} onChange={e => setEmpUser(e.target.value)} className="w-full p-3 border rounded-lg" required />
-                    <input type="password" inputMode="numeric" placeholder="كلمة المرور (أرقام)" value={empPass} onChange={e => setEmpPass(e.target.value)} className="w-full p-3 border rounded-lg" required />
-                    {error && <p className="text-red-500 text-xs">{error}</p>}
+                    <input type="text" placeholder="كلمة المرور" value={empPass} onChange={e => setEmpPass(e.target.value)} className="w-full p-3 border rounded-lg" required />
+                    <input type="tel" placeholder="رقم الهاتف (اختياري)" value={empPhone} onChange={e => setEmpPhone(e.target.value)} className="w-full p-3 border rounded-lg" />
+                    
+                    {error && <p className="text-red-500 text-sm">{error}</p>}
+                    
                     <button disabled={isProcessing} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center">
-                         {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'إضافة'}
+                        {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'حفظ'}
                     </button>
                     <button type="button" onClick={() => setShowEmpModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                 </form>
@@ -360,64 +366,91 @@ const AdminDashboard: React.FC = () => {
       {/* Manage Employees Modal */}
       {showManageEmpModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 h-[80vh] flex flex-col">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-gray-800">إدارة الموظفين</h3>
-                    <button onClick={() => setShowManageEmpModal(false)} className="text-gray-500">إغلاق</button>
+                    <h3 className="text-lg font-bold">قائمة الموظفين</h3>
+                    <button onClick={() => setShowManageEmpModal(false)} className="bg-gray-100 p-2 rounded-full"><X size={18}/></button>
                 </div>
                 
-                <div className="space-y-4">
+                <div className="flex-1 overflow-y-auto space-y-3">
                     {companyEmployees.map(emp => (
-                        <div key={emp.id} className="border p-3 rounded-xl bg-gray-50 transition hover:border-blue-300">
+                        <div key={emp.id} className="border p-3 rounded-lg relative">
                             {editInfoId?.id === emp.id ? (
-                                <div className="space-y-2 mb-2">
-                                    <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded" placeholder="الاسم" />
-                                    <input value={editUser} onChange={e => setEditUser(e.target.value)} className="w-full p-2 border rounded" placeholder="اسم المستخدم" />
-                                    {error && <p className="text-red-500 text-xs">{error}</p>}
+                                <div className="space-y-2">
+                                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-1 border rounded" placeholder="الاسم" />
+                                    <input type="text" value={editUser} onChange={e => setEditUser(e.target.value)} className="w-full p-1 border rounded" placeholder="Username" />
+                                    <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} className="w-full p-1 border rounded" placeholder="رقم الهاتف" />
                                     <div className="flex gap-2">
-                                        <button onClick={handleUpdateInfo} disabled={isProcessing} className="bg-green-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1 min-w-[60px] justify-center">
-                                            {isProcessing ? <Loader2 className="animate-spin" size={12}/> : 'حفظ'}
-                                        </button>
-                                        <button onClick={() => setEditInfoId(null)} className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm">إلغاء</button>
+                                        <button onClick={handleUpdateInfo} disabled={isProcessing} className="bg-green-500 text-white px-3 py-1 rounded text-xs">حفظ</button>
+                                        <button onClick={() => setEditInfoId(null)} className="bg-gray-300 text-gray-800 px-3 py-1 rounded text-xs">إلغاء</button>
                                     </div>
+                                    {error && <p className="text-red-500 text-xs">{error}</p>}
                                 </div>
                             ) : (
-                                <div className="flex justify-between items-center">
-                                    <div 
-                                        className="cursor-pointer flex-1" 
-                                        onClick={() => setSelectedEmpReport(emp)}
-                                        title="اضغط لعرض التقرير"
-                                    >
-                                        <p className="font-bold text-blue-700 hover:underline">{emp.full_name}</p>
-                                        <p className="text-xs text-gray-500">user: {emp.username}</p>
+                                <div>
+                                    <div className="flex justify-between">
+                                      <h4 className="font-bold">{emp.full_name}</h4>
+                                      {emp.phone && <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">{emp.phone}</span>}
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => openEditInfo(emp)} className="p-2 bg-indigo-100 text-indigo-600 rounded-lg" title="تعديل البيانات">
-                                            <Pencil size={16} />
+                                    <p className="text-sm text-gray-500 mb-2">Username: {emp.username}</p>
+                                    
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        <button onClick={() => openEditInfo(emp)} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded flex items-center gap-1">
+                                            <Pencil size={12} /> تعديل
                                         </button>
-                                        <button onClick={() => setEditPassId(editPassId === emp.id ? null : emp.id)} className="p-2 bg-blue-100 text-blue-600 rounded-lg" title="تغيير كلمة المرور">
-                                            <Key size={16} />
+                                        <button onClick={() => setEditPassId(emp.id)} className="text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded flex items-center gap-1">
+                                            <Key size={12} /> كلمة المرور
                                         </button>
-                                        <button onClick={() => initiateDeleteEmployee(emp.id)} className="p-2 bg-red-100 text-red-600 rounded-lg" title="حذف الموظف">
-                                            <Trash2 size={16} />
+                                        <button onClick={() => initiateDeleteEmployee(emp.id)} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded flex items-center gap-1">
+                                            <Trash2 size={12} /> حذف
+                                        </button>
+                                        <button onClick={() => setSelectedEmpReport(emp)} className="text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded flex items-center gap-1">
+                                            <FileText size={12} /> تقرير
                                         </button>
                                     </div>
-                                </div>
-                            )}
 
-                            {editPassId === emp.id && (
-                                <div className="mt-3 flex gap-2 border-t pt-2">
-                                    <input 
-                                        type="text" 
-                                        inputMode="numeric"
-                                        placeholder="كلمة المرور الجديدة (أرقام)" 
-                                        className="flex-1 p-2 border rounded-lg text-sm"
-                                        value={newPass}
-                                        onChange={e => setNewPass(e.target.value)}
-                                    />
-                                    <button onClick={() => handleChangePassword(emp.id)} disabled={isProcessing} className="bg-green-600 text-white px-3 rounded-lg text-sm flex items-center min-w-[60px] justify-center">
-                                         {isProcessing ? <Loader2 className="animate-spin" size={14}/> : 'تغيير'}
-                                    </button>
+                                    {/* Password Change Field */}
+                                    {editPassId === emp.id && (
+                                        <div className="mt-2 flex gap-1 animate-in slide-in-from-top-2">
+                                            <input 
+                                                type="text" 
+                                                placeholder="كلمة المرور الجديدة" 
+                                                className="border rounded px-2 py-1 text-xs w-full"
+                                                value={newPass}
+                                                onChange={e => setNewPass(e.target.value)}
+                                            />
+                                            <button onClick={() => handleChangePassword(emp.id)} disabled={isProcessing} className="bg-green-500 text-white px-2 rounded">
+                                                <CheckIcon size={14} />
+                                            </button>
+                                            <button onClick={() => setEditPassId(null)} className="bg-gray-300 text-black px-2 rounded">
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Delete Confirmation */}
+                                    {empToDelete === emp.id && (
+                                        <div className="mt-2 bg-red-50 p-2 rounded animate-in slide-in-from-top-2">
+                                            <p className="text-xs text-red-700 font-bold mb-1">أدخل كلمة مرورك للتأكيد:</p>
+                                            <form onSubmit={confirmDeleteEmployee} className="flex gap-1">
+                                                <input 
+                                                    type="password" 
+                                                    className="border rounded px-2 py-1 text-xs w-full"
+                                                    value={confirmPassword}
+                                                    onChange={e => setConfirmPassword(e.target.value)}
+                                                    placeholder="••••"
+                                                    autoFocus
+                                                />
+                                                <button type="submit" disabled={isProcessing} className="bg-red-600 text-white px-2 rounded text-xs">
+                                                    حذف
+                                                </button>
+                                                <button type="button" onClick={() => setEmpToDelete(null)} className="bg-gray-300 text-black px-2 rounded text-xs">
+                                                    إلغاء
+                                                </button>
+                                            </form>
+                                            {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -428,114 +461,56 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Employee Detail Report Modal */}
+      {/* Employee Mini Report Modal */}
       {selectedEmpReport && (
           <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-                  <div className="bg-blue-600 p-4 text-white flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                          <FileText size={20} />
-                          <h3 className="font-bold">تقرير الموظف</h3>
-                      </div>
-                      <button onClick={() => setSelectedEmpReport(null)} className="p-1 hover:bg-white/20 rounded-full"><X size={20}/></button>
-                  </div>
+              <div className="bg-white rounded-2xl w-full max-w-sm p-5 relative">
+                  <button onClick={() => setSelectedEmpReport(null)} className="absolute top-4 left-4 bg-gray-100 p-1 rounded-full"><X size={18}/></button>
+                  <h3 className="font-bold text-lg mb-1">{selectedEmpReport.full_name}</h3>
+                  {selectedEmpReport.phone && <p className="text-sm text-gray-600 mb-1">{selectedEmpReport.phone}</p>}
+                  <p className="text-xs text-gray-500 mb-4">تقرير مختصر</p>
                   
-                  <div className="p-5">
-                      <div className="text-center mb-6">
-                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 text-blue-600 font-bold text-xl">
-                              {selectedEmpReport.full_name.charAt(0)}
-                          </div>
-                          <h4 className="font-bold text-lg text-gray-800">{selectedEmpReport.full_name}</h4>
-                          <p className="text-xs text-gray-500">@{selectedEmpReport.username}</p>
-                      </div>
-
-                      {(() => {
-                          const stats = getEmpStats(selectedEmpReport.id);
-                          return (
-                              <div className="space-y-4">
-                                  <div className="grid grid-cols-2 gap-3">
-                                      <div className="bg-gray-50 p-3 rounded-xl border text-center">
-                                          <span className="text-xs text-gray-500 block">رصيد (EGP)</span>
-                                          <span className="font-bold text-lg">{stats.treasury?.egp_balance.toLocaleString()}</span>
-                                      </div>
-                                      <div className="bg-gray-50 p-3 rounded-xl border text-center">
-                                          <span className="text-xs text-gray-500 block">رصيد (SDG)</span>
-                                          <span className="font-bold text-lg">{stats.treasury?.sdg_balance.toLocaleString()}</span>
-                                      </div>
+                  {(() => {
+                      const stats = getEmpStats(selectedEmpReport.id);
+                      return (
+                          <div className="space-y-4">
+                              <div className="flex gap-2">
+                                  <div className="flex-1 bg-blue-50 p-3 rounded-xl text-center">
+                                      <p className="text-xs text-blue-400">عهدة مصري</p>
+                                      <p className="font-bold text-lg">{stats.treasury?.egp_balance.toLocaleString()}</p>
                                   </div>
-
-                                  <div className="border-t pt-3">
-                                      <p className="text-xs font-bold text-gray-500 mb-2">آخر العمليات ({stats.totalTxs})</p>
-                                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                                          {stats.recentTxs.map(tx => (
-                                              <div key={tx.id} className="flex justify-between text-xs bg-gray-50 p-2 rounded border border-gray-100">
-                                                  <span className={tx.from_currency === 'SDG' ? 'text-orange-600' : 'text-blue-600'}>
-                                                      {tx.type === 'exchange' ? 'صرف' : 'حركة'} {tx.from_amount.toLocaleString()} {tx.from_currency}
-                                                  </span>
-                                                  <span className="text-gray-400">{new Date(tx.created_at).toLocaleDateString()}</span>
-                                              </div>
-                                          ))}
-                                          {stats.recentTxs.length === 0 && <p className="text-center text-gray-400 text-xs py-2">لا توجد عمليات</p>}
-                                      </div>
+                                  <div className="flex-1 bg-emerald-50 p-3 rounded-xl text-center">
+                                      <p className="text-xs text-emerald-400">عهدة سوداني</p>
+                                      <p className="font-bold text-lg">{stats.treasury?.sdg_balance.toLocaleString()}</p>
                                   </div>
                               </div>
-                          );
-                      })()}
-                  </div>
+                              
+                              <div>
+                                  <h4 className="font-bold text-xs text-gray-500 mb-2">آخر 5 عمليات</h4>
+                                  <div className="space-y-2 text-xs">
+                                      {stats.recentTxs.map(t => (
+                                          <div key={t.id} className="flex justify-between border-b pb-1">
+                                              <span>{t.type}</span>
+                                              <span className="font-bold">{t.from_amount} {t.from_currency}</span>
+                                          </div>
+                                      ))}
+                                      {stats.recentTxs.length === 0 && <p className="text-gray-400">لا توجد عمليات</p>}
+                                  </div>
+                              </div>
+                          </div>
+                      );
+                  })()}
               </div>
           </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {empToDelete && (
-          <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-xs p-6 shadow-2xl">
-                  <div className="text-center mb-4">
-                      <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                          <Lock size={24} className="text-red-600" />
-                      </div>
-                      <h3 className="font-bold text-gray-800">تأكيد الحذف</h3>
-                      <p className="text-xs text-gray-500 mt-1">لحذف الموظف، يرجى إدخال كلمة مرور المدير</p>
-                  </div>
-                  
-                  <form onSubmit={confirmDeleteEmployee}>
-                      <input 
-                          type="password" 
-                          autoFocus
-                          placeholder="كلمة مرور المدير" 
-                          className="w-full p-3 border rounded-lg mb-2 text-center"
-                          value={confirmPassword}
-                          onChange={e => setConfirmPassword(e.target.value)}
-                      />
-                      {error && <p className="text-red-500 text-xs text-center mb-2">{error}</p>}
-                      
-                      <div className="flex gap-2">
-                          <button 
-                              type="submit" 
-                              disabled={isProcessing}
-                              className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold flex justify-center"
-                          >
-                              {isProcessing ? <Loader2 className="animate-spin" size={16}/> : 'حذف نهائي'}
-                          </button>
-                          <button 
-                              type="button" 
-                              onClick={() => { setEmpToDelete(null); setConfirmPassword(''); }}
-                              className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg font-bold"
-                          >
-                              إلغاء
-                          </button>
-                      </div>
-                  </form>
-              </div>
-          </div>
-      )}
-
-      {/* Subscription Info Footer */}
-      <div className="text-center text-xs text-gray-400 pt-4">
-          ينتهي الاشتراك في: {company ? new Date(company.subscription_end).toLocaleDateString('ar-EG') : '-'}
-      </div>
     </div>
   );
 };
+
+// Helper Icon for Password Save
+const CheckIcon = ({ size }: { size: number }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+);
 
 export default AdminDashboard;
