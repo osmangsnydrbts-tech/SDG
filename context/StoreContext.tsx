@@ -195,14 +195,28 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const subEnd = new Date();
     subEnd.setDate(subEnd.getDate() + days);
 
-    const { data: company, error: compError } = await supabase.from('companies').insert({
+    const companyData: any = {
       name,
       username,
       subscription_end: subEnd.toISOString(),
       is_active: true,
-      phone_numbers: phoneNumbers,
       logo
-    }).select().single();
+    };
+    if (phoneNumbers) companyData.phone_numbers = phoneNumbers;
+
+    let { data: company, error: compError } = await supabase.from('companies').insert(companyData).select().single();
+
+    // Fallback: If phone_numbers column is missing
+    if (compError && (compError.message.includes("column") || compError.code === '42703')) {
+        console.warn("Column 'phone_numbers' missing, saving without it.");
+        delete companyData.phone_numbers;
+        const retry = await supabase.from('companies').insert(companyData).select().single();
+        company = retry.data;
+        compError = retry.error;
+        if (!compError) {
+             showToast('تم إنشاء الشركة (لم يتم حفظ الهاتف لعدم تحديث قاعدة البيانات)', 'info');
+        }
+    }
 
     if (compError || !company) {
       console.error("Error adding company:", compError);
@@ -249,8 +263,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       const { password, ...companyData } = data;
+      const payload: any = { ...companyData };
 
-      const { error } = await supabase.from('companies').update(companyData).eq('id', id);
+      let { error } = await supabase.from('companies').update(payload).eq('id', id);
+
+      // Fallback for missing column
+      if (error && (error.message.includes("column") || error.code === '42703')) {
+          if (payload.phone_numbers) {
+              delete payload.phone_numbers;
+              const retry = await supabase.from('companies').update(payload).eq('id', id);
+              error = retry.error;
+              if (!error) showToast('تم التحديث (لم يتم حفظ الهاتف لعدم تحديث قاعدة البيانات)', 'info');
+          }
+      }
+
       if (error) {
         console.error("Error updating company:", error);
         return { success: false, message: error.message };
@@ -342,15 +368,29 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { success: false, message: 'اسم المستخدم مسجل مسبقاً' };
     }
 
-    const { data: user, error } = await supabase.from('users').insert({
+    const payload: any = {
       username,
       password: pass,
       role: 'employee',
       full_name: fullName,
       company_id: companyId,
-      phone: phone,
       is_active: true
-    }).select().single();
+    };
+    if (phone) payload.phone = phone;
+
+    let { data: user, error } = await supabase.from('users').insert(payload).select().single();
+
+    // Fallback if 'phone' column is missing in 'users' table
+    if (error && (error.message.includes("column") || error.code === '42703')) {
+        console.warn("Column 'phone' missing in users table, saving without it.");
+        delete payload.phone;
+        const retry = await supabase.from('users').insert(payload).select().single();
+        user = retry.data;
+        error = retry.error;
+        if (!error) {
+            showToast('تم إضافة الموظف (لم يتم حفظ الهاتف لعدم تحديث قاعدة البيانات)', 'info');
+        }
+    }
 
     if (error) {
         console.error("Error adding employee:", error);
@@ -379,7 +419,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return { success: false, message: 'اسم المستخدم مسجل مسبقاً' };
       }
 
-      const { error } = await supabase.from('users').update(data).eq('id', userId);
+      const payload: any = { ...data };
+      let { error } = await supabase.from('users').update(payload).eq('id', userId);
+
+      // Fallback
+      if (error && (error.message.includes("column") || error.code === '42703')) {
+          if (payload.phone) {
+              delete payload.phone;
+              const retry = await supabase.from('users').update(payload).eq('id', userId);
+              error = retry.error;
+              if(!error) showToast('تم التحديث (لم يتم حفظ الهاتف لعدم تحديث قاعدة البيانات)', 'info');
+          }
+      }
+
       if (error) {
           console.error("Error updating employee:", error);
           return { success: false, message: 'فشل التحديث: ' + error.message };
