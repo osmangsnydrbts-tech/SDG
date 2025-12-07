@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { ArrowLeftRight, CheckCircle, Calculator, Loader2 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
@@ -8,7 +9,6 @@ const Exchange: React.FC = () => {
   const { currentUser, performExchange, exchangeRates, companies } = useStore();
   const [direction, setDirection] = useState<'SDG_TO_EGP' | 'EGP_TO_SDG'>('SDG_TO_EGP');
   const [amount, setAmount] = useState<string>('');
-  const [formattedAmount, setFormattedAmount] = useState<string>('');
   const [result, setResult] = useState<number>(0);
   const [receipt, setReceipt] = useState('');
   const [isWholesale, setIsWholesale] = useState(false);
@@ -21,46 +21,6 @@ const Exchange: React.FC = () => {
 
   const rates = exchangeRates.find(r => r.company_id === currentUser?.company_id);
   const company = companies.find(c => c.id === currentUser?.company_id);
-
-  // دالة لتنسيق المبلغ بفواصل عشرية
-  const formatAmount = useCallback((value: string): string => {
-    // إزالة أي أحرف غير رقمية أو نقاط
-    let cleaned = value.replace(/[^\d.]/g, '');
-    
-    // السماح بنقطة واحدة فقط
-    const parts = cleaned.split('.');
-    if (parts.length > 2) {
-      cleaned = parts[0] + '.' + parts.slice(1).join('');
-    }
-    
-    // الحد من المنازل العشرية لرقمين
-    if (parts.length === 2 && parts[1].length > 2) {
-      cleaned = parts[0] + '.' + parts[1].substring(0, 2);
-    }
-    
-    return cleaned;
-  }, []);
-
-  // دالة لتنسيق العرض بفواصل الآلاف
-  const formatDisplay = useCallback((value: string): string => {
-    if (!value) return '';
-    
-    const parts = value.split('.');
-    let integerPart = parts[0];
-    const decimalPart = parts.length > 1 ? parts[1] : '';
-    
-    // إضافة فواصل الآلاف
-    integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    
-    // إرجاع القيمة المنسقة
-    return decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
-  }, []);
-
-  // تحديث المبلغ المنسق عند تغيير القيمة
-  useEffect(() => {
-    const formatted = formatAmount(amount);
-    setFormattedAmount(formatDisplay(formatted));
-  }, [amount, formatAmount, formatDisplay]);
 
   useEffect(() => {
     if (!rates || !amount) {
@@ -90,26 +50,9 @@ const Exchange: React.FC = () => {
     }
   }, [amount, direction, rates]);
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    
-    // السماح بالحذف الكامل
-    if (inputValue === '') {
-      setAmount('');
-      return;
-    }
-    
-    // إزالة فواصل الآلاف للتحليل
-    const cleanedValue = inputValue.replace(/,/g, '');
-    const formatted = formatAmount(cleanedValue);
-    
-    // تحديث القيمة العددية
-    setAmount(formatted);
-  };
-
   const handleExchange = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser?.company_id || isLoading || !amount) return;
+    if (!currentUser?.company_id || isLoading) return;
     
     setSuccessMsg('');
     setErrorMsg('');
@@ -127,7 +70,6 @@ const Exchange: React.FC = () => {
       if (res.success) {
         setSuccessMsg(res.message);
         setAmount('');
-        setFormattedAmount('');
         setReceipt('');
         if (res.transaction) {
             setLastTransaction(res.transaction);
@@ -176,8 +118,8 @@ const Exchange: React.FC = () => {
             <span>سعر الصرف الحالي:</span>
             <span className="font-bold">
               {direction === 'SDG_TO_EGP' 
-                ? `${isWholesale ? rates.wholesale_rate.toLocaleString() + ' (جملة)' : rates.sd_to_eg_rate.toLocaleString()}` 
-                : rates.eg_to_sd_rate.toLocaleString()}
+                ? `${isWholesale ? rates.wholesale_rate + ' (جملة)' : rates.sd_to_eg_rate}` 
+                : rates.eg_to_sd_rate}
             </span>
           </div>
           {direction === 'SDG_TO_EGP' && (
@@ -189,16 +131,14 @@ const Exchange: React.FC = () => {
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">المبلغ المراد صرفه</label>
             <input 
-              type="text" 
+              type="number" 
               inputMode="decimal"
-              value={formattedAmount}
-              onChange={handleAmountChange}
-              className="w-full p-4 text-lg font-bold border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none text-left dir-ltr"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full p-4 text-lg font-bold border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
               placeholder="0.00"
               required
-              dir="ltr"
             />
-            <p className="text-xs text-gray-400 mt-1"></p>
           </div>
 
           <div className="bg-blue-600 text-white p-4 rounded-xl flex justify-between items-center shadow-md">
@@ -206,7 +146,7 @@ const Exchange: React.FC = () => {
               <Calculator size={20} />
               <span className="font-medium">الصافي للعميل</span>
             </div>
-            <span className="text-2xl font-bold">{result.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span className="text-2xl font-bold">{result.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
           </div>
 
           <div>
