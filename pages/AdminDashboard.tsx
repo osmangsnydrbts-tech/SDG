@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, ChevronDown, ChevronUp, Banknote, ArrowRightLeft, Smartphone, ArrowUpCircle } from 'lucide-react';
@@ -45,6 +45,14 @@ const AdminDashboard: React.FC = () => {
   const [editPhone, setEditPhone] = useState('');
   const [newPass, setNewPass] = useState('');
 
+  // Custom Share Text State
+  const [customShareText, setCustomShareText] = useState(() => localStorage.getItem('customShareText') || '');
+
+  // Persist Custom Share Text
+  useEffect(() => {
+    localStorage.setItem('customShareText', customShareText);
+  }, [customShareText]);
+
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee' && u.is_active);
 
   const handleUpdateRates = async (e: React.FormEvent) => {
@@ -66,7 +74,7 @@ const AdminDashboard: React.FC = () => {
   const handleShareRates = async () => {
     if (!rateData || !company) return;
 
-    const text = `
+    let text = `
 *${company.name}*
 نشرة أسعار الصرف اليومية
 📅 ${new Date().toLocaleDateString('ar-EG')}
@@ -79,6 +87,10 @@ const AdminDashboard: React.FC = () => {
 السعر: ${rateData.wholesale_rate}
 أقل كمية: ${rateData.wholesale_threshold.toLocaleString()} EGP
     `.trim();
+
+    if (customShareText.trim()) {
+        text += `\n\n${customShareText.trim()}`;
+    }
 
     if (navigator.share) {
       try {
@@ -264,41 +276,64 @@ const AdminDashboard: React.FC = () => {
       {/* Share Modal */}
       {showShareModal && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-            <div className="w-full max-w-sm">
-                <div id="rate-card-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-                    <div className="bg-blue-600 p-6 text-white text-center">
-                        {company?.logo && <img src={company.logo} alt="Logo" className="h-16 w-16 mx-auto bg-white rounded-lg p-1 object-contain mb-3" crossOrigin="anonymous"/>}
-                        <h2 className="text-2xl font-bold">{company?.name}</h2>
-                        <p className="text-blue-200 text-sm mt-1">نشرة أسعار الصرف اليومية</p>
-                    </div>
-                    <div className="p-6 space-y-4">
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                            <span className="text-gray-500 font-medium">سوداني {'->'} مصري</span>
-                            <span className="text-3xl font-bold text-gray-800">{rateData?.sd_to_eg_rate}</span>
+            <div className="w-full max-w-sm flex flex-col max-h-[90vh]">
+                <div className="flex-1 overflow-y-auto no-scrollbar">
+                    <div id="rate-card-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden mb-4">
+                        <div className="bg-blue-600 p-6 text-white text-center">
+                            {company?.logo && <img src={company.logo} alt="Logo" className="h-16 w-16 mx-auto bg-white rounded-lg p-1 object-contain mb-3" crossOrigin="anonymous"/>}
+                            <h2 className="text-2xl font-bold">{company?.name}</h2>
+                            <p className="text-blue-200 text-sm mt-1">نشرة أسعار الصرف اليومية</p>
                         </div>
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                            <span className="text-gray-500 font-medium">مصري {'->'} سوداني</span>
-                            <span className="text-3xl font-bold text-gray-800">{rateData?.eg_to_sd_rate}</span>
-                        </div>
-                        
-                        <div className="border-t pt-4 mt-2">
-                            <div className="flex justify-between text-sm mb-2">
-                                <span className="text-gray-500">سعر الجملة</span>
-                                <span className="font-bold text-blue-600">{rateData?.wholesale_rate}</span>
+                        <div className="p-6 space-y-4">
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                <span className="text-gray-500 font-medium">سوداني {'->'} مصري</span>
+                                <span className="text-3xl font-bold text-gray-800">{rateData?.sd_to_eg_rate}</span>
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-500">أقل كمية للجملة</span>
-                                <span className="font-bold text-gray-800">{rateData?.wholesale_threshold.toLocaleString()} EGP</span>
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                <span className="text-gray-500 font-medium">مصري {'->'} سوداني</span>
+                                <span className="text-3xl font-bold text-gray-800">{rateData?.eg_to_sd_rate}</span>
                             </div>
-                        </div>
+                            
+                            <div className="border-t pt-4 mt-2">
+                                <div className="flex justify-between text-sm mb-2">
+                                    <span className="text-gray-500">سعر الجملة</span>
+                                    <span className="font-bold text-blue-600">{rateData?.wholesale_rate}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">أقل كمية للجملة</span>
+                                    <span className="font-bold text-gray-800">{rateData?.wholesale_threshold.toLocaleString()} EGP</span>
+                                </div>
+                            </div>
+                            
+                            {/* Custom Text Preview */}
+                            {customShareText && (
+                                <div className="mt-2 pt-2 border-t border-dashed border-gray-200 text-center text-sm font-medium text-gray-700 whitespace-pre-line">
+                                    {customShareText}
+                                </div>
+                            )}
 
-                        <div className="text-center text-xs text-gray-400 mt-4 pt-4 border-t">
-                            {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            <div className="text-center text-xs text-gray-400 mt-4 pt-4 border-t">
+                                {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="mt-4 flex gap-3">
+                {/* Custom Text Input */}
+                <div className="bg-white p-3 rounded-xl shadow-lg mb-3">
+                    <label className="text-xs font-bold text-gray-500 mb-2 flex items-center justify-between">
+                        <span>نص إضافي (توقيع / ملاحظات)</span>
+                        <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">يُحفظ تلقائياً</span>
+                    </label>
+                    <textarea 
+                        value={customShareText}
+                        onChange={(e) => setCustomShareText(e.target.value)}
+                        placeholder="أضف نصاً سيظهر في كل مشاركة (مثال: نسعد بخدمتكم...)"
+                        className="w-full p-2 border border-gray-200 rounded-lg text-sm h-16 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+
+                <div className="flex gap-3 shrink-0">
                     <button onClick={() => setShowShareModal(false)} className="bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-50">
                         <X size={24} />
                     </button>
