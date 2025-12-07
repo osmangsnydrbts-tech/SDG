@@ -23,10 +23,12 @@ const EWallets: React.FC = () => {
       return companyEmployees.find(e => e.id === id)?.full_name || 'Unknown';
   };
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
       e.preventDefault();
       if (currentUser?.company_id && employeeId) {
-          addEWallet(currentUser.company_id, parseInt(employeeId), phone, provider);
+          setIsLoading(true);
+          await addEWallet(currentUser.company_id, parseInt(employeeId), phone, provider);
+          setIsLoading(false);
           setShowAddModal(false);
           setPhone(''); setEmployeeId('');
       }
@@ -126,7 +128,9 @@ const EWallets: React.FC = () => {
                             <option value="Orange">Orange Cash</option>
                             <option value="We">We Pay</option>
                         </select>
-                        <button className="w-full bg-pink-600 text-white py-3 rounded-lg font-bold mt-2">حفظ</button>
+                        <button disabled={isLoading} className="w-full bg-pink-600 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center">
+                            {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'حفظ'}
+                        </button>
                         <button type="button" onClick={() => setShowAddModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                     </form>
                 </div>
