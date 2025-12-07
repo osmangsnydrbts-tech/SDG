@@ -469,19 +469,19 @@ const AdminDashboard: React.FC = () => {
                                                     <div className="space-y-2 text-sm">
                                                         <div className="flex justify-between">
                                                             <span className="text-gray-500">رصيد الخزينة</span>
-                                                            <span className="font-bold text-lg text-blue-700">{stats.treasury?.egp_balance.toLocaleString()}</span>
+                                                            <span className="font-bold text-lg text-blue-700">{stats.treasury?.egp_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                                         </div>
                                                         <div className="flex justify-between text-xs">
                                                             <span className="text-gray-500 flex items-center gap-1"><ArrowRightLeft size={10}/> إجمالي الصرف</span>
-                                                            <span className="font-bold text-gray-700">{stats.egpExchange.toLocaleString()}</span>
+                                                            <span className="font-bold text-gray-700">{stats.egpExchange.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                                         </div>
                                                         <div className="flex justify-between text-xs">
                                                             <span className="text-gray-500 flex items-center gap-1"><Smartphone size={10}/> إجمالي المحافظ</span>
-                                                            <span className="font-bold text-gray-700">{stats.egpWallet.toLocaleString()}</span>
+                                                            <span className="font-bold text-gray-700">{stats.egpWallet.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                                         </div>
                                                         <div className="flex justify-between text-xs">
                                                             <span className="text-gray-500 flex items-center gap-1"><ArrowUpCircle size={10}/> توييد / عكسي</span>
-                                                            <span className="font-bold text-red-600">{stats.egpReverse.toLocaleString()}</span>
+                                                            <span className="font-bold text-red-600">{stats.egpReverse.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -495,15 +495,15 @@ const AdminDashboard: React.FC = () => {
                                                     <div className="space-y-2 text-sm">
                                                         <div className="flex justify-between">
                                                             <span className="text-gray-500">رصيد الخزينة</span>
-                                                            <span className="font-bold text-lg text-emerald-700">{stats.treasury?.sdg_balance.toLocaleString()}</span>
+                                                            <span className="font-bold text-lg text-emerald-700">{stats.treasury?.sdg_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                                         </div>
                                                         <div className="flex justify-between text-xs">
                                                             <span className="text-gray-500 flex items-center gap-1"><ArrowRightLeft size={10}/> إجمالي الصرف</span>
-                                                            <span className="font-bold text-gray-700">{stats.sdgExchange.toLocaleString()}</span>
+                                                            <span className="font-bold text-gray-700">{stats.sdgExchange.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                                         </div>
                                                         <div className="flex justify-between text-xs">
                                                             <span className="text-gray-500 flex items-center gap-1"><ArrowUpCircle size={10}/> توييد / عكسي</span>
-                                                            <span className="font-bold text-red-600">{stats.sdgReverse.toLocaleString()}</span>
+                                                            <span className="font-bold text-red-600">{stats.sdgReverse.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                                         </div>
                                                     </div>
                                                 </div>
