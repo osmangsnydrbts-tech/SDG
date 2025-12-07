@@ -19,6 +19,7 @@ export interface User {
   role: Role;
   full_name: string;
   company_id: number | null;
+  phone?: string;
   is_active: boolean;
 }
 
