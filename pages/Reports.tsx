@@ -127,11 +127,11 @@ const Reports: React.FC = () => {
         getEmployeeName(t.employee_id),
         t.type,
         t.from_currency || '-',
-        t.from_amount,
+        Math.round(t.from_amount),
         t.to_currency || '-',
-        t.to_amount || '-',
+        t.to_amount ? Math.round(t.to_amount) : '-',
         t.rate || '-',
-        t.commission || 0,
+        t.commission ? Math.round(t.commission) : 0,
         t.receipt_number || '-'
     ]);
 
