@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Plus, User, ArrowUpRight, ArrowDownLeft, Trash2, Loader2 } from 'lucide-react';
+import FormattedInput from '../components/FormattedInput';
 
 const Merchants: React.FC = () => {
   const { currentUser, merchants, addMerchant, addMerchantEntry, deleteMerchant } = useStore();
@@ -130,7 +131,13 @@ const Merchants: React.FC = () => {
                             <option value="EGP">EGP</option>
                             <option value="SDG">SDG</option>
                         </select>
-                        <input type="number" inputMode="decimal" placeholder="المبلغ" value={amount} onChange={e => setAmount(e.target.value)} className="w-full p-3 border rounded-lg text-lg font-bold" required />
+                        <FormattedInput 
+                            value={amount}
+                            onChange={setAmount}
+                            className="w-full p-3 border rounded-lg text-lg font-bold"
+                            placeholder="المبلغ"
+                            required
+                        />
                         <button disabled={isProcessing} className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center">
                             {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'تسجيل'}
                         </button>
