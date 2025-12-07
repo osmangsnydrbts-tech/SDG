@@ -199,7 +199,7 @@ const SuperAdminDashboard: React.FC = () => {
                       {!company.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">موقوفة</span>}
                   </h3>
                   <p className="text-sm text-gray-500">Admin: {company.username}</p>
-                  {company.phone_numbers && <p className="text-xs text-gray-400 mt-1">{company.phone_numbers}</p>}
+                  {company.phone_numbers && <p className="text-xs text-gray-400 mt-1">هاتف: {company.phone_numbers}</p>}
                 </div>
               </div>
               
@@ -275,7 +275,10 @@ const SuperAdminDashboard: React.FC = () => {
                  </div>
               </div>
               
-              <input type="text" placeholder="أرقام الهواتف (اختياري)" className="w-full p-2 border rounded-lg" value={phoneNumbers} onChange={e => setPhoneNumbers(e.target.value)} />
+              <div>
+                  <label className="text-xs text-gray-500 font-bold">أرقام الهواتف (للتواصل في النشرات)</label>
+                  <input type="text" placeholder="مثال: 0912345678 - 0123456789" className="w-full p-2 border rounded-lg" value={phoneNumbers} onChange={e => setPhoneNumbers(e.target.value)} />
+              </div>
 
               <input type="text" placeholder="اسم مستخدم المدير" className="w-full p-2 border rounded-lg" value={username} onChange={e => setUsername(e.target.value)} required />
               <input type="password" inputMode="numeric" placeholder="كلمة المرور" className="w-full p-2 border rounded-lg" value={password} onChange={e => setPassword(e.target.value)} required />
