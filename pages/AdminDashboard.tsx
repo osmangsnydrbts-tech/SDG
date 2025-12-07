@@ -2,11 +2,11 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock } from 'lucide-react';
+import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, ChevronDown, ChevronUp, Banknote, ArrowRightLeft, Smartphone, ArrowUpCircle } from 'lucide-react';
 import { User } from '../types';
 
 const AdminDashboard: React.FC = () => {
-  const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies, treasuries, transactions, showToast } = useStore();
+  const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies, treasuries, transactions } = useStore();
   const navigate = useNavigate();
   const rateData = exchangeRates.find(r => r.company_id === currentUser?.company_id);
   const company = companies.find(c => c.id === currentUser?.company_id);
@@ -20,8 +20,8 @@ const AdminDashboard: React.FC = () => {
   const [editPassId, setEditPassId] = useState<number | null>(null);
   const [editInfoId, setEditInfoId] = useState<User | null>(null);
 
-  // New States for Employee Report & Secure Delete
-  const [selectedEmpReport, setSelectedEmpReport] = useState<User | null>(null);
+  // New States for Employee List
+  const [expandedEmpId, setExpandedEmpId] = useState<number | null>(null);
   const [empToDelete, setEmpToDelete] = useState<number | null>(null);
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -154,7 +154,6 @@ const AdminDashboard: React.FC = () => {
       e.preventDefault();
       if (!empToDelete || !currentUser) return;
       
-      // Simple security check (Checking current user password vs input)
       if (confirmPassword === currentUser.password) {
         setIsProcessing(true);
         await deleteEmployee(empToDelete);
@@ -166,20 +165,38 @@ const AdminDashboard: React.FC = () => {
       }
   };
 
+  const toggleEmployeeExpand = (id: number) => {
+      setExpandedEmpId(expandedEmpId === id ? null : id);
+  };
+
+  // Helper to calculate stats for expanded view
+  const getDetailedStats = (empId: number) => {
+      const treasury = treasuries.find(t => t.employee_id === empId);
+      const empTxs = transactions.filter(t => t.employee_id === empId);
+
+      // EGP Stats
+      // 1. Exchange Out (Buying SDG)
+      const egpExchange = empTxs.filter(t => t.type === 'exchange' && t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0);
+      // 2. Wallet Volume (Deposit + Withdrawal) - Money moved via wallets
+      const egpWallet = empTxs.filter(t => ['wallet_deposit', 'wallet_withdrawal'].includes(t.type)).reduce((sum, t) => sum + t.from_amount, 0);
+      // 3. Reverse (Sent back to Main Treasury)
+      const egpReverse = empTxs.filter(t => t.type === 'treasury_withdraw' && t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0);
+
+      // SDG Stats
+      // 1. Exchange Out (Buying EGP)
+      const sdgExchange = empTxs.filter(t => t.type === 'exchange' && t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0);
+      // 2. Reverse (Sent back to Main Treasury)
+      const sdgReverse = empTxs.filter(t => t.type === 'treasury_withdraw' && t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0);
+
+      return { treasury, egpExchange, egpWallet, egpReverse, sdgExchange, sdgReverse };
+  };
+
   const QuickAction = ({ icon: Icon, label, onClick, color }: any) => (
     <button onClick={onClick} className={`${color} text-white p-4 rounded-xl shadow-md flex flex-col items-center justify-center gap-2 active:scale-95 transition`}>
       <Icon size={28} />
       <span className="font-bold text-sm">{label}</span>
     </button>
   );
-
-  // Helper for Employee Report
-  const getEmpStats = (empId: number) => {
-      const treasury = treasuries.find(t => t.employee_id === empId);
-      const txs = transactions.filter(t => t.employee_id === empId).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      const recentTxs = txs.slice(0, 5);
-      return { treasury, recentTxs, totalTxs: txs.length };
-  };
 
   return (
     <div className="space-y-6">
@@ -361,142 +378,180 @@ const AdminDashboard: React.FC = () => {
       {/* Manage Employees Modal */}
       {showManageEmpModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-sm p-6 h-[80vh] flex flex-col">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 h-[85vh] flex flex-col">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold">قائمة الموظفين</h3>
                     <button onClick={() => setShowManageEmpModal(false)} className="bg-gray-100 p-2 rounded-full"><X size={18}/></button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto space-y-3">
-                    {companyEmployees.map(emp => (
-                        <div key={emp.id} className="border p-3 rounded-lg relative">
-                            {editInfoId?.id === emp.id ? (
-                                <div className="space-y-2">
-                                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-1 border rounded" placeholder="الاسم" />
-                                    <input type="text" value={editUser} onChange={e => setEditUser(e.target.value)} className="w-full p-1 border rounded" placeholder="Username" />
-                                    <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} className="w-full p-1 border rounded" placeholder="رقم الهاتف" />
-                                    <div className="flex gap-2">
-                                        <button onClick={handleUpdateInfo} disabled={isProcessing} className="bg-green-500 text-white px-3 py-1 rounded text-xs">حفظ</button>
-                                        <button onClick={() => setEditInfoId(null)} className="bg-gray-300 text-gray-800 px-3 py-1 rounded text-xs">إلغاء</button>
-                                    </div>
-                                    {error && <p className="text-red-500 text-xs">{error}</p>}
-                                </div>
-                            ) : (
-                                <div>
-                                    <div className="flex justify-between">
-                                      <h4 className="font-bold">{emp.full_name}</h4>
-                                      {emp.phone && <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">{emp.phone}</span>}
-                                    </div>
-                                    <p className="text-sm text-gray-500 mb-2">Username: {emp.username}</p>
-                                    
-                                    <div className="flex flex-wrap gap-2 mt-2">
-                                        <button onClick={() => openEditInfo(emp)} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded flex items-center gap-1">
-                                            <Pencil size={12} /> تعديل
-                                        </button>
-                                        <button onClick={() => setEditPassId(emp.id)} className="text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded flex items-center gap-1">
-                                            <Key size={12} /> كلمة المرور
-                                        </button>
-                                        <button onClick={() => initiateDeleteEmployee(emp.id)} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded flex items-center gap-1">
-                                            <Trash2 size={12} /> حذف
-                                        </button>
-                                        <button onClick={() => setSelectedEmpReport(emp)} className="text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded flex items-center gap-1">
-                                            <FileText size={12} /> تقرير
-                                        </button>
-                                    </div>
+                <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
+                    {companyEmployees.map(emp => {
+                        const isExpanded = expandedEmpId === emp.id;
+                        const stats = isExpanded ? getDetailedStats(emp.id) : null;
 
-                                    {/* Password Change Field */}
-                                    {editPassId === emp.id && (
-                                        <div className="mt-2 flex gap-1 animate-in slide-in-from-top-2">
-                                            <input 
-                                                type="text" 
-                                                placeholder="كلمة المرور الجديدة" 
-                                                className="border rounded px-2 py-1 text-xs w-full"
-                                                value={newPass}
-                                                onChange={e => setNewPass(e.target.value)}
-                                            />
-                                            <button onClick={() => handleChangePassword(emp.id)} disabled={isProcessing} className="bg-green-500 text-white px-2 rounded">
-                                                <CheckIcon size={14} />
-                                            </button>
-                                            <button onClick={() => setEditPassId(null)} className="bg-gray-300 text-black px-2 rounded">
-                                                <X size={14} />
-                                            </button>
+                        return (
+                            <div key={emp.id} className={`border rounded-xl overflow-hidden transition-all ${isExpanded ? 'border-blue-300 shadow-md' : 'border-gray-200'}`}>
+                                {editInfoId?.id === emp.id ? (
+                                    <div className="p-4 space-y-2 bg-gray-50">
+                                        <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded-lg" placeholder="الاسم" />
+                                        <input type="text" value={editUser} onChange={e => setEditUser(e.target.value)} className="w-full p-2 border rounded-lg" placeholder="Username" />
+                                        <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} className="w-full p-2 border rounded-lg" placeholder="رقم الهاتف" />
+                                        <div className="flex gap-2 pt-2">
+                                            <button onClick={handleUpdateInfo} disabled={isProcessing} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-sm font-bold">حفظ</button>
+                                            <button onClick={() => setEditInfoId(null)} className="flex-1 bg-gray-300 text-gray-800 py-2 rounded-lg text-sm font-bold">إلغاء</button>
                                         </div>
-                                    )}
+                                        {error && <p className="text-red-500 text-xs text-center">{error}</p>}
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Header - Click to Expand */}
+                                        <div 
+                                            onClick={() => toggleEmployeeExpand(emp.id)}
+                                            className={`p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 ${isExpanded ? 'bg-gray-50 border-b border-gray-100' : ''}`}
+                                        >
+                                            <div>
+                                                <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                                                    {emp.full_name}
+                                                    {emp.phone && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{emp.phone}</span>}
+                                                </h4>
+                                                <p className="text-xs text-gray-400 mt-0.5">@{emp.username}</p>
+                                            </div>
+                                            <div className="text-gray-400">
+                                                {isExpanded ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
+                                            </div>
+                                        </div>
 
-                                    {/* Delete Confirmation */}
-                                    {empToDelete === emp.id && (
-                                        <div className="mt-2 bg-red-50 p-2 rounded animate-in slide-in-from-top-2">
-                                            <p className="text-xs text-red-700 font-bold mb-1">أدخل كلمة مرورك للتأكيد:</p>
-                                            <form onSubmit={confirmDeleteEmployee} className="flex gap-1">
-                                                <input 
-                                                    type="password" 
-                                                    className="border rounded px-2 py-1 text-xs w-full"
-                                                    value={confirmPassword}
-                                                    onChange={e => setConfirmPassword(e.target.value)}
-                                                    placeholder="••••"
-                                                    autoFocus
-                                                />
-                                                <button type="submit" disabled={isProcessing} className="bg-red-600 text-white px-2 rounded text-xs">
-                                                    حذف
-                                                </button>
-                                                <button type="button" onClick={() => setEmpToDelete(null)} className="bg-gray-300 text-black px-2 rounded text-xs">
-                                                    إلغاء
-                                                </button>
-                                            </form>
-                                            {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                    {companyEmployees.length === 0 && <p className="text-center text-gray-500">لا يوجد موظفين</p>}
+                                        {/* Expanded Detail View */}
+                                        {isExpanded && stats && (
+                                            <div className="p-4 animate-in slide-in-from-top-4">
+                                                
+                                                {/* EGP Section */}
+                                                <div className="bg-blue-50 rounded-xl p-3 mb-3 border border-blue-100">
+                                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-blue-100">
+                                                        <Banknote size={16} className="text-blue-600"/>
+                                                        <span className="font-bold text-blue-800 text-sm">المصري (EGP)</span>
+                                                    </div>
+                                                    <div className="space-y-2 text-sm">
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-500">رصيد الخزينة</span>
+                                                            <span className="font-bold text-lg text-blue-700">{stats.treasury?.egp_balance.toLocaleString()}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-gray-500 flex items-center gap-1"><ArrowRightLeft size={10}/> إجمالي الصرف</span>
+                                                            <span className="font-bold text-gray-700">{stats.egpExchange.toLocaleString()}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-gray-500 flex items-center gap-1"><Smartphone size={10}/> إجمالي المحافظ</span>
+                                                            <span className="font-bold text-gray-700">{stats.egpWallet.toLocaleString()}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-gray-500 flex items-center gap-1"><ArrowUpCircle size={10}/> توييد / عكسي</span>
+                                                            <span className="font-bold text-red-600">{stats.egpReverse.toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* SDG Section */}
+                                                <div className="bg-emerald-50 rounded-xl p-3 mb-4 border border-emerald-100">
+                                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-emerald-100">
+                                                        <Banknote size={16} className="text-emerald-600"/>
+                                                        <span className="font-bold text-emerald-800 text-sm">السوداني (SDG)</span>
+                                                    </div>
+                                                    <div className="space-y-2 text-sm">
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-500">رصيد الخزينة</span>
+                                                            <span className="font-bold text-lg text-emerald-700">{stats.treasury?.sdg_balance.toLocaleString()}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-gray-500 flex items-center gap-1"><ArrowRightLeft size={10}/> إجمالي الصرف</span>
+                                                            <span className="font-bold text-gray-700">{stats.sdgExchange.toLocaleString()}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-gray-500 flex items-center gap-1"><ArrowUpCircle size={10}/> توييد / عكسي</span>
+                                                            <span className="font-bold text-red-600">{stats.sdgReverse.toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Coordinated Action Toolbar */}
+                                                <div className="grid grid-cols-3 gap-2 border-t pt-3">
+                                                    <button 
+                                                        onClick={() => openEditInfo(emp)} 
+                                                        className="flex flex-col items-center justify-center p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition"
+                                                    >
+                                                        <Pencil size={18} className="text-blue-600 mb-1"/>
+                                                        <span className="text-[10px] font-bold text-gray-600">تعديل البيانات</span>
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setEditPassId(emp.id)} 
+                                                        className="flex flex-col items-center justify-center p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition"
+                                                    >
+                                                        <Key size={18} className="text-yellow-600 mb-1"/>
+                                                        <span className="text-[10px] font-bold text-gray-600">تغيير السر</span>
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => initiateDeleteEmployee(emp.id)} 
+                                                        className="flex flex-col items-center justify-center p-2 rounded-lg bg-red-50 hover:bg-red-100 transition"
+                                                    >
+                                                        <Trash2 size={18} className="text-red-600 mb-1"/>
+                                                        <span className="text-[10px] font-bold text-red-600">حذف الموظف</span>
+                                                    </button>
+                                                </div>
+
+                                                {/* Inline Password Change */}
+                                                {editPassId === emp.id && (
+                                                    <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-100 animate-in fade-in">
+                                                        <label className="text-xs font-bold text-yellow-800 mb-1 block">كلمة المرور الجديدة</label>
+                                                        <div className="flex gap-2">
+                                                            <input 
+                                                                type="text" 
+                                                                className="border rounded-lg px-3 py-2 text-sm w-full outline-none focus:ring-1 focus:ring-yellow-500"
+                                                                value={newPass}
+                                                                onChange={e => setNewPass(e.target.value)}
+                                                                placeholder="أدخل كلمة المرور"
+                                                            />
+                                                            <button onClick={() => handleChangePassword(emp.id)} disabled={isProcessing} className="bg-green-500 text-white px-3 rounded-lg">
+                                                                <CheckIcon size={18} />
+                                                            </button>
+                                                            <button onClick={() => setEditPassId(null)} className="bg-gray-300 text-black px-3 rounded-lg">
+                                                                <X size={18} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Inline Delete Confirm */}
+                                                {empToDelete === emp.id && (
+                                                    <div className="mt-3 bg-red-50 p-3 rounded-lg border border-red-100 animate-in fade-in">
+                                                        <p className="text-xs text-red-700 font-bold mb-2">أدخل كلمة مرورك (المدير) للتأكيد:</p>
+                                                        <form onSubmit={confirmDeleteEmployee} className="flex gap-2">
+                                                            <input 
+                                                                type="password" 
+                                                                className="border rounded-lg px-3 py-2 text-sm w-full outline-none focus:ring-1 focus:ring-red-500"
+                                                                value={confirmPassword}
+                                                                onChange={e => setConfirmPassword(e.target.value)}
+                                                                placeholder="كلمة مرور المدير"
+                                                                autoFocus
+                                                            />
+                                                            <button type="submit" disabled={isProcessing} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">
+                                                                حذف نهائي
+                                                            </button>
+                                                        </form>
+                                                        <button onClick={() => setEmpToDelete(null)} className="text-xs text-gray-500 mt-2 hover:underline">إلغاء</button>
+                                                        {error && <p className="text-red-600 text-xs mt-2 font-bold">{error}</p>}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
+                    {companyEmployees.length === 0 && <p className="text-center text-gray-500 mt-10">لا يوجد موظفين</p>}
                 </div>
             </div>
         </div>
-      )}
-
-      {/* Employee Mini Report Modal */}
-      {selectedEmpReport && (
-          <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-sm p-5 relative">
-                  <button onClick={() => setSelectedEmpReport(null)} className="absolute top-4 left-4 bg-gray-100 p-1 rounded-full"><X size={18}/></button>
-                  <h3 className="font-bold text-lg mb-1">{selectedEmpReport.full_name}</h3>
-                  {selectedEmpReport.phone && <p className="text-sm text-gray-600 mb-1">{selectedEmpReport.phone}</p>}
-                  <p className="text-xs text-gray-500 mb-4">تقرير مختصر</p>
-                  
-                  {(() => {
-                      const stats = getEmpStats(selectedEmpReport.id);
-                      return (
-                          <div className="space-y-4">
-                              <div className="flex gap-2">
-                                  <div className="flex-1 bg-blue-50 p-3 rounded-xl text-center">
-                                      <p className="text-xs text-blue-400">عهدة مصري</p>
-                                      <p className="font-bold text-lg">{stats.treasury?.egp_balance.toLocaleString()}</p>
-                                  </div>
-                                  <div className="flex-1 bg-emerald-50 p-3 rounded-xl text-center">
-                                      <p className="text-xs text-emerald-400">عهدة سوداني</p>
-                                      <p className="font-bold text-lg">{stats.treasury?.sdg_balance.toLocaleString()}</p>
-                                  </div>
-                              </div>
-                              
-                              <div>
-                                  <h4 className="font-bold text-xs text-gray-500 mb-2">آخر 5 عمليات</h4>
-                                  <div className="space-y-2 text-xs">
-                                      {stats.recentTxs.map(t => (
-                                          <div key={t.id} className="flex justify-between border-b pb-1">
-                                              <span>{t.type}</span>
-                                              <span className="font-bold">{t.from_amount} {t.from_currency}</span>
-                                          </div>
-                                      ))}
-                                      {stats.recentTxs.length === 0 && <p className="text-gray-400">لا توجد عمليات</p>}
-                                  </div>
-                              </div>
-                          </div>
-                      );
-                  })()}
-              </div>
-          </div>
       )}
 
     </div>
