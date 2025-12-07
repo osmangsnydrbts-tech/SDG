@@ -66,9 +66,6 @@ const AdminDashboard: React.FC = () => {
   const handleShareRates = async () => {
     if (!rateData || !company) return;
 
-    // Add phone numbers at the bottom for inquiries
-    const phones = company.phone_numbers ? `\n\n📞 للاستفسار: ${company.phone_numbers}` : '';
-
     const text = `
 *${company.name}*
 نشرة أسعار الصرف اليومية
@@ -80,7 +77,7 @@ const AdminDashboard: React.FC = () => {
 
 📦 *الجملة:*
 السعر: ${rateData.wholesale_rate}
-أقل كمية: ${rateData.wholesale_threshold.toLocaleString()} EGP${phones}
+أقل كمية: ${rateData.wholesale_threshold.toLocaleString()} EGP
     `.trim();
 
     if (navigator.share) {
@@ -279,9 +276,6 @@ const AdminDashboard: React.FC = () => {
                         </div>
 
                         <div className="text-center text-xs text-gray-400 mt-4 pt-4 border-t">
-                            {company?.phone_numbers && (
-                               <div className="mb-2 font-bold text-gray-700 text-sm" dir="ltr">📞 للاستفسار: {company.phone_numbers}</div>
-                            )}
                             {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         </div>
                     </div>
