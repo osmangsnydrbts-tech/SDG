@@ -62,7 +62,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             clonedElement.style.textAlign = 'right';
             clonedElement.style.letterSpacing = 'normal'; // منع تقطع الحروف
             clonedElement.style.fontVariantLigatures = 'normal';
-            clonedElement.style.webkitFontSmoothing = 'antialiased';
+            (clonedElement.style as any).webkitFontSmoothing = 'antialiased';
             
             // التأكد من أن النص المركزي يبقى في المركز
             const headerText = clonedElement.querySelectorAll('.text-center');
@@ -486,7 +486,7 @@ ${transaction.commission && transaction.commission > 0 ? `العمولة: ${tran
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-gray-800 text-sm font-bold tracking-wider">
-                      {transaction.id.slice(-8).toUpperCase()}
+                      {String(transaction.id).slice(-8).toUpperCase()}
                     </span>
                     <div className="h-10 w-10 bg-gray-100 rounded flex items-center justify-center">
                       <div className="grid grid-cols-3 gap-0.5">
