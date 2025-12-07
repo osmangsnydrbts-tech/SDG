@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Transaction, Company, User } from '../types';
-import { X, Share2, Loader2 } from 'lucide-react';
+import { X, Share2, Loader2, CheckCircle2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface ReceiptModalProps {
@@ -23,27 +23,37 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     setIsSharing(true);
 
     try {
-      // Wait for UI to stabilize
+      // Wait for UI to stabilize and fonts to load
+      await document.fonts.ready;
       await new Promise(resolve => setTimeout(resolve, 300));
 
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
-        scale: 2,
+        scale: 3, // Increased scale for sharper text
         useCORS: true,
         logging: false,
         allowTaint: true,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: document.documentElement.offsetWidth,
-        windowHeight: document.documentElement.offsetHeight,
+        // Ensure the full height/width is captured
+        windowWidth: element.scrollWidth + 50,
+        windowHeight: element.scrollHeight + 50,
         onclone: (clonedDoc) => {
             const clonedElement = clonedDoc.getElementById('receipt-content');
             if (clonedElement) {
+                // Reset styles that might interfere with capture
                 clonedElement.style.transform = 'none';
-                clonedElement.style.overflow = 'visible';
-                // Ensure text direction and fonts are preserved
+                clonedElement.style.margin = '0';
+                clonedElement.style.boxShadow = 'none'; 
+                
+                // Force Layout & Typography for Arabic
+                clonedElement.style.fontFamily = "'Tajawal', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
                 clonedElement.style.direction = 'rtl';
-                clonedElement.style.fontFamily = "'Tajawal', sans-serif";
+                clonedElement.style.textAlign = 'right';
+                clonedElement.style.textRendering = 'optimizeLegibility';
+                clonedElement.style.fontVariantLigatures = 'normal';
+                
+                // Ensure header text is centered in the clone
+                const headerText = clonedElement.querySelectorAll('.text-center');
+                headerText.forEach((el: any) => el.style.textAlign = 'center');
             }
         }
       });
@@ -95,8 +105,8 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
   const getFromLabel = (t: Transaction) => {
       switch (t.type) {
           case 'exchange': return 'المبلغ المستلم';
-          case 'wallet_deposit': return 'المبلغ المستلم من العميل';
-          case 'wallet_withdrawal': return 'المبلغ المسحوب من المحفظة';
+          case 'wallet_deposit': return 'المبلغ المستلم';
+          case 'wallet_withdrawal': return 'المسحوب من المحفظة';
           case 'treasury_feed': return 'المبلغ المودع';
           case 'treasury_withdraw': return 'المبلغ المسحوب';
           case 'wallet_feed': return 'قيمة التغذية';
@@ -106,9 +116,9 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
 
   const getToLabel = (t: Transaction) => {
       switch (t.type) {
-          case 'exchange': return 'المبلغ المسلم للعميل';
-          case 'wallet_deposit': return 'المبلغ المودع في المحفظة';
-          case 'wallet_withdrawal': return 'المبلغ المضاف للعهدة';
+          case 'exchange': return 'المبلغ المسلم';
+          case 'wallet_deposit': return 'المودع في المحفظة';
+          case 'wallet_withdrawal': return 'المضاف للعهدة';
           default: return 'المبلغ المستلم';
       }
   };
@@ -125,85 +135,109 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
       <div className="w-full max-w-md my-auto">
         
         {/* Printable Area */}
-        <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative" dir="rtl">
+        <div id="receipt-content" className="bg-white rounded-3xl shadow-2xl overflow-hidden relative border border-gray-100" dir="rtl">
           
+          {/* Decorative Pattern */}
+          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500"></div>
+
           {/* Header */}
-          <div className="bg-gray-50 p-6 border-b border-gray-100 flex flex-col items-center justify-center text-center">
-            <div className="flex items-center justify-center gap-3 w-full">
+          <div className="bg-slate-50 p-6 pt-8 pb-4 flex flex-col items-center justify-center text-center">
+            <div className="flex flex-col items-center justify-center gap-3 w-full mb-2">
                 {company.logo ? (
                   <img 
                     src={company.logo} 
                     alt="Logo" 
-                    className="h-14 w-14 object-contain rounded-lg bg-white border border-gray-200 p-0.5 shrink-0" 
+                    className="h-20 w-20 object-contain rounded-xl bg-white shadow-sm border border-gray-100 p-1" 
                     crossOrigin="anonymous" 
                   />
                 ) : (
-                  <div className="h-14 w-14 bg-blue-100 rounded-full flex items-center justify-center shrink-0 text-blue-600 font-bold text-xl">
+                  <div className="h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-2xl shadow-md">
                      {company.name.charAt(0)}
                   </div>
                 )}
-                <h2 className="text-xl font-extrabold text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">
+                <h2 className="text-xl font-bold text-slate-800 tracking-tight mt-1">
                   {company.name}
                 </h2>
             </div>
-            <p className="text-gray-400 text-xs mt-3 font-medium tracking-wide">إشعار معاملة مالية</p>
+            <div className="inline-block bg-white px-4 py-1 rounded-full border border-gray-200 text-xs text-gray-500 font-medium">
+                إشعار معاملة رسمية
+            </div>
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-5 bg-white">
+          <div className="p-6 pt-2 bg-white relative">
             
-            <div className="text-center border-b border-dashed border-gray-200 pb-4">
-               <h3 className="text-lg font-bold text-blue-700 mb-1">{getTransactionType(transaction)}</h3>
-               <p className="text-xs text-gray-500">رقم الإشعار: <span className="font-mono font-bold text-gray-700 text-sm">{transaction.receipt_number || `#${transaction.id}`}</span></p>
-               <p className="text-xs text-gray-500 mt-1" dir="ltr">
-                  {new Date(transaction.created_at).toLocaleDateString('ar-EG')} - {new Date(transaction.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
-               </p>
+            {/* Transaction Title & Meta */}
+            <div className="text-center mb-6">
+               <h3 className="text-lg font-bold text-blue-700 mb-2">{getTransactionType(transaction)}</h3>
+               <div className="flex justify-center items-center gap-2 text-xs text-gray-400 font-mono bg-gray-50 py-1.5 px-3 rounded-lg mx-auto w-fit">
+                 <span>{new Date(transaction.created_at).toLocaleDateString('en-US')}</span>
+                 <span>|</span>
+                 <span>{new Date(transaction.created_at).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'})}</span>
+                 <span>|</span>
+                 <span>#{transaction.receipt_number || transaction.id}</span>
+               </div>
             </div>
 
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span className="text-gray-600 font-medium">
+            {/* Main Details Card */}
+            <div className="space-y-3">
+              {/* Row 1: From Amount */}
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-slate-500 text-sm font-medium">
                     {getFromLabel(transaction)}
                 </span>
-                <span className="font-bold text-gray-900 text-lg" dir="ltr">
-                  {formatAmount(transaction.from_amount)} {transaction.from_currency}
+                <span className="font-bold text-slate-900 text-lg tracking-tight" dir="ltr">
+                  {formatAmount(transaction.from_amount)} <span className="text-sm font-normal text-slate-500">{transaction.from_currency}</span>
                 </span>
               </div>
 
+              {/* Rate (If Exchange) */}
               {transaction.type === 'exchange' && transaction.rate && (
-                <div className="flex justify-between items-center px-2">
-                  <span className="text-gray-500">سعر الصرف</span>
-                  <span className="font-bold text-gray-800">{transaction.rate}</span>
+                <div className="flex justify-between items-center px-3 py-1 text-sm">
+                  <span className="text-gray-400">سعر الصرف</span>
+                  <span className="font-bold text-gray-700 font-mono bg-gray-50 px-2 py-0.5 rounded">{transaction.rate}</span>
                 </div>
               )}
 
+              {/* Row 2: To Amount (Highlighted) */}
               {transaction.to_amount && (
-                <div className="flex justify-between items-center p-4 bg-blue-600 rounded-lg shadow-sm text-white">
-                  <span className="text-blue-100 font-bold">
+                <div className="flex justify-between items-center p-4 bg-blue-600 rounded-xl shadow-lg shadow-blue-200 text-white mt-2 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10"><CheckCircle2 size={40}/></div>
+                  <span className="text-blue-100 font-medium text-sm relative z-10">
                     {getToLabel(transaction)}
                   </span>
-                  <span className="font-extrabold text-2xl" dir="ltr">
-                    {formatAmount(transaction.to_amount)} {transaction.to_currency}
+                  <span className="font-bold text-2xl tracking-tight relative z-10" dir="ltr">
+                    {formatAmount(transaction.to_amount)} <span className="text-base font-normal opacity-80">{transaction.to_currency}</span>
                   </span>
                 </div>
               )}
 
+              {/* Commission Details */}
               {transaction.commission && transaction.commission > 0 && (
-                 <div className="flex justify-between items-center px-2 pt-1">
-                  <span className="text-gray-500">العمولة/الربح</span>
-                  <span className="font-bold text-red-500">{transaction.commission.toLocaleString()} EGP</span>
+                 <div className="flex justify-between items-center px-3 pt-2 text-xs">
+                  <span className="text-gray-400">شامل العمولة والخدمة</span>
+                  <span className="font-bold text-slate-600">{transaction.commission.toLocaleString()} EGP</span>
                 </div>
               )}
             </div>
 
-            <div className="pt-6 mt-2 border-t border-gray-100">
+            {/* Footer Information */}
+            <div className="pt-6 mt-6 border-t border-gray-100 border-dashed">
               <div className="flex justify-between items-center text-xs text-gray-500 mb-4">
-                <span>الموظف المسؤول:</span>
-                <span className="font-bold text-gray-700">{employee?.full_name}</span>
+                <span className="flex items-center gap-1">الموظف: <span className="font-bold text-gray-700">{employee?.full_name}</span></span>
+                {/* QR Code Placeholder Style */}
+                <div className="h-8 w-8 bg-gray-100 rounded flex items-center justify-center">
+                    <div className="grid grid-cols-2 gap-0.5">
+                        <div className="w-2 h-2 bg-gray-400 rounded-sm"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-sm"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-sm"></div>
+                        <div className="w-2 h-2 bg-gray-300 rounded-sm"></div>
+                    </div>
+                </div>
               </div>
               
-              <div className="text-center text-xs text-gray-400 font-light">
-                 شكراً لتعاملكم معنا
+              <div className="text-center text-[10px] text-gray-400 font-light">
+                 تم إصدار هذا الإشعار إلكترونياً
               </div>
             </div>
           </div>
