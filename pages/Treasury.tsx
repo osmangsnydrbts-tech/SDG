@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { ArrowDownCircle, ArrowUpCircle, AlertCircle, CheckCircle2, UserCheck, Banknote, Loader2 } from 'lucide-react';
+import FormattedInput from '../components/FormattedInput';
 
 const Treasury: React.FC = () => {
   const { currentUser, treasuries, users, manageTreasury } = useStore();
@@ -196,11 +197,9 @@ const Treasury: React.FC = () => {
                           <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
                               <Banknote className="text-gray-400" />
                           </div>
-                          <input 
-                              type="number" 
-                              inputMode="decimal"
+                          <FormattedInput 
                               value={amount}
-                              onChange={(e) => setAmount(e.target.value)}
+                              onChange={setAmount}
                               className="w-full pr-12 pl-4 py-4 text-2xl font-bold border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                               placeholder="0.00"
                               autoFocus
