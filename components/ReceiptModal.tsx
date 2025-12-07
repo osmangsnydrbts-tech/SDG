@@ -16,7 +16,6 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    // إغلاق النافذة عند الضغط على زر ESC
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -33,47 +32,67 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     setIsSharing(true);
 
     try {
-      // انتظار تحميل الخطوط والاستقرار
+      // Wait for fonts to fully load to avoid font-swapping or missing glyphs
       await document.fonts.ready;
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
-        scale: 3,
+        scale: 2, // High resolution
         useCORS: true,
         logging: false,
         allowTaint: true,
-        windowWidth: element.scrollWidth + 50,
-        windowHeight: element.scrollHeight + 50,
         onclone: (clonedDoc) => {
           const clonedElement = clonedDoc.getElementById('receipt-content');
           if (clonedElement) {
-            // إعادة تعيين الأنماط التي قد تتعارض مع الالتقاط
+            // 1. Clean up styles that might affect the screenshot frame
             clonedElement.style.transform = 'none';
             clonedElement.style.margin = '0';
             clonedElement.style.boxShadow = 'none';
             clonedElement.style.borderRadius = '0';
             
-            // إجبار تخطيط اللغة العربية وتصحيح الخطوط
-            clonedElement.style.fontFamily = "'Tajawal', sans-serif";
+            // 2. Fix Text Direction and Alignment (Global)
             clonedElement.style.direction = 'rtl';
             clonedElement.style.textAlign = 'right';
-            clonedElement.style.letterSpacing = 'normal'; // منع تقطع الحروف
+            
+            // 3. Fix Arabic Letter Spacing (Separated Letters Issue)
+            // html2canvas can sometimes calculate letter spacing incorrectly for Arabic ligatures
+            clonedElement.style.letterSpacing = '0px'; 
             clonedElement.style.fontVariantLigatures = 'normal';
-            (clonedElement.style as any).webkitFontSmoothing = 'antialiased';
-            
-            // التأكد من أن النص المركزي يبقى في المركز
-            const headerText = clonedElement.querySelectorAll('.text-center');
-            headerText.forEach((el: any) => el.style.textAlign = 'center');
-            
-            // تحسين عرض الأزرار للصورة
+            clonedElement.style.fontFeatureSettings = '"liga" 1';
+            clonedElement.style.fontFamily = "'Tajawal', sans-serif";
+
+            // 4. Apply fixes recursively to all elements to ensure inheritance matches
+            const allElements = clonedElement.querySelectorAll('*');
+            Array.from(allElements).forEach((el: any) => {
+              if (el.style) {
+                el.style.fontFamily = "'Tajawal', sans-serif";
+                el.style.letterSpacing = '0px'; 
+                el.style.fontVariantLigatures = 'normal';
+              }
+            });
+
+            // 5. Preserve LTR for Numbers/English/Currencies
+            const ltrElements = clonedElement.querySelectorAll('[dir="ltr"]');
+            Array.from(ltrElements).forEach((el: any) => {
+                el.style.direction = 'ltr';
+                el.style.textAlign = 'left';
+            });
+
+            // 6. Preserve Center Alignment where needed
+            const centerElements = clonedElement.querySelectorAll('.text-center');
+            Array.from(centerElements).forEach((el: any) => {
+                el.style.textAlign = 'center';
+            });
+
+            // 7. Hide Interaction Elements
             const buttons = clonedElement.querySelectorAll('button');
-            buttons.forEach((btn: any) => btn.style.display = 'none');
+            Array.from(buttons).forEach((btn: any) => btn.style.display = 'none');
           }
         }
       });
 
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 1.0));
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
 
       if (blob) {
         const fileName = `إشعار_${transaction.receipt_number || transaction.id}.jpg`;
@@ -84,10 +103,10 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             await navigator.share({
               files: [file],
               title: 'إشعار عملية',
-              text: `إشعار عملية - ${company.name} - ${transaction.receipt_number || ''}`,
+              text: `إشعار عملية - ${company.name}`,
             });
           } catch (error) {
-            console.log('تم إلغاء المشاركة', error);
+            console.log('Share cancelled', error);
           }
         } else {
           const link = document.createElement('a');
@@ -96,14 +115,11 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          
-          // إظهار تأكيد التنزيل
-          alert('تم تحميل صورة الإشعار بنجاح');
         }
       }
     } catch (error) {
-      console.error('خطأ في إنشاء الصورة', error);
-      alert('حدث خطأ أثناء إنشاء الصورة. حاول مرة أخرى.');
+      console.error('Error generating receipt image', error);
+      alert('حدث خطأ أثناء حفظ الإشعار');
     } finally {
       setIsSharing(false);
     }
@@ -272,7 +288,7 @@ ${transaction.commission && transaction.commission > 0 ? `العمولة: ${tran
                   </div>
                 </div>
                 <div className="pr-12">
-                  <span className="text-slate-500 text-sm font-medium block mb-1">
+                   <span className="text-slate-500 text-sm font-medium block mb-1">
                     {getFromLabel(transaction)}
                   </span>
                   <span className="font-bold text-slate-900 text-xl tracking-tight" dir="ltr">
@@ -329,9 +345,9 @@ ${transaction.commission && transaction.commission > 0 ? `العمولة: ${tran
                     </div>
                     <span className="text-gray-500 text-sm">العمولة والرسوم</span>
                   </div>
-                  <span className="font-bold text-gray-700 text-lg">
+                  <span className="font-bold text-gray-700 text-lg" dir="ltr">
                     {transaction.commission.toLocaleString('ar-SA')} 
-                    <span className="text-sm font-normal text-gray-500 mr-1">EGP</span>
+                    <span className="text-sm font-normal text-gray-500 ml-1">EGP</span>
                   </span>
                 </div>
               )}
