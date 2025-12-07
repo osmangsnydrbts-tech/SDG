@@ -69,7 +69,7 @@ const EmployeeDashboard: React.FC = () => {
             <div className="p-3 bg-pink-50 rounded-xl flex justify-between items-center">
                 <div>
                     <p className="text-xs text-pink-400 mb-1 flex items-center gap-1"><Smartphone size={12}/> رصيد المحافظ</p>
-                    <p className="text-xl font-bold text-pink-700">{myWalletsBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} EGP</p>
+                    <p className="text-xl font-bold text-pink-700">{myWalletsBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</p>
                 </div>
                 <button 
                     onClick={() => navigate('/wallet-transfer')}
