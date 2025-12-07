@@ -9,7 +9,6 @@ export interface Company {
   subscription_end: string;
   is_active: boolean;
   logo?: string; // Base64 string
-  phone_numbers?: string;
 }
 
 export interface User {
