@@ -83,8 +83,8 @@ const Treasury: React.FC = () => {
 
   const getFormattedAmount = () => {
       const val = parseFloat(amount);
-      if (isNaN(val)) return '0.00';
-      return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (isNaN(val)) return '0';
+      return val.toLocaleString(undefined, { maximumFractionDigits: 0 });
   };
 
   return (
@@ -127,7 +127,7 @@ const Treasury: React.FC = () => {
                         <Banknote className="opacity-50" size={32} />
                     </div>
                     <p className="text-blue-100 text-sm mb-1">الرصيد المصري</p>
-                    <h3 className="text-3xl font-bold tracking-tight">{mainTreasury?.egp_balance.toLocaleString()}</h3>
+                    <h3 className="text-3xl font-bold tracking-tight">{mainTreasury?.egp_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
                 </div>
 
                 <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 text-white p-6 rounded-2xl shadow-lg border border-emerald-500/50">
@@ -138,7 +138,7 @@ const Treasury: React.FC = () => {
                         <Banknote className="opacity-50" size={32} />
                     </div>
                     <p className="text-emerald-100 text-sm mb-1">الرصيد السوداني</p>
-                    <h3 className="text-3xl font-bold tracking-tight">{mainTreasury?.sdg_balance.toLocaleString()}</h3>
+                    <h3 className="text-3xl font-bold tracking-tight">{mainTreasury?.sdg_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
                 </div>
              </div>
 
@@ -183,12 +183,12 @@ const Treasury: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white p-5 rounded-2xl border-b-4 border-blue-500 shadow-sm">
                     <p className="text-gray-500 text-xs mb-2 font-bold flex items-center gap-1"><Wallet size={14}/> إجمالي المصري</p>
-                    <p className="text-2xl font-bold text-gray-800">{totalEmployeeEgp.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-gray-800">{totalEmployeeEgp.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                     <span className="text-xs text-gray-400">EGP</span>
                 </div>
                 <div className="bg-white p-5 rounded-2xl border-b-4 border-emerald-500 shadow-sm">
                     <p className="text-gray-500 text-xs mb-2 font-bold flex items-center gap-1"><Wallet size={14}/> إجمالي السوداني</p>
-                    <p className="text-2xl font-bold text-gray-800">{totalEmployeeSdg.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-gray-800">{totalEmployeeSdg.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                     <span className="text-xs text-gray-400">SDG</span>
                 </div>
               </div>
@@ -209,8 +209,8 @@ const Treasury: React.FC = () => {
                                       </div>
                                   </div>
                                   <div className="text-left bg-gray-50 p-2 rounded-lg min-w-[100px]">
-                                      <div className="font-bold text-gray-800">{t?.egp_balance.toLocaleString()} <span className="text-xs text-gray-500">EGP</span></div>
-                                      <div className="font-bold text-gray-600 text-sm">{t?.sdg_balance.toLocaleString()} <span className="text-xs text-gray-400">SDG</span></div>
+                                      <div className="font-bold text-gray-800">{t?.egp_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs text-gray-500">EGP</span></div>
+                                      <div className="font-bold text-gray-600 text-sm">{t?.sdg_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs text-gray-400">SDG</span></div>
                                   </div>
                               </div>
                               
