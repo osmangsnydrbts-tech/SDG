@@ -22,7 +22,6 @@ const SuperAdminDashboard: React.FC = () => {
   const [password, setPassword] = useState(''); // Shared state for Add & Edit (Optional in Edit)
   const [logo, setLogo] = useState('');
   const [days, setDays] = useState(365);
-  const [phoneNumbers, setPhoneNumbers] = useState('');
   const [expiryDate, setExpiryDate] = useState(''); // Only for Edit
 
   const activeCompanies = companies.filter(c => c.is_active).length;
@@ -40,7 +39,7 @@ const SuperAdminDashboard: React.FC = () => {
   };
 
   const openAddModal = () => {
-      setName(''); setUsername(''); setPassword(''); setDays(365); setLogo(''); setPhoneNumbers(''); setError('');
+      setName(''); setUsername(''); setPassword(''); setDays(365); setLogo(''); setError('');
       setShowAddModal(true);
   };
 
@@ -49,7 +48,6 @@ const SuperAdminDashboard: React.FC = () => {
       setUsername(company.username);
       setPassword(''); // Reset password field
       setLogo(company.logo || '');
-      setPhoneNumbers(company.phone_numbers || '');
       setExpiryDate(new Date(company.subscription_end).toISOString().split('T')[0]);
       setError('');
       setShowEditModal(company);
@@ -60,7 +58,7 @@ const SuperAdminDashboard: React.FC = () => {
     setError('');
     setIsProcessing(true);
     try {
-        const res = await addCompany(name, username, password, days, phoneNumbers, logo);
+        const res = await addCompany(name, username, password, days, logo);
         if (res.success) {
             setShowAddModal(false);
         } else {
@@ -82,7 +80,6 @@ const SuperAdminDashboard: React.FC = () => {
               name,
               username,
               logo,
-              phone_numbers: phoneNumbers,
               subscription_end: new Date(expiryDate).toISOString(),
               password: password || undefined // Only send if not empty
           });
@@ -199,7 +196,6 @@ const SuperAdminDashboard: React.FC = () => {
                       {!company.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">موقوفة</span>}
                   </h3>
                   <p className="text-sm text-gray-500">Admin: {company.username}</p>
-                  {company.phone_numbers && <p className="text-xs text-gray-400 mt-1">هاتف: {company.phone_numbers}</p>}
                 </div>
               </div>
               
@@ -275,11 +271,6 @@ const SuperAdminDashboard: React.FC = () => {
                  </div>
               </div>
               
-              <div>
-                  <label className="text-xs text-gray-500 font-bold">أرقام الهواتف (للتواصل في النشرات)</label>
-                  <input type="text" placeholder="مثال: 0912345678 - 0123456789" className="w-full p-2 border rounded-lg" value={phoneNumbers} onChange={e => setPhoneNumbers(e.target.value)} />
-              </div>
-
               <input type="text" placeholder="اسم مستخدم المدير" className="w-full p-2 border rounded-lg" value={username} onChange={e => setUsername(e.target.value)} required />
               <input type="password" inputMode="numeric" placeholder="كلمة المرور" className="w-full p-2 border rounded-lg" value={password} onChange={e => setPassword(e.target.value)} required />
               <input type="number" inputMode="numeric" placeholder="مدة الاشتراك (يوم)" className="w-full p-2 border rounded-lg" value={days} onChange={e => setDays(parseInt(e.target.value))} required />
@@ -326,11 +317,6 @@ const SuperAdminDashboard: React.FC = () => {
                         <span className="text-xs">{logo ? 'تغيير الصورة' : 'رفع شعار'}</span>
                     </div>
                  </div>
-              </div>
-
-              <div>
-                  <label className="text-xs text-gray-500 font-bold">أرقام الهواتف</label>
-                  <input type="text" className="w-full p-2 border rounded-lg" value={phoneNumbers} onChange={e => setPhoneNumbers(e.target.value)} />
               </div>
 
               <div>
