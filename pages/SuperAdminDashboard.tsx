@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Plus, Power, Calendar, Building, UploadCloud, Activity, Trash2, Pencil, Database, Download } from 'lucide-react';
+import { Plus, Power, Calendar, Building, UploadCloud, Activity, Trash2, Pencil, Database, Download, Loader2 } from 'lucide-react';
 import { Company } from '../types';
 
 const SuperAdminDashboard: React.FC = () => {
@@ -14,6 +14,7 @@ const SuperAdminDashboard: React.FC = () => {
   const [showRenewModal, setShowRenewModal] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [dbMessage, setDbMessage] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Form States (Add/Edit)
   const [name, setName] = useState('');
@@ -21,6 +22,7 @@ const SuperAdminDashboard: React.FC = () => {
   const [password, setPassword] = useState(''); // Shared state for Add & Edit (Optional in Edit)
   const [logo, setLogo] = useState('');
   const [days, setDays] = useState(365);
+  const [phoneNumbers, setPhoneNumbers] = useState('');
   const [expiryDate, setExpiryDate] = useState(''); // Only for Edit
 
   const activeCompanies = companies.filter(c => c.is_active).length;
@@ -38,7 +40,7 @@ const SuperAdminDashboard: React.FC = () => {
   };
 
   const openAddModal = () => {
-      setName(''); setUsername(''); setPassword(''); setDays(365); setLogo(''); setError('');
+      setName(''); setUsername(''); setPassword(''); setDays(365); setLogo(''); setPhoneNumbers(''); setError('');
       setShowAddModal(true);
   };
 
@@ -47,6 +49,7 @@ const SuperAdminDashboard: React.FC = () => {
       setUsername(company.username);
       setPassword(''); // Reset password field
       setLogo(company.logo || '');
+      setPhoneNumbers(company.phone_numbers || '');
       setExpiryDate(new Date(company.subscription_end).toISOString().split('T')[0]);
       setError('');
       setShowEditModal(company);
@@ -55,11 +58,16 @@ const SuperAdminDashboard: React.FC = () => {
   const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const res = await addCompany(name, username, password, days, logo);
-    if (res.success) {
-        setShowAddModal(false);
-    } else {
-        setError(res.message);
+    setIsProcessing(true);
+    try {
+        const res = await addCompany(name, username, password, days, phoneNumbers, logo);
+        if (res.success) {
+            setShowAddModal(false);
+        } else {
+            setError(res.message);
+        }
+    } finally {
+        setIsProcessing(false);
     }
   };
 
@@ -67,24 +75,30 @@ const SuperAdminDashboard: React.FC = () => {
       e.preventDefault();
       if (!showEditModal) return;
       setError('');
+      setIsProcessing(true);
       
-      const res = await updateCompany(showEditModal.id, {
-          name,
-          username,
-          logo,
-          subscription_end: new Date(expiryDate).toISOString(),
-          password: password || undefined // Only send if not empty
-      });
+      try {
+          const res = await updateCompany(showEditModal.id, {
+              name,
+              username,
+              logo,
+              phone_numbers: phoneNumbers,
+              subscription_end: new Date(expiryDate).toISOString(),
+              password: password || undefined // Only send if not empty
+          });
 
-      if (res.success) {
-          setShowEditModal(null);
-      } else {
-          setError(res.message);
+          if (res.success) {
+              setShowEditModal(null);
+          } else {
+              setError(res.message);
+          }
+      } finally {
+          setIsProcessing(false);
       }
   };
 
   const handleDeleteCompany = (id: number) => {
-      if (window.confirm('هل أنت متأكد من حذف هذه الشركة؟ سيتم تعطيل جميع حساباتها.')) {
+      if (window.confirm('تحذير: هل أنت متأكد تماماً من حذف هذه الشركة؟\n\nسيتم حذف جميع البيانات المرتبطة بها نهائياً (موظفين، عمليات، محافظ، تقارير) ولا يمكن استرجاعها.')) {
           deleteCompany(id);
       }
   };
@@ -185,6 +199,7 @@ const SuperAdminDashboard: React.FC = () => {
                       {!company.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">موقوفة</span>}
                   </h3>
                   <p className="text-sm text-gray-500">Admin: {company.username}</p>
+                  {company.phone_numbers && <p className="text-xs text-gray-400 mt-1">{company.phone_numbers}</p>}
                 </div>
               </div>
               
@@ -206,7 +221,7 @@ const SuperAdminDashboard: React.FC = () => {
                   <button 
                     onClick={() => handleDeleteCompany(company.id)}
                     className="p-2 text-red-500 hover:bg-red-50 rounded-full"
-                    title="حذف الشركة"
+                    title="حذف الشركة نهائياً"
                   >
                       <Trash2 size={18} />
                   </button>
@@ -259,6 +274,8 @@ const SuperAdminDashboard: React.FC = () => {
                     </div>
                  </div>
               </div>
+              
+              <input type="text" placeholder="أرقام الهواتف (اختياري)" className="w-full p-2 border rounded-lg" value={phoneNumbers} onChange={e => setPhoneNumbers(e.target.value)} />
 
               <input type="text" placeholder="اسم مستخدم المدير" className="w-full p-2 border rounded-lg" value={username} onChange={e => setUsername(e.target.value)} required />
               <input type="password" inputMode="numeric" placeholder="كلمة المرور" className="w-full p-2 border rounded-lg" value={password} onChange={e => setPassword(e.target.value)} required />
@@ -267,7 +284,9 @@ const SuperAdminDashboard: React.FC = () => {
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
               <div className="flex gap-2 pt-2">
-                <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg">حفظ</button>
+                <button type="submit" disabled={isProcessing} className="flex-1 bg-blue-600 text-white py-2 rounded-lg flex items-center justify-center">
+                    {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'حفظ'}
+                </button>
                 <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg">إلغاء</button>
               </div>
             </form>
@@ -307,6 +326,11 @@ const SuperAdminDashboard: React.FC = () => {
               </div>
 
               <div>
+                  <label className="text-xs text-gray-500 font-bold">أرقام الهواتف</label>
+                  <input type="text" className="w-full p-2 border rounded-lg" value={phoneNumbers} onChange={e => setPhoneNumbers(e.target.value)} />
+              </div>
+
+              <div>
                   <label className="text-xs text-gray-500 font-bold">اسم مستخدم المدير</label>
                   <input type="text" className="w-full p-2 border rounded-lg" value={username} onChange={e => setUsername(e.target.value)} required />
               </div>
@@ -331,7 +355,9 @@ const SuperAdminDashboard: React.FC = () => {
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
               <div className="flex gap-2 pt-2">
-                <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg">تحديث</button>
+                <button type="submit" disabled={isProcessing} className="flex-1 bg-blue-600 text-white py-2 rounded-lg flex items-center justify-center">
+                    {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'تحديث'}
+                </button>
                 <button type="button" onClick={() => setShowEditModal(null)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg">إلغاء</button>
               </div>
             </form>
