@@ -254,7 +254,7 @@ const Reports: React.FC = () => {
                             <h4 className="font-bold text-orange-800 mb-2">مقبوضات العملة السودانية (SDG)</h4>
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-gray-600">إجمالي ما تم استلامه:</span>
-                                <span className="text-2xl font-bold text-orange-700" dir="ltr">{stats.receivedSdg.toLocaleString()} SDG</span>
+                                <span className="text-2xl font-bold text-orange-700" dir="ltr">{stats.receivedSdg.toLocaleString(undefined, { maximumFractionDigits: 0 })} SDG</span>
                             </div>
                         </div>
 
@@ -263,7 +263,7 @@ const Reports: React.FC = () => {
                             <h4 className="font-bold text-blue-800 mb-2">مقبوضات العملة المصرية (EGP)</h4>
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-gray-600">إجمالي ما تم استلامه:</span>
-                                <span className="text-2xl font-bold text-blue-700" dir="ltr">{stats.receivedEgp.toLocaleString()} EGP</span>
+                                <span className="text-2xl font-bold text-blue-700" dir="ltr">{stats.receivedEgp.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
                             </div>
                         </div>
 
@@ -275,7 +275,7 @@ const Reports: React.FC = () => {
                             </h4>
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-gray-600">صافي العمولات:</span>
-                                <span className="text-2xl font-bold text-green-700" dir="ltr">{stats.walletCommission.toLocaleString()} EGP</span>
+                                <span className="text-2xl font-bold text-green-700" dir="ltr">{stats.walletCommission.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
                             </div>
                         </div>
 
@@ -316,8 +316,8 @@ const Reports: React.FC = () => {
                                         <div className="text-xs">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
                                     </td>
                                     <td className="p-3 font-medium">{getEmployeeName(t.employee_id)}</td>
-                                    <td className="p-3 font-bold text-green-700" dir="ltr">{t.from_amount.toLocaleString()} {t.from_currency}</td>
-                                    <td className="p-3 text-red-600" dir="ltr">{t.to_amount?.toLocaleString()} {t.to_currency}</td>
+                                    <td className="p-3 font-bold text-green-700" dir="ltr">{t.from_amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} {t.from_currency}</td>
+                                    <td className="p-3 text-red-600" dir="ltr">{t.to_amount?.toLocaleString(undefined, { maximumFractionDigits: 0 })} {t.to_currency}</td>
                                     <td className="p-3 text-xs text-gray-500 font-mono">{t.receipt_number || '-'}</td>
                                     <td className="p-3 flex items-center gap-2">
                                         <button onClick={() => setViewTransaction(t)} className="text-blue-600 hover:bg-blue-50 p-2 rounded-full">
@@ -367,7 +367,7 @@ const Reports: React.FC = () => {
                                          {t.type === 'treasury_feed' ? 'إيداع/تغذية' : 'سحب/استرداد'}
                                      </span>
                                  </td>
-                                 <td className="p-3 font-bold" dir="ltr">{t.from_amount.toLocaleString()} {t.from_currency}</td>
+                                 <td className="p-3 font-bold" dir="ltr">{t.from_amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} {t.from_currency}</td>
                                  <td className="p-3 text-xs text-gray-500">{t.description}</td>
                              </tr>
                          ))}
