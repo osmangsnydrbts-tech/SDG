@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Transaction, Company, User } from '../types';
-import { X, Share2, Loader2, CheckCircle2, Printer, Copy, Download, QrCode } from 'lucide-react';
+import { X, Share2, Loader2, CheckCircle2, Copy, Download, QrCode } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
@@ -15,7 +16,6 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
   const [isSharing, setIsSharing] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
     // إغلاق النافذة عند الضغط على زر ESC
@@ -108,97 +108,6 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
       alert('حدث خطأ أثناء إنشاء الصورة. حاول مرة أخرى.');
     } finally {
       setIsSharing(false);
-    }
-  };
-
-  const handlePrint = async () => {
-    setIsPrinting(true);
-    const element = document.getElementById('receipt-content');
-    
-    if (!element) {
-      setIsPrinting(false);
-      return;
-    }
-
-    try {
-      // إنشاء نافذة طباعة
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert('الرجاء السماح بالنوافذ المنبثقة للطباعة');
-        setIsPrinting(false);
-        return;
-      }
-
-      // إعداد محتوى الطباعة
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html dir="rtl">
-        <head>
-          <title>إشعار عملية - ${company.name}</title>
-          <meta charset="UTF-8">
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&display=swap');
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { 
-              font-family: 'Tajawal', sans-serif;
-              direction: rtl;
-              padding: 20px;
-              background: white;
-              color: #333;
-            }
-            .receipt { 
-              max-width: 400px;
-              margin: 0 auto;
-              border: 1px solid #e5e7eb;
-              border-radius: 16px;
-              overflow: hidden;
-              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            }
-            .print-header {
-              text-align: center;
-              padding: 20px;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              color: white;
-            }
-            .print-header h1 { font-size: 24px; margin-bottom: 10px; }
-            .print-header h2 { font-size: 18px; opacity: 0.9; }
-            .print-footer {
-              text-align: center;
-              padding: 15px;
-              border-top: 2px dashed #e5e7eb;
-              margin-top: 20px;
-              color: #6b7280;
-              font-size: 12px;
-            }
-            @media print {
-              body { padding: 0; }
-              .no-print { display: none !important; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="receipt">
-            ${element.innerHTML}
-          </div>
-          <div class="print-footer no-print">
-            <p>تم الإنشاء في: ${new Date().toLocaleString('ar-SA')}</p>
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(() => window.close(), 1000);
-            };
-          </script>
-        </body>
-        </html>
-      `);
-      
-      printWindow.document.close();
-    } catch (error) {
-      console.error('خطأ في الطباعة', error);
-      alert('حدث خطأ أثناء الطباعة');
-    } finally {
-      setIsPrinting(false);
     }
   };
 
@@ -548,21 +457,7 @@ ${transaction.commission && transaction.commission > 0 ? `العمولة: ${tran
           </div>
 
           {/* Secondary Actions */}
-          <div className="grid grid-cols-3 gap-3">
-            <button 
-              onClick={handlePrint}
-              disabled={isPrinting}
-              className="bg-white text-gray-700 p-3 rounded-xl shadow-lg hover:bg-gray-50 transition-all duration-200 active:scale-95 flex flex-col items-center justify-center gap-2"
-              title="طباعة"
-            >
-              {isPrinting ? (
-                <Loader2 size={20} className="animate-spin" />
-              ) : (
-                <Printer size={20} />
-              )}
-              <span className="text-xs font-medium">طباعة</span>
-            </button>
-            
+          <div className="grid grid-cols-2 gap-3">
             <button 
               onClick={handleGeneratePDF}
               disabled={isGeneratingPDF}
@@ -599,7 +494,7 @@ ${transaction.commission && transaction.commission > 0 ? `العمولة: ${tran
           
           {/* Help Text */}
           <div className="text-center text-xs text-gray-400 pt-2">
-            يمكنك مشاركة الإشعار كصورة أو طباعته أو حفظه كملف PDF
+            يمكنك مشاركة الإشعار كصورة أو حفظه كملف PDF
           </div>
         </div>
 
