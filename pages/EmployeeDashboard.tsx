@@ -25,12 +25,24 @@ const EmployeeDashboard: React.FC = () => {
   const getEmployee = (empId?: number) => users.find(u => u.id === empId);
 
   const getTransactionIcon = (type: string) => {
-      if (type === 'exchange' || type === 'e_wallet' || type === 'treasury_withdraw') {
-          // Money Leaving (Red Arrow Up)
+      if (type === 'exchange' || type === 'e_wallet' || type === 'treasury_withdraw' || type === 'wallet_withdrawal') {
+          // Money Leaving (Red Arrow Up) - Or Money Moving Out of Wallet
           return { icon: <ArrowUpRight size={16} />, bg: 'bg-red-100', text: 'text-red-600' };
       } else {
           // Money Coming In (Green Arrow Down)
           return { icon: <ArrowDownLeft size={16} />, bg: 'bg-green-100', text: 'text-green-600' };
+      }
+  };
+
+  const getTransactionLabel = (type: string) => {
+      switch(type) {
+          case 'exchange': return 'صرف عملة';
+          case 'e_wallet': return 'تحويل قديم'; // Legacy
+          case 'wallet_deposit': return 'إيداع محفظة';
+          case 'wallet_withdrawal': return 'سحب محفظة';
+          case 'treasury_feed': return 'تغذية خزينة';
+          case 'wallet_feed': return 'تغذية محفظة';
+          default: return 'سحب رصيد';
       }
   };
 
@@ -100,9 +112,7 @@ const EmployeeDashboard: React.FC = () => {
                             </div>
                             <div>
                                 <p className="text-sm font-bold">
-                                    {t.type === 'exchange' ? 'صرف عملة' : 
-                                     t.type === 'e_wallet' ? 'تحويل محفظة' : 
-                                     t.type === 'treasury_feed' ? 'تغذية خزينة' : 'سحب رصيد'}
+                                    {getTransactionLabel(t.type)}
                                 </p>
                                 <p className="text-xs text-gray-400">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</p>
                             </div>
