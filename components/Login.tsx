@@ -18,16 +18,20 @@ const Login: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const success = await login(username, password);
-      if (success) {
-        const savedUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        if (savedUser.role === 'super_admin') navigate('/super-admin');
-        else if (savedUser.role === 'admin') navigate('/admin');
+      const result = await login(username, password);
+      
+      if (result.success && result.role) {
+        // Navigate based on the returned role immediately
+        // Do NOT set isLoading(false) here. Keep spinner until page unmounts.
+        if (result.role === 'super_admin') navigate('/super-admin');
+        else if (result.role === 'admin') navigate('/admin');
         else navigate('/employee');
       } else {
+        // Only stop loading if login failed
         showToast('بيانات الدخول غير صحيحة أو الاشتراك منتهي', 'error');
+        setIsLoading(false);
       }
-    } finally {
+    } catch (error) {
       setIsLoading(false);
     }
   };
@@ -99,7 +103,14 @@ const Login: React.FC = () => {
             disabled={isLoading}
             className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors flex items-center justify-center gap-2 ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
           >
-            {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'دخول'}
+            {isLoading ? (
+              <>
+                <Loader2 className="animate-spin" size={20} />
+                جاري الدخول...
+              </>
+            ) : (
+              'دخول'
+            )}
           </button>
         </form>
       </div>
