@@ -26,7 +26,7 @@ interface StoreData {
   // Actions
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
-  addCompany: (name: string, username: string, password: string, days: number, phoneNumbers: string, logo?: string) => Promise<{ success: boolean; message: string }>;
+  addCompany: (name: string, username: string, password: string, days: number, logo?: string) => Promise<{ success: boolean; message: string }>;
   updateCompany: (id: number, data: Partial<Company> & { password?: string }) => Promise<{ success: boolean; message: string }>;
   renewSubscription: (companyId: number, days: number) => Promise<void>;
   deleteCompany: (companyId: number) => Promise<void>;
@@ -187,7 +187,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       showToast('تم تسجيل الخروج', 'info');
   };
 
-  const addCompany = async (name: string, username: string, pass: string, days: number, phoneNumbers: string, logo?: string) => {
+  const addCompany = async (name: string, username: string, pass: string, days: number, logo?: string) => {
     if (isUsernameTaken(username)) {
       return { success: false, message: 'اسم المستخدم مسجل مسبقاً' };
     }
@@ -202,21 +202,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       is_active: true,
       logo
     };
-    if (phoneNumbers) companyData.phone_numbers = phoneNumbers;
 
     let { data: company, error: compError } = await supabase.from('companies').insert(companyData).select().single();
-
-    // Fallback: If phone_numbers column is missing
-    if (compError && (compError.message.includes("column") || compError.code === '42703')) {
-        console.warn("Column 'phone_numbers' missing, saving without it.");
-        delete companyData.phone_numbers;
-        const retry = await supabase.from('companies').insert(companyData).select().single();
-        company = retry.data;
-        compError = retry.error;
-        if (!compError) {
-             showToast('تم إنشاء الشركة (لم يتم حفظ الهاتف لعدم تحديث قاعدة البيانات)', 'info');
-        }
-    }
 
     if (compError || !company) {
       console.error("Error adding company:", compError);
@@ -266,16 +253,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const payload: any = { ...companyData };
 
       let { error } = await supabase.from('companies').update(payload).eq('id', id);
-
-      // Fallback for missing column
-      if (error && (error.message.includes("column") || error.code === '42703')) {
-          if (payload.phone_numbers) {
-              delete payload.phone_numbers;
-              const retry = await supabase.from('companies').update(payload).eq('id', id);
-              error = retry.error;
-              if (!error) showToast('تم التحديث (لم يتم حفظ الهاتف لعدم تحديث قاعدة البيانات)', 'info');
-          }
-      }
 
       if (error) {
         console.error("Error updating company:", error);
