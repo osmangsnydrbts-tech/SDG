@@ -9,6 +9,7 @@ export interface Company {
   subscription_end: string;
   is_active: boolean;
   logo?: string; // Base64 string
+  phone_numbers?: string;
 }
 
 export interface User {
@@ -75,7 +76,7 @@ export interface Transaction {
   id: number;
   company_id: number;
   employee_id?: number;
-  type: 'exchange' | 'e_wallet' | 'treasury_feed' | 'treasury_withdraw' | 'merchant_entry' | 'wallet_feed';
+  type: 'exchange' | 'e_wallet' | 'treasury_feed' | 'treasury_withdraw' | 'merchant_entry' | 'wallet_feed' | 'wallet_deposit' | 'wallet_withdrawal';
   from_currency?: string;
   to_currency?: string;
   from_amount: number;
