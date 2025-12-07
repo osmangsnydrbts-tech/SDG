@@ -56,11 +56,13 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             clonedElement.style.boxShadow = 'none';
             clonedElement.style.borderRadius = '0';
             
-            // إجبار تخطيط اللغة العربية
-            clonedElement.style.fontFamily = "'Tajawal', 'Segoe UI', 'Arial', sans-serif";
+            // إجبار تخطيط اللغة العربية وتصحيح الخطوط
+            clonedElement.style.fontFamily = "'Tajawal', sans-serif";
             clonedElement.style.direction = 'rtl';
             clonedElement.style.textAlign = 'right';
-            clonedElement.style.textRendering = 'optimizeLegibility';
+            clonedElement.style.letterSpacing = 'normal'; // منع تقطع الحروف
+            clonedElement.style.fontVariantLigatures = 'normal';
+            clonedElement.style.webkitFontSmoothing = 'antialiased';
             
             // التأكد من أن النص المركزي يبقى في المركز
             const headerText = clonedElement.querySelectorAll('.text-center');
@@ -180,7 +182,6 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
           </div>
           <div class="print-footer no-print">
             <p>تم الإنشاء في: ${new Date().toLocaleString('ar-SA')}</p>
-            <p>للتواصل: ${company.phone || company.email || ''}</p>
           </div>
           <script>
             window.onload = function() {
@@ -352,9 +353,6 @@ ${transaction.commission && transaction.commission > 0 ? `العمولة: ${tran
                 <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
                   {company.name}
                 </h2>
-                {company.phone && (
-                  <p className="text-sm text-gray-500 mt-1">{company.phone}</p>
-                )}
               </div>
             </div>
             <div className="inline-flex items-center gap-2 bg-white px-5 py-2 rounded-full border border-gray-200 shadow-sm">
