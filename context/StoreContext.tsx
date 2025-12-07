@@ -478,11 +478,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (potentialWholesaleResult >= rateData.wholesale_threshold) {
             isWholesale = true;
             exchangeRate = rateData.wholesale_rate;
-            toAmount = potentialWholesaleResult;
+            // Round to nearest integer (>= 0.5 rounds up, < 0.5 rounds down)
+            toAmount = Math.round(potentialWholesaleResult);
         } else {
             isWholesale = false;
             exchangeRate = rateData.sd_to_eg_rate;
-            toAmount = amount / exchangeRate;
+            // Round to nearest integer (>= 0.5 rounds up, < 0.5 rounds down)
+            toAmount = Math.round(amount / exchangeRate);
         }
 
        if (empTreasury.egp_balance < toAmount) {
@@ -496,7 +498,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     } else {
         exchangeRate = rateData.eg_to_sd_rate;
-        toAmount = amount * exchangeRate;
+        // Round to nearest integer (>= 0.5 rounds up, < 0.5 rounds down)
+        toAmount = Math.round(amount * exchangeRate);
 
         if (empTreasury.sdg_balance < toAmount) {
             return { success: false, message: `رصيد السوداني غير كافي` };
@@ -692,7 +695,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const rates = exchangeRates.find(r => r.company_id === wallet.company_id);
       const commissionRate = rates?.ewallet_commission || 1; 
-      const commission = amount * (commissionRate / 100);
+      // Round commission: >= 0.5 rounds up, < 0.5 rounds down
+      const commission = Math.round(amount * (commissionRate / 100));
 
       const transactionType = type === 'withdraw' ? 'wallet_withdrawal' : 'wallet_deposit';
 
