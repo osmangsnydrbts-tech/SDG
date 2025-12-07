@@ -200,6 +200,7 @@ ${transaction.to_amount ? `المستلم: ${transaction.to_amount.toLocaleStrin
           <div className="px-6 py-6 flex flex-col items-center gap-6">
             
             {/* From Amount */}
+            {transaction.from_amount >= 1 && (
             <div className="text-center w-full">
                 <p className="text-gray-500 font-medium text-sm mb-1">{getFromLabel(transaction)}</p>
                 <div className="flex items-center justify-center gap-2" dir="ltr">
@@ -207,6 +208,7 @@ ${transaction.to_amount ? `المستلم: ${transaction.to_amount.toLocaleStrin
                     <span className="text-sm font-bold text-gray-500 uppercase mt-2">{transaction.from_currency}</span>
                 </div>
             </div>
+            )}
 
             {/* Rate Section (Only for Exchange) */}
             {transaction.type === 'exchange' && transaction.rate && (
@@ -219,7 +221,7 @@ ${transaction.to_amount ? `المستلم: ${transaction.to_amount.toLocaleStrin
             )}
 
             {/* To Amount */}
-             {transaction.to_amount && (
+             {transaction.to_amount && transaction.to_amount >= 1 && (
                 <div className="text-center w-full">
                     <p className="text-gray-500 font-medium text-sm mb-1">{getToLabel(transaction)}</p>
                     <div className="flex items-center justify-center gap-2" dir="ltr">
