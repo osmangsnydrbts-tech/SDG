@@ -41,6 +41,9 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             if (clonedElement) {
                 clonedElement.style.transform = 'none';
                 clonedElement.style.overflow = 'visible';
+                // Ensure text direction and fonts are preserved
+                clonedElement.style.direction = 'rtl';
+                clonedElement.style.fontFamily = "'Tajawal', sans-serif";
             }
         }
       });
@@ -56,7 +59,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             await navigator.share({
               files: [file],
               title: 'إشعار عملية',
-              text: `إشعار عملية - ${company.name}`,
+              text: `إشعار عملية - ${company.name} - ${transaction.receipt_number || ''}`,
             });
           } catch (error) {
             console.log('Sharing failed or cancelled', error);
@@ -79,14 +82,35 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
   };
 
   const getTransactionType = (t: Transaction) => {
-    if (t.type === 'exchange') return 'عملية صرف عملة';
+    if (t.type === 'exchange') return 'إشعار صرف عملة';
     if (t.type === 'e_wallet') return 'تحويل محفظة إلكترونية';
-    if (t.type === 'wallet_deposit') return 'إيداع في محفظة';
-    if (t.type === 'wallet_withdrawal') return 'سحب من محفظة';
-    if (t.type === 'treasury_feed') return 'إيداع نقدي';
-    if (t.type === 'treasury_withdraw') return 'سحب نقدي';
-    if (t.type === 'wallet_feed') return 'تغذية محفظة';
-    return 'عملية مالية';
+    if (t.type === 'wallet_deposit') return 'إشعار إيداع محفظة';
+    if (t.type === 'wallet_withdrawal') return 'إشعار سحب محفظة';
+    if (t.type === 'treasury_feed') return 'إيصال استلام نقدية';
+    if (t.type === 'treasury_withdraw') return 'إيصال صرف نقدية';
+    if (t.type === 'wallet_feed') return 'إشعار تغذية محفظة';
+    return 'إشعار عملية مالية';
+  };
+
+  const getFromLabel = (t: Transaction) => {
+      switch (t.type) {
+          case 'exchange': return 'المبلغ المستلم';
+          case 'wallet_deposit': return 'المبلغ المستلم من العميل';
+          case 'wallet_withdrawal': return 'المبلغ المسحوب من المحفظة';
+          case 'treasury_feed': return 'المبلغ المودع';
+          case 'treasury_withdraw': return 'المبلغ المسحوب';
+          case 'wallet_feed': return 'قيمة التغذية';
+          default: return 'المبلغ';
+      }
+  };
+
+  const getToLabel = (t: Transaction) => {
+      switch (t.type) {
+          case 'exchange': return 'المبلغ المسلم للعميل';
+          case 'wallet_deposit': return 'المبلغ المودع في المحفظة';
+          case 'wallet_withdrawal': return 'المبلغ المضاف للعهدة';
+          default: return 'المبلغ المستلم';
+      }
   };
 
   const formatAmount = (amount: number) => {
@@ -101,14 +125,11 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
       <div className="w-full max-w-md my-auto">
         
         {/* Printable Area */}
-        <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative">
+        <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative" dir="rtl">
           
           {/* Header */}
           <div className="bg-gray-50 p-6 border-b border-gray-100 flex flex-col items-center justify-center text-center">
-            <div className="flex flex-row-reverse items-center justify-center gap-3 w-full flex-nowrap">
-                <h2 className="text-xl font-extrabold text-gray-800 text-right whitespace-nowrap overflow-visible">
-                  {company.name}
-                </h2>
+            <div className="flex items-center justify-center gap-3 w-full">
                 {company.logo ? (
                   <img 
                     src={company.logo} 
@@ -121,6 +142,9 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
                      {company.name.charAt(0)}
                   </div>
                 )}
+                <h2 className="text-xl font-extrabold text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">
+                  {company.name}
+                </h2>
             </div>
             <p className="text-gray-400 text-xs mt-3 font-medium tracking-wide">إشعار معاملة مالية</p>
           </div>
@@ -139,7 +163,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             <div className="space-y-3 text-sm">
               <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span className="text-gray-600 font-medium">
-                    {transaction.type === 'wallet_withdrawal' ? 'المبلغ المسحوب من المحفظة' : 'المبلغ'}
+                    {getFromLabel(transaction)}
                 </span>
                 <span className="font-bold text-gray-900 text-lg" dir="ltr">
                   {formatAmount(transaction.from_amount)} {transaction.from_currency}
@@ -156,9 +180,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
               {transaction.to_amount && (
                 <div className="flex justify-between items-center p-4 bg-blue-600 rounded-lg shadow-sm text-white">
                   <span className="text-blue-100 font-bold">
-                    {transaction.type === 'wallet_withdrawal' ? 'المبلغ المضاف للخزينة (مع العمولة)' : 
-                     transaction.type === 'wallet_deposit' ? 'المبلغ المضاف للمحفظة (مع العمولة)' :
-                     'المبلغ المسلم للعميل'}
+                    {getToLabel(transaction)}
                   </span>
                   <span className="font-extrabold text-2xl" dir="ltr">
                     {formatAmount(transaction.to_amount)} {transaction.to_currency}
@@ -179,6 +201,13 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
                 <span>الموظف المسؤول:</span>
                 <span className="font-bold text-gray-700">{employee?.full_name}</span>
               </div>
+              
+              {company.phone_numbers && (
+                  <div className="text-center text-xs text-gray-500 mb-2" dir="ltr">
+                      {company.phone_numbers}
+                  </div>
+              )}
+
               <div className="text-center text-xs text-gray-400 font-light">
                  شكراً لتعاملكم معنا
               </div>
@@ -217,3 +246,4 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
 };
 
 export default ReceiptModal;
+    
