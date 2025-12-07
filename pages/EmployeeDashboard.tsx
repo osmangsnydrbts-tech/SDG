@@ -118,8 +118,8 @@ const EmployeeDashboard: React.FC = () => {
                             </div>
                         </div>
                         <div className="text-right">
-                            <p className="text-sm font-bold">{t.from_amount.toLocaleString()} <span className="text-xs">{t.from_currency}</span></p>
-                            {t.to_amount && <p className="text-xs text-gray-500">➜ {t.to_amount.toLocaleString()} {t.to_currency}</p>}
+                            <p className="text-sm font-bold">{t.from_amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs">{t.from_currency}</span></p>
+                            {t.to_amount && <p className="text-xs text-gray-500">➜ {t.to_amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} {t.to_currency}</p>}
                         </div>
                     </div>
                   );
