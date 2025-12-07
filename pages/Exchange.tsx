@@ -34,17 +34,21 @@ const Exchange: React.FC = () => {
     if (isNaN(numAmount)) return;
 
     if (direction === 'SDG_TO_EGP') {
-      let finalRate = rates.sd_to_eg_rate;
-      let calculatedEgp = numAmount / finalRate;
-
-      if (calculatedEgp >= rates.wholesale_threshold) {
+      // Logic: Try dividing by Wholesale Rate first.
+      // If the resulting EGP amount >= Threshold, use Wholesale Rate.
+      // Otherwise, use Retail Rate.
+      
+      const potentialWholesaleResult = numAmount / rates.wholesale_rate;
+      
+      if (potentialWholesaleResult >= rates.wholesale_threshold) {
+        // Qualifies for Wholesale
         setIsWholesale(true);
-        finalRate = rates.wholesale_rate;
-        calculatedEgp = numAmount / finalRate;
+        setResult(potentialWholesaleResult);
       } else {
+        // Does not qualify, use Retail/Standard Rate
         setIsWholesale(false);
+        setResult(numAmount / rates.sd_to_eg_rate);
       }
-      setResult(calculatedEgp);
     } else {
       setIsWholesale(false);
       setResult(numAmount * rates.eg_to_sd_rate);
