@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Transaction, Company, User } from '../types';
-import { X, Share2, Loader2, CheckCircle2, Copy, Download, QrCode } from 'lucide-react';
+import { X, Share2, Loader2, CheckCircle2, Copy, QrCode } from 'lucide-react';
 import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 
 interface ReceiptModalProps {
   transaction: Transaction | null;
@@ -14,7 +13,6 @@ interface ReceiptModalProps {
 
 const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, employee, onClose }) => {
   const [isSharing, setIsSharing] = useState(false);
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -108,40 +106,6 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
       alert('حدث خطأ أثناء إنشاء الصورة. حاول مرة أخرى.');
     } finally {
       setIsSharing(false);
-    }
-  };
-
-  const handleGeneratePDF = async () => {
-    const element = document.getElementById('receipt-content');
-    if (!element || isGeneratingPDF) return;
-
-    setIsGeneratingPDF(true);
-
-    try {
-      await document.fonts.ready;
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const canvas = await html2canvas(element, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`إشعار_${transaction.receipt_number || transaction.id}.pdf`);
-      
-      alert('تم تحميل ملف PDF بنجاح');
-    } catch (error) {
-      console.error('خطأ في إنشاء PDF', error);
-      alert('حدث خطأ أثناء إنشاء ملف PDF');
-    } finally {
-      setIsGeneratingPDF(false);
     }
   };
 
@@ -457,24 +421,10 @@ ${transaction.commission && transaction.commission > 0 ? `العمولة: ${tran
           </div>
 
           {/* Secondary Actions */}
-          <div className="grid grid-cols-2 gap-3">
-            <button 
-              onClick={handleGeneratePDF}
-              disabled={isGeneratingPDF}
-              className="bg-white text-gray-700 p-3 rounded-xl shadow-lg hover:bg-gray-50 transition-all duration-200 active:scale-95 flex flex-col items-center justify-center gap-2"
-              title="تحميل PDF"
-            >
-              {isGeneratingPDF ? (
-                <Loader2 size={20} className="animate-spin" />
-              ) : (
-                <Download size={20} />
-              )}
-              <span className="text-xs font-medium">PDF</span>
-            </button>
-            
+          <div className="grid grid-cols-1 gap-3">
             <button 
               onClick={handleCopyDetails}
-              className={`p-3 rounded-xl shadow-lg transition-all duration-200 active:scale-95 flex flex-col items-center justify-center gap-2 ${
+              className={`p-3 rounded-xl shadow-lg transition-all duration-200 active:scale-95 flex flex-row items-center justify-center gap-2 ${
                 copied 
                   ? 'bg-green-100 text-green-700' 
                   : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -487,14 +437,14 @@ ${transaction.commission && transaction.commission > 0 ? `العمولة: ${tran
                 <Copy size={20} />
               )}
               <span className="text-xs font-medium">
-                {copied ? 'تم النسخ' : 'نسخ'}
+                {copied ? 'تم النسخ' : 'نسخ النص'}
               </span>
             </button>
           </div>
           
           {/* Help Text */}
           <div className="text-center text-xs text-gray-400 pt-2">
-            يمكنك مشاركة الإشعار كصورة أو حفظه كملف PDF
+            يمكنك مشاركة الإشعار كصورة أو نسخ النص
           </div>
         </div>
 
