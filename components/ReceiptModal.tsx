@@ -156,8 +156,8 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
               {transaction.to_amount && (
                 <div className="flex justify-between items-center p-4 bg-blue-600 rounded-lg shadow-sm text-white">
                   <span className="text-blue-100 font-bold">
-                    {transaction.type === 'wallet_withdrawal' ? 'المبلغ المضاف للخزينة (مع الربح)' : 
-                     transaction.type === 'wallet_deposit' ? 'المبلغ المضاف للمحفظة (مع الربح)' :
+                    {transaction.type === 'wallet_withdrawal' ? 'المبلغ المضاف للخزينة (مع العمولة)' : 
+                     transaction.type === 'wallet_deposit' ? 'المبلغ المضاف للمحفظة (مع العمولة)' :
                      'المبلغ المسلم للعميل'}
                   </span>
                   <span className="font-extrabold text-2xl" dir="ltr">
