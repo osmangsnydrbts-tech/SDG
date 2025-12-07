@@ -158,8 +158,8 @@ ${transaction.to_amount ? `المستلم: ${transaction.to_amount.toLocaleStrin
   };
 
   const formatAmount = (amount: number) => {
-    // Show integer for large amounts if no decimals, or standard format
-    return amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    // Show integer only
+    return amount.toLocaleString('en-US', { maximumFractionDigits: 0 });
   };
 
   return (
