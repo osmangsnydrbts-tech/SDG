@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Plus, Trash2, Smartphone, ArrowDownCircle, Loader2 } from 'lucide-react';
+import FormattedInput from '../components/FormattedInput';
 
 const EWallets: React.FC = () => {
   const { currentUser, eWallets, users, addEWallet, deleteEWallet, feedEWallet } = useStore();
@@ -144,13 +145,11 @@ const EWallets: React.FC = () => {
                     <h3 className="font-bold mb-4">تغذية رصيد المحفظة</h3>
                     <p className="text-xs text-gray-500 mb-4">سيتم خصم المبلغ من الخزينة الرئيسية (EGP)</p>
                     <form onSubmit={handleFeed} className="space-y-3">
-                        <input 
-                            type="number" 
-                            inputMode="decimal"
-                            placeholder="المبلغ (EGP)" 
-                            value={amount} 
-                            onChange={e => setAmount(e.target.value)} 
+                        <FormattedInput 
+                            value={amount}
+                            onChange={setAmount}
                             className="w-full p-3 border rounded-lg font-bold text-lg" 
+                            placeholder="المبلغ (EGP)"
                             required 
                         />
                         {msg && <p className={`text-center text-sm font-bold ${msg.includes('بنجاح') ? 'text-green-600' : 'text-red-600'}`}>{msg}</p>}
