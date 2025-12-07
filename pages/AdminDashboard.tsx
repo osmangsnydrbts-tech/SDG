@@ -85,7 +85,7 @@ const AdminDashboard: React.FC = () => {
 
 📦 *الجملة:*
 السعر: ${rateData.wholesale_rate}
-أقل كمية: ${rateData.wholesale_threshold.toLocaleString()} EGP
+أقل كمية: ${rateData.wholesale_threshold.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP
     `.trim();
 
     if (customShareText.trim()) {
@@ -187,18 +187,18 @@ const AdminDashboard: React.FC = () => {
       const empTxs = transactions.filter(t => t.employee_id === empId);
 
       // EGP Stats
-      // 1. Exchange Out (Buying SDG)
-      const egpExchange = empTxs.filter(t => t.type === 'exchange' && t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0);
-      // 2. Wallet Volume (Deposit + Withdrawal) - Money moved via wallets
-      const egpWallet = empTxs.filter(t => ['wallet_deposit', 'wallet_withdrawal'].includes(t.type)).reduce((sum, t) => sum + t.from_amount, 0);
-      // 3. Reverse (Sent back to Main Treasury)
-      const egpReverse = empTxs.filter(t => t.type === 'treasury_withdraw' && t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0);
+      // 1. Exchange Out (Buying SDG) - Round to integer
+      const egpExchange = Math.round(empTxs.filter(t => t.type === 'exchange' && t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0));
+      // 2. Wallet Volume (Deposit + Withdrawal) - Money moved via wallets - Round to integer
+      const egpWallet = Math.round(empTxs.filter(t => ['wallet_deposit', 'wallet_withdrawal'].includes(t.type)).reduce((sum, t) => sum + t.from_amount, 0));
+      // 3. Reverse (Sent back to Main Treasury) - Round to integer
+      const egpReverse = Math.round(empTxs.filter(t => t.type === 'treasury_withdraw' && t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0));
 
       // SDG Stats
-      // 1. Exchange Out (Buying EGP)
-      const sdgExchange = empTxs.filter(t => t.type === 'exchange' && t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0);
-      // 2. Reverse (Sent back to Main Treasury)
-      const sdgReverse = empTxs.filter(t => t.type === 'treasury_withdraw' && t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0);
+      // 1. Exchange Out (Buying EGP) - Round to integer
+      const sdgExchange = Math.round(empTxs.filter(t => t.type === 'exchange' && t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0));
+      // 2. Reverse (Sent back to Main Treasury) - Round to integer
+      const sdgReverse = Math.round(empTxs.filter(t => t.type === 'treasury_withdraw' && t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0));
 
       return { treasury, egpExchange, egpWallet, egpReverse, sdgExchange, sdgReverse };
   };
@@ -301,7 +301,7 @@ const AdminDashboard: React.FC = () => {
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-500">أقل كمية للجملة</span>
-                                    <span className="font-bold text-gray-800">{rateData?.wholesale_threshold.toLocaleString()} EGP</span>
+                                    <span className="font-bold text-gray-800">{rateData?.wholesale_threshold.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
                                 </div>
                             </div>
                             
