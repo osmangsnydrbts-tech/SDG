@@ -49,7 +49,7 @@ const Merchants: React.FC = () => {
       }
   };
 
-  const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 
   return (
     <div className="space-y-4">
