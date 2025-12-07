@@ -4,6 +4,7 @@ import { useStore } from '../context/StoreContext';
 import { ArrowLeftRight, CheckCircle, Calculator, Loader2 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
+import FormattedInput from '../components/FormattedInput';
 
 const Exchange: React.FC = () => {
   const { currentUser, performExchange, exchangeRates, companies } = useStore();
@@ -130,11 +131,9 @@ const Exchange: React.FC = () => {
         <form onSubmit={handleExchange} className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">المبلغ المراد صرفه</label>
-            <input 
-              type="number" 
-              inputMode="decimal"
+            <FormattedInput
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={setAmount}
               className="w-full p-4 text-lg font-bold border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
               placeholder="0.00"
               required
