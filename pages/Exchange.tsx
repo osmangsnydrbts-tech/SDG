@@ -43,15 +43,15 @@ const Exchange: React.FC = () => {
       if (potentialWholesaleResult >= rates.wholesale_threshold) {
         // Qualifies for Wholesale
         setIsWholesale(true);
-        setResult(potentialWholesaleResult);
+        setResult(Math.round(potentialWholesaleResult));
       } else {
         // Does not qualify, use Retail/Standard Rate
         setIsWholesale(false);
-        setResult(numAmount / rates.sd_to_eg_rate);
+        setResult(Math.round(numAmount / rates.sd_to_eg_rate));
       }
     } else {
       setIsWholesale(false);
-      setResult(numAmount * rates.eg_to_sd_rate);
+      setResult(Math.round(numAmount * rates.eg_to_sd_rate));
     }
   }, [amount, direction, rates]);
 
