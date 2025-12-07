@@ -4,6 +4,7 @@ import { useStore } from '../context/StoreContext';
 import { Send, Smartphone, CheckCircle, Loader2, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
+import FormattedInput from '../components/FormattedInput';
 
 const WalletTransfer: React.FC = () => {
   const { currentUser, eWallets, performEWalletTransfer, exchangeRates, companies } = useStore();
@@ -146,11 +147,9 @@ const WalletTransfer: React.FC = () => {
 
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">المبلغ</label>
-                        <input 
-                            type="number" 
-                            inputMode="decimal"
+                        <FormattedInput 
                             value={amount}
-                            onChange={e => setAmount(e.target.value)}
+                            onChange={setAmount}
                             className="w-full p-3 border rounded-xl text-lg font-bold"
                             placeholder="0.00"
                             required
