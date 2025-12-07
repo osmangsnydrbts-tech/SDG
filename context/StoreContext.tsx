@@ -295,22 +295,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const deleteCompany = async (companyId: number) => {
     try {
-      // Hard delete sequence to handle Foreign Keys manually if cascade isn't set on DB level
-      // 1. Delete Transactions
+      // Hard delete sequence
       await supabase.from('transactions').delete().eq('company_id', companyId);
-      // 2. Delete Merchant Entries
       await supabase.from('merchant_entries').delete().eq('company_id', companyId);
-      // 3. Delete Merchants
       await supabase.from('merchants').delete().eq('company_id', companyId);
-      // 4. Delete E-Wallets
       await supabase.from('e_wallets').delete().eq('company_id', companyId);
-      // 5. Delete Treasuries
       await supabase.from('treasuries').delete().eq('company_id', companyId);
-      // 6. Delete Exchange Rates
       await supabase.from('exchange_rates').delete().eq('company_id', companyId);
-      // 7. Delete Users
       await supabase.from('users').delete().eq('company_id', companyId);
-      // 8. Delete Company
       await supabase.from('companies').delete().eq('id', companyId);
 
       await fetchData();
@@ -364,7 +356,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Fallback if 'phone' column is missing in 'users' table
     if (error && (error.message.includes("column") || error.code === '42703')) {
-        console.warn("Column 'phone' missing in users table, saving without it.");
         delete payload.phone;
         const retry = await supabase.from('users').insert(payload).select().single();
         user = retry.data;
@@ -375,7 +366,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     if (error) {
-        console.error("Error adding employee:", error);
         return { success: false, message: 'حدث خطأ: ' + error.message };
     }
 
@@ -415,7 +405,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       if (error) {
-          console.error("Error updating employee:", error);
           return { success: false, message: 'فشل التحديث: ' + error.message };
       }
 
@@ -447,12 +436,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     amount: number, 
     receipt: string
   ) => {
+    // Round input amount (>=0.5 -> 1, <0.5 -> 0)
+    const rAmount = Math.round(amount);
+
+    if (rAmount <= 0) return { success: false, message: 'المبلغ غير صحيح' };
+
     // 1. DUPLICATE CHECK
     if (receipt) {
         const duplicate = transactions.find(t => 
             t.company_id === companyId && 
             t.receipt_number === receipt && 
-            t.from_amount === amount &&
+            t.from_amount === rAmount &&
             t.type === 'exchange'
         );
         if (duplicate) {
@@ -472,19 +466,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     let isWholesale = false;
 
     if (fromCurrency === 'SDG') {
-        // Updated logic: Check potential wholesale result first
-        const potentialWholesaleResult = amount / rateData.wholesale_rate;
+        const potentialWholesaleResult = rAmount / rateData.wholesale_rate;
         
         if (potentialWholesaleResult >= rateData.wholesale_threshold) {
             isWholesale = true;
             exchangeRate = rateData.wholesale_rate;
-            // Round to nearest integer (>= 0.5 rounds up, < 0.5 rounds down)
             toAmount = Math.round(potentialWholesaleResult);
         } else {
             isWholesale = false;
             exchangeRate = rateData.sd_to_eg_rate;
-            // Round to nearest integer (>= 0.5 rounds up, < 0.5 rounds down)
-            toAmount = Math.round(amount / exchangeRate);
+            toAmount = Math.round(rAmount / exchangeRate);
         }
 
        if (empTreasury.egp_balance < toAmount) {
@@ -492,21 +483,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
        }
        
        await supabase.from('treasuries').update({
-           sdg_balance: empTreasury.sdg_balance + amount,
+           sdg_balance: empTreasury.sdg_balance + rAmount,
            egp_balance: empTreasury.egp_balance - toAmount
        }).eq('id', empTreasury.id);
 
     } else {
         exchangeRate = rateData.eg_to_sd_rate;
-        // Round to nearest integer (>= 0.5 rounds up, < 0.5 rounds down)
-        toAmount = Math.round(amount * exchangeRate);
+        toAmount = Math.round(rAmount * exchangeRate);
 
         if (empTreasury.sdg_balance < toAmount) {
             return { success: false, message: `رصيد السوداني غير كافي` };
         }
 
         await supabase.from('treasuries').update({
-            egp_balance: empTreasury.egp_balance + amount,
+            egp_balance: empTreasury.egp_balance + rAmount,
             sdg_balance: empTreasury.sdg_balance - toAmount
         }).eq('id', empTreasury.id);
     }
@@ -517,7 +507,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         type: 'exchange',
         from_currency: fromCurrency,
         to_currency: toCurrency,
-        from_amount: amount,
+        from_amount: rAmount,
         to_amount: toAmount,
         rate: exchangeRate,
         receipt_number: receipt,
@@ -548,15 +538,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const toAmount = transaction.to_amount || 0;
 
     if (transaction.from_currency === 'SDG') {
-        // Was: Employee got SDG, Gave EGP
-        // Reverse: Remove SDG, Add EGP back
         await supabase.from('treasuries').update({
             sdg_balance: empTreasury.sdg_balance - fromAmount,
             egp_balance: empTreasury.egp_balance + toAmount
         }).eq('id', empTreasury.id);
-    } else { // EGP -> SDG
-        // Was: Employee got EGP, Gave SDG
-        // Reverse: Remove EGP, Add SDG back
+    } else { 
         await supabase.from('treasuries').update({
             egp_balance: empTreasury.egp_balance - fromAmount,
             sdg_balance: empTreasury.sdg_balance + toAmount
@@ -590,10 +576,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addMerchantEntry = async (merchantId: number, type: 'credit' | 'debit', currency: 'EGP' | 'SDG', amount: number) => {
+      // Round amount
+      const rAmount = Math.round(amount);
+      if (rAmount <= 0) return;
+
       const merchant = merchants.find(m => m.id === merchantId);
       if (merchant) {
           const balanceKey = currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
-          const change = type === 'credit' ? amount : -amount;
+          const change = type === 'credit' ? rAmount : -rAmount;
           
           await supabase.from('merchants').update({
               [balanceKey]: merchant[balanceKey] + change
@@ -604,7 +594,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               company_id: merchant.company_id,
               entry_type: type,
               currency,
-              amount,
+              amount: rAmount,
               description: `قيد ${type === 'credit' ? 'له' : 'عليه'}`,
               created_at: new Date().toISOString()
           });
@@ -633,26 +623,30 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const feedEWallet = async (walletId: number, amount: number) => {
+    // Round amount
+    const rAmount = Math.round(amount);
+    if (rAmount <= 0) return { success: false, message: 'المبلغ غير صحيح' };
+
     const wallet = eWallets.find(w => w.id === walletId);
     if (!wallet) return { success: false, message: 'المحفظة غير موجودة' };
 
     const mainTreasury = treasuries.find(t => t.company_id === wallet.company_id && !t.employee_id);
-    if (!mainTreasury || mainTreasury.egp_balance < amount) {
+    if (!mainTreasury || mainTreasury.egp_balance < rAmount) {
         return { success: false, message: 'رصيد الخزينة الرئيسية غير كافي' };
     }
 
     await supabase.from('treasuries').update({
-        egp_balance: mainTreasury.egp_balance - amount
+        egp_balance: mainTreasury.egp_balance - rAmount
     }).eq('id', mainTreasury.id);
 
     await supabase.from('e_wallets').update({
-        balance: wallet.balance + amount
+        balance: wallet.balance + rAmount
     }).eq('id', walletId);
 
     await supabase.from('transactions').insert({
         company_id: wallet.company_id,
         type: 'wallet_feed',
-        from_amount: amount,
+        from_amount: rAmount,
         from_currency: 'EGP',
         description: `تغذية محفظة ${wallet.phone_number}`,
         e_wallet_id: walletId,
@@ -671,6 +665,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     recipientPhone: string, 
     receipt: string
   ) => {
+      // Round amount
+      const rAmount = Math.round(amount);
+      if (rAmount <= 0) return { success: false, message: 'المبلغ غير صحيح' };
+
       const wallet = eWallets.find(w => w.id === walletId);
       if (!wallet) return { success: false, message: 'Wallet not found' };
       
@@ -685,7 +683,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const duplicate = transactions.find(t => 
             t.company_id === user.company_id && 
             t.receipt_number === receipt && 
-            t.from_amount === amount &&
+            t.from_amount === rAmount &&
             (t.type === 'wallet_deposit' || t.type === 'wallet_withdrawal')
         );
         if (duplicate) {
@@ -695,35 +693,30 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const rates = exchangeRates.find(r => r.company_id === wallet.company_id);
       const commissionRate = rates?.ewallet_commission || 1; 
-      // Round commission: >= 0.5 rounds up, < 0.5 rounds down
-      const commission = Math.round(amount * (commissionRate / 100));
+      
+      // Round commission
+      const commission = Math.round(rAmount * (commissionRate / 100));
 
       const transactionType = type === 'withdraw' ? 'wallet_withdrawal' : 'wallet_deposit';
 
       if (type === 'withdraw') {
           // Withdrawal: 
-          // 1. Deduct from E-Wallet Treasury (Balance)
-          // 2. Add Amount + Commission to Employee Treasury
-          
-          if (wallet.balance < amount) {
+          if (wallet.balance < rAmount) {
               return { success: false, message: `رصيد المحفظة غير كافي للسحب` };
           }
           
-          // Deduct Amount from Wallet
           await supabase.from('e_wallets').update({
-            balance: wallet.balance - amount
+            balance: wallet.balance - rAmount
           }).eq('id', walletId);
 
-          // Add Amount + Commission to Employee Cash
-          const totalToAdd = amount + commission;
+          const totalToAdd = rAmount + commission;
           await supabase.from('treasuries').update({
             egp_balance: empTreasury.egp_balance + totalToAdd
           }).eq('id', empTreasury.id);
 
       } else {
           // Deposit:
-          // Add Amount + Commission to Wallet Balance
-          const totalToAdd = amount + commission;
+          const totalToAdd = rAmount + commission;
           await supabase.from('e_wallets').update({
             balance: wallet.balance + totalToAdd
           }).eq('id', walletId);
@@ -735,8 +728,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           type: transactionType,
           from_currency: 'EGP',
           to_currency: 'EGP',
-          from_amount: amount,
-          to_amount: amount + commission, // Storing total impact including commission
+          from_amount: rAmount,
+          to_amount: rAmount + commission,
           commission: commission,
           receipt_number: receipt,
           description: `${type === 'withdraw' ? 'سحب' : 'إيداع'} - ${recipientPhone} via ${wallet.provider}`,
@@ -759,13 +752,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     amount: number,
     employeeId?: number
   ) => {
+      // Round amount
+      const rAmount = Math.round(amount);
+      if (rAmount <= 0) return { success: false, message: 'المبلغ غير صحيح' };
+
       const balanceKey = currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
       const mainTreasury = treasuries.find(t => t.company_id === companyId && !t.employee_id);
 
       if (!mainTreasury) return { success: false, message: 'الخزينة الرئيسية غير موجودة' };
 
       if (type === 'feed' && target === 'employee') {
-          if (mainTreasury[balanceKey] < amount) {
+          if (mainTreasury[balanceKey] < rAmount) {
               return { success: false, message: 'رصيد الخزينة الرئيسية غير كافي' };
           }
       }
@@ -773,24 +770,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (type === 'feed' && target === 'employee') {
           const empT = treasuries.find(t => t.employee_id === employeeId);
           if (empT) {
-             await supabase.from('treasuries').update({ [balanceKey]: mainTreasury[balanceKey] - amount }).eq('id', mainTreasury.id);
-             await supabase.from('treasuries').update({ [balanceKey]: empT[balanceKey] + amount }).eq('id', empT.id);
+             await supabase.from('treasuries').update({ [balanceKey]: mainTreasury[balanceKey] - rAmount }).eq('id', mainTreasury.id);
+             await supabase.from('treasuries').update({ [balanceKey]: empT[balanceKey] + rAmount }).eq('id', empT.id);
           }
       } 
       else if (type === 'withdraw' && target === 'employee') {
           const empT = treasuries.find(t => t.employee_id === employeeId);
           if (empT) {
-              if (empT[balanceKey] < amount) return { success: false, message: 'رصيد الموظف غير كافي' };
-              await supabase.from('treasuries').update({ [balanceKey]: empT[balanceKey] - amount }).eq('id', empT.id);
-              await supabase.from('treasuries').update({ [balanceKey]: mainTreasury[balanceKey] + amount }).eq('id', mainTreasury.id);
+              if (empT[balanceKey] < rAmount) return { success: false, message: 'رصيد الموظف غير كافي' };
+              await supabase.from('treasuries').update({ [balanceKey]: empT[balanceKey] - rAmount }).eq('id', empT.id);
+              await supabase.from('treasuries').update({ [balanceKey]: mainTreasury[balanceKey] + rAmount }).eq('id', mainTreasury.id);
           }
       }
       else if (type === 'feed' && target === 'main') {
-          await supabase.from('treasuries').update({ [balanceKey]: mainTreasury[balanceKey] + amount }).eq('id', mainTreasury.id);
+          await supabase.from('treasuries').update({ [balanceKey]: mainTreasury[balanceKey] + rAmount }).eq('id', mainTreasury.id);
       }
       else if (type === 'withdraw' && target === 'main') {
-          if (mainTreasury[balanceKey] < amount) return { success: false, message: 'رصيد الخزينة غير كافي' };
-          await supabase.from('treasuries').update({ [balanceKey]: mainTreasury[balanceKey] - amount }).eq('id', mainTreasury.id);
+          if (mainTreasury[balanceKey] < rAmount) return { success: false, message: 'رصيد الخزينة غير كافي' };
+          await supabase.from('treasuries').update({ [balanceKey]: mainTreasury[balanceKey] - rAmount }).eq('id', mainTreasury.id);
       }
 
       let desc = '';
@@ -803,7 +800,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           company_id: companyId,
           employee_id: target === 'employee' ? employeeId : undefined,
           type: type === 'feed' ? 'treasury_feed' : 'treasury_withdraw',
-          from_amount: amount,
+          from_amount: rAmount,
           from_currency: currency,
           description: desc,
           created_at: new Date().toISOString()
