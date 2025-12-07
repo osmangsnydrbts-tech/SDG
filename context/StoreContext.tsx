@@ -467,17 +467,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     let isWholesale = false;
 
     if (fromCurrency === 'SDG') {
-       let normalRate = rateData.sd_to_eg_rate;
-       let calcAmount = amount / normalRate; 
-       
-       if (calcAmount >= rateData.wholesale_threshold) {
-           isWholesale = true;
-           exchangeRate = rateData.wholesale_rate;
-           calcAmount = amount / exchangeRate;
-       } else {
-           exchangeRate = normalRate;
-       }
-       toAmount = calcAmount;
+        // Updated logic: Check potential wholesale result first
+        const potentialWholesaleResult = amount / rateData.wholesale_rate;
+        
+        if (potentialWholesaleResult >= rateData.wholesale_threshold) {
+            isWholesale = true;
+            exchangeRate = rateData.wholesale_rate;
+            toAmount = potentialWholesaleResult;
+        } else {
+            isWholesale = false;
+            exchangeRate = rateData.sd_to_eg_rate;
+            toAmount = amount / exchangeRate;
+        }
 
        if (empTreasury.egp_balance < toAmount) {
            return { success: false, message: `رصيد المصري غير كافي` };
