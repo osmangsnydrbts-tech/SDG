@@ -66,7 +66,8 @@ const AdminDashboard: React.FC = () => {
   const handleShareRates = async () => {
     if (!rateData || !company) return;
 
-    const phones = company.phone_numbers ? `\n📞 للتواصل: ${company.phone_numbers}` : '';
+    // Add phone numbers at the bottom for inquiries
+    const phones = company.phone_numbers ? `\n\n📞 للاستفسار: ${company.phone_numbers}` : '';
 
     const text = `
 *${company.name}*
@@ -255,9 +256,6 @@ const AdminDashboard: React.FC = () => {
                         {company?.logo && <img src={company.logo} alt="Logo" className="h-16 w-16 mx-auto bg-white rounded-lg p-1 object-contain mb-3" crossOrigin="anonymous"/>}
                         <h2 className="text-2xl font-bold">{company?.name}</h2>
                         <p className="text-blue-200 text-sm mt-1">نشرة أسعار الصرف اليومية</p>
-                        {company?.phone_numbers && (
-                           <p className="text-blue-100 text-xs mt-2 font-mono" dir="ltr">{company.phone_numbers}</p>
-                        )}
                     </div>
                     <div className="p-6 space-y-4">
                         <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
@@ -281,6 +279,9 @@ const AdminDashboard: React.FC = () => {
                         </div>
 
                         <div className="text-center text-xs text-gray-400 mt-4 pt-4 border-t">
+                            {company?.phone_numbers && (
+                               <div className="mb-2 font-bold text-gray-700 text-sm" dir="ltr">📞 للاستفسار: {company.phone_numbers}</div>
+                            )}
                             {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         </div>
                     </div>
