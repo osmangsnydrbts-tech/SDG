@@ -74,7 +74,7 @@ const WalletTransfer: React.FC = () => {
   const calculateCommission = () => {
       const val = parseFloat(amount);
       if (isNaN(val)) return 0;
-      return val * (commissionRate / 100);
+      return Math.round(val * (commissionRate / 100));
   };
 
   const calculateTotal = () => {
