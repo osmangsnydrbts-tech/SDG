@@ -160,12 +160,12 @@ const WalletTransfer: React.FC = () => {
                     <div className="bg-gray-50 p-4 rounded-xl space-y-2">
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-500">المبلغ:</span>
-                            <span className="font-bold">{amount || 0} EGP</span>
+                            <span className="font-bold">{amount ? parseFloat(amount).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'} EGP</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                            <span className="text-gray-500">الربح ({commissionRate}%):</span>
+                            <span className="text-gray-500">العمولة ({commissionRate}%):</span>
                             <span className="font-bold text-green-600">
-                                {calculateCommission().toFixed(2)} EGP
+                                {calculateCommission().toLocaleString(undefined, { minimumFractionDigits: 2 })} EGP
                             </span>
                         </div>
                         
@@ -174,19 +174,21 @@ const WalletTransfer: React.FC = () => {
                                 <>
                                     <div className="flex justify-between items-center text-sm text-red-600 mb-1">
                                         <span>يخصم من المحفظة:</span>
-                                        <span className="font-bold">{amount || 0} EGP</span>
+                                        <span className="font-bold">{amount ? parseFloat(amount).toLocaleString() : '0'} EGP</span>
                                     </div>
                                     <div className="flex justify-between items-center text-lg text-green-700">
                                         <span className="font-bold">يضاف إلى خزينتك:</span>
-                                        <span className="font-extrabold">{calculateTotal().toFixed(2)} EGP</span>
+                                        <span className="font-extrabold">{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })} EGP</span>
                                     </div>
+                                    <p className="text-xs text-gray-400 mt-1">يتم سحب المبلغ من المحفظة وإضافته مع العمولة إلى عهدتك</p>
                                 </>
                             ) : (
                                 <>
                                     <div className="flex justify-between items-center text-lg text-green-700">
                                         <span className="font-bold">يضاف إلى المحفظة:</span>
-                                        <span className="font-extrabold">{calculateTotal().toFixed(2)} EGP</span>
+                                        <span className="font-extrabold">{calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })} EGP</span>
                                     </div>
+                                    <p className="text-xs text-gray-400 mt-1">يتم إضافة المبلغ مع العمولة إلى رصيد المحفظة</p>
                                 </>
                             )}
                         </div>
