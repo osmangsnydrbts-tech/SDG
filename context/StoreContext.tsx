@@ -575,12 +575,59 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const transaction = transactions.find(t => t.id === transactionId);
     if (!transaction) return { success: false, message: 'العملية غير موجودة' };
 
+    // --- HANDLE WALLET TRANSACTIONS ---
+    if (['wallet_deposit', 'wallet_withdrawal', 'wallet_feed'].includes(transaction.type)) {
+        const wallet = eWallets.find(w => w.id === transaction.e_wallet_id);
+        
+        if (!wallet) return { success: false, message: 'المحفظة المرتبطة غير موجودة' };
+
+        if (transaction.type === 'wallet_feed') {
+            // Feed: Main Treasury -> Wallet
+            // Reverse: Wallet -> Main Treasury
+            const mainTreasury = treasuries.find(t => t.company_id === transaction.company_id && !t.employee_id);
+            if (!mainTreasury) return { success: false, message: 'الخزينة الرئيسية غير موجودة' };
+
+            const amount = transaction.from_amount;
+            if (wallet.balance < amount) return { success: false, message: 'رصيد المحفظة لا يكفي للاسترداد' };
+
+            await supabase.from('e_wallets').update({ balance: wallet.balance - amount }).eq('id', wallet.id);
+            await supabase.from('treasuries').update({ egp_balance: mainTreasury.egp_balance + amount }).eq('id', mainTreasury.id);
+        }
+        else if (transaction.type === 'wallet_deposit') {
+             // Deposit: (Amount + Commission) added to wallet
+             // Reverse: Remove from wallet
+             const amountToRemove = transaction.to_amount || transaction.from_amount;
+             if (wallet.balance < amountToRemove) return { success: false, message: 'رصيد المحفظة لا يكفي للاسترداد' };
+             
+             await supabase.from('e_wallets').update({ balance: wallet.balance - amountToRemove }).eq('id', wallet.id);
+        }
+        else if (transaction.type === 'wallet_withdrawal') {
+            // Withdraw: Removed from Wallet, Added to Emp Treasury (Amount + Commission)
+            // Reverse: Add to Wallet, Remove from Emp Treasury
+            const empTreasury = treasuries.find(t => t.employee_id === transaction.employee_id);
+            if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+
+            const amountToReturnToWallet = transaction.from_amount; // Raw amount
+            const amountToTakeFromEmp = transaction.to_amount || transaction.from_amount; // Amount + Commission
+
+            if (empTreasury.egp_balance < amountToTakeFromEmp) return { success: false, message: 'رصيد الموظف لا يكفي للاسترداد' };
+
+            await supabase.from('e_wallets').update({ balance: wallet.balance + amountToReturnToWallet }).eq('id', wallet.id);
+            await supabase.from('treasuries').update({ egp_balance: empTreasury.egp_balance - amountToTakeFromEmp }).eq('id', empTreasury.id);
+        }
+
+        await supabase.from('transactions').delete().eq('id', transactionId);
+        await fetchData();
+        showToast('تم حذف عملية المحفظة وعكس الأرصدة', 'success');
+        return { success: true, message: 'تم الحذف بنجاح' };
+    }
+
+    // --- HANDLE EXCHANGE / EXPENSE ---
     const empTreasury = treasuries.find(t => t.employee_id === transaction.employee_id);
     if (!empTreasury) {
         return { success: false, message: 'خزينة الموظف غير موجودة لاسترداد المبلغ' };
     }
 
-    // Reverse logic based on type
     if (transaction.type === 'exchange') {
         const fromAmount = transaction.from_amount;
         const toAmount = transaction.to_amount || 0;
