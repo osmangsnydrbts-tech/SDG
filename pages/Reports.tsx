@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Download, Filter, Calculator, Search, Eye, Trash2, Calendar, ListFilter } from 'lucide-react';
+import { FileText, Download, Filter, Calculator, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, TrendingUp, AlertOctagon } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -35,7 +35,7 @@ const Reports: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-      if (window.confirm('هل أنت متأكد من حذف هذه العملية؟ سيتم استرداد المبلغ إلى خزينة الموظف.')) {
+      if (window.confirm('هل أنت متأكد من حذف هذه العملية؟ سيتم عكس التأثير المالي على الخزينة.')) {
           await deleteTransaction(id);
       }
   };
@@ -71,9 +71,12 @@ const Reports: React.FC = () => {
 
         if (!roleMatch) return false;
 
-        // 2. Search Query Check (Receipt Number)
+        // 2. Search Query Check (Receipt Number or Description)
         if (searchQuery) {
-            return t.receipt_number?.toLowerCase().includes(searchQuery.toLowerCase());
+            const query = searchQuery.toLowerCase();
+            const receiptMatch = t.receipt_number?.toLowerCase().includes(query);
+            const descMatch = t.description?.toLowerCase().includes(query);
+            if (!receiptMatch && !descMatch) return false;
         }
 
         // 3. Date Range Check
@@ -93,6 +96,7 @@ const Reports: React.FC = () => {
             }
 
             if (selectedType === 'treasury' && !['treasury_feed', 'treasury_withdraw'].includes(t.type)) return false;
+            if (selectedType === 'expense' && t.type !== 'expense') return false;
             if (selectedType === 'wallet_feed' && t.type !== 'wallet_feed') return false;
         }
 
@@ -104,19 +108,27 @@ const Reports: React.FC = () => {
   
   // Derived lists based on filtered data
   const exchangeTx = filtered.filter(t => t.type === 'exchange');
-  const treasuryTx = filtered.filter(t => ['treasury_feed', 'treasury_withdraw'].includes(t.type));
-  const walletTx = filtered.filter(t => ['e_wallet', 'wallet_deposit', 'wallet_withdrawal'].includes(t.type));
+  const treasuryTx = filtered.filter(t => ['treasury_feed', 'treasury_withdraw', 'expense'].includes(t.type));
+  const walletTx = filtered.filter(t => ['e_wallet', 'wallet_deposit', 'wallet_withdrawal', 'wallet_feed'].includes(t.type));
 
   // --- STATS CALCULATION ---
   const stats = {
       exchangeCount: exchangeTx.length,
+      // Buying SDG (Customer gave SDG, took EGP)
       receivedSdg: exchangeTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
+      // Buying EGP (Customer gave EGP, took SDG)
       receivedEgp: exchangeTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
+      
+      // Commissions
       walletCommission: walletTx.reduce((sum, t) => sum + (t.commission || 0), 0),
+
+      // Expenses
+      expensesEgp: filtered.filter(t => t.type === 'expense' && t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
+      expensesSdg: filtered.filter(t => t.type === 'expense' && t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
   };
 
   const handleExport = () => {
-    const headers = ["ID", "التاريخ", "الموظف", "النوع", "من", "المبلغ", "إلى", "المبلغ", "السعر", "العمولة", "رقم الإشعار"];
+    const headers = ["ID", "التاريخ", "الموظف", "النوع", "من", "المبلغ", "إلى", "المبلغ", "السعر", "العمولة", "الوصف", "رقم الإشعار"];
     
     // Export based on active tab or all filtered
     const dataToExport = activeTab === 'exchange' ? exchangeTx : activeTab === 'treasury' ? treasuryTx : filtered;
@@ -132,6 +144,7 @@ const Reports: React.FC = () => {
         t.to_amount ? Math.round(t.to_amount) : '-',
         t.rate || '-',
         t.commission ? Math.round(t.commission) : 0,
+        t.description ? `"${t.description}"` : '-',
         t.receipt_number || '-'
     ]);
 
@@ -148,6 +161,19 @@ const Reports: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const getTxTypeLabel = (type: string) => {
+      switch(type) {
+          case 'exchange': return 'صرف عملة';
+          case 'expense': return 'منصرفات';
+          case 'treasury_feed': return 'تغذية خزينة';
+          case 'treasury_withdraw': return 'سحب خزينة';
+          case 'wallet_deposit': return 'إيداع محفظة';
+          case 'wallet_withdrawal': return 'سحب محفظة';
+          case 'wallet_feed': return 'تغذية محفظة';
+          default: return type;
+      }
   };
 
   return (
@@ -173,8 +199,7 @@ const Reports: React.FC = () => {
                 </span>
                 <input 
                     type="text" 
-                    inputMode="numeric"
-                    placeholder="بحث برقم الإشعار..." 
+                    placeholder="بحث برقم الإشعار أو الوصف..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pr-10 pl-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition"
@@ -224,6 +249,7 @@ const Reports: React.FC = () => {
                     >
                         <option value="all">كل العمليات</option>
                         <option value="exchange">صرف عملة</option>
+                        <option value="expense">منصرفات</option>
                         <option value="e_wallet">محفظة إلكترونية</option>
                         <option value="treasury">حركة خزينة (إيداع/سحب)</option>
                         <option value="wallet_feed">تغذية محفظة</option>
@@ -236,7 +262,7 @@ const Reports: React.FC = () => {
         <div className="flex bg-white p-1 rounded-xl border border-gray-200 overflow-x-auto">
             <button onClick={() => setActiveTab('breakdown')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition ${activeTab === 'breakdown' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>تقرير تفصيلي</button>
             <button onClick={() => setActiveTab('exchange')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition ${activeTab === 'exchange' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>سجل الصرف</button>
-            <button onClick={() => setActiveTab('treasury')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition ${activeTab === 'treasury' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>سجل الخزينة</button>
+            <button onClick={() => setActiveTab('treasury')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition ${activeTab === 'treasury' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>سجل الخزينة / المنصرفات</button>
         </div>
 
         {/* Detailed Breakdown Tab */}
@@ -248,42 +274,54 @@ const Reports: React.FC = () => {
                         ملخص الفترة المحددة
                     </h3>
                     
-                    <div className="space-y-6">
-                        {/* SDG Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* SDG Intake */}
                         <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-                            <h4 className="font-bold text-orange-800 mb-2">مقبوضات العملة السودانية (SDG)</h4>
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">إجمالي ما تم استلامه:</span>
-                                <span className="text-2xl font-bold text-orange-700" dir="ltr">{stats.receivedSdg.toLocaleString(undefined, { maximumFractionDigits: 0 })} SDG</span>
-                            </div>
+                            <h4 className="font-bold text-orange-800 mb-2 flex items-center gap-2">
+                                <TrendingDown size={18}/> مقبوضات سوداني (شراء EGP)
+                            </h4>
+                            <div className="text-2xl font-bold text-orange-700" dir="ltr">{stats.receivedSdg.toLocaleString(undefined, { maximumFractionDigits: 0 })} SDG</div>
                         </div>
 
-                        {/* EGP Section */}
+                        {/* EGP Intake */}
                         <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                            <h4 className="font-bold text-blue-800 mb-2">مقبوضات العملة المصرية (EGP)</h4>
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">إجمالي ما تم استلامه:</span>
-                                <span className="text-2xl font-bold text-blue-700" dir="ltr">{stats.receivedEgp.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
+                            <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
+                                <TrendingDown size={18}/> مقبوضات مصري (شراء SDG)
+                            </h4>
+                            <div className="text-2xl font-bold text-blue-700" dir="ltr">{stats.receivedEgp.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</div>
+                        </div>
+
+                        {/* Expenses */}
+                        <div className="bg-red-50 p-4 rounded-xl border border-red-100 md:col-span-2">
+                            <h4 className="font-bold text-red-800 mb-2 flex items-center gap-2">
+                                <TrendingUp size={18}/> إجمالي المنصرفات (Expenses)
+                            </h4>
+                            <div className="flex gap-8">
+                                <div>
+                                    <span className="text-xs text-red-500 block">منصرفات مصري</span>
+                                    <span className="text-xl font-bold text-red-700" dir="ltr">{stats.expensesEgp.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-red-500 block">منصرفات سوداني</span>
+                                    <span className="text-xl font-bold text-red-700" dir="ltr">{stats.expensesSdg.toLocaleString(undefined, { maximumFractionDigits: 0 })} SDG</span>
+                                </div>
                             </div>
                         </div>
 
                         {/* Commission Section */}
-                        <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                        <div className="bg-green-50 p-4 rounded-xl border border-green-100 md:col-span-2">
                             <h4 className="font-bold text-green-800 mb-2 flex items-center gap-2">
                                 <Calculator size={18} />
-                                عمولات المحفظة الإلكترونية
+                                صافي عمولات المحفظة الإلكترونية
                             </h4>
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">صافي العمولات:</span>
-                                <span className="text-2xl font-bold text-green-700" dir="ltr">{stats.walletCommission.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
-                            </div>
+                            <div className="text-2xl font-bold text-green-700" dir="ltr">{stats.walletCommission.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</div>
                         </div>
+                    </div>
 
-                        <div className="pt-4 border-t text-sm text-gray-500 text-center flex justify-around">
+                    <div className="pt-4 mt-4 border-t text-sm text-gray-500 text-center flex justify-around">
                              <span>عدد عمليات الصرف: <b>{stats.exchangeCount}</b></span>
                              <span>|</span>
                              <span>عدد عمليات المحفظة: <b>{walletTx.length}</b></span>
-                        </div>
                     </div>
                  </div>
              </div>
@@ -338,11 +376,11 @@ const Reports: React.FC = () => {
             </div>
         )}
 
-        {/* Treasury Log */}
+        {/* Treasury Log (Including Expenses) */}
         {activeTab === 'treasury' && (
              <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-in fade-in duration-300">
              <div className="p-4 bg-gray-50 font-bold border-b text-sm text-gray-700 flex justify-between">
-                <span>سجل حركة الخزينة</span>
+                <span>سجل حركة الخزينة والمنصرفات</span>
                 <span className="text-xs font-normal text-gray-500 bg-white px-2 py-1 rounded border">العدد: {treasuryTx.length}</span>
              </div>
              <div className="overflow-x-auto">
@@ -350,9 +388,11 @@ const Reports: React.FC = () => {
                      <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                          <tr>
                              <th className="p-3">الوقت</th>
+                             <th className="p-3">الموظف</th>
                              <th className="p-3">النوع</th>
                              <th className="p-3">المبلغ</th>
                              <th className="p-3">الوصف</th>
+                             <th className="p-3">إجراءات</th>
                          </tr>
                      </thead>
                      <tbody className="divide-y">
@@ -362,16 +402,36 @@ const Reports: React.FC = () => {
                                      <div className="font-bold">{new Date(t.created_at).toLocaleDateString('ar-EG')}</div>
                                      <div className="text-xs">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
                                  </td>
+                                 <td className="p-3 font-medium">{getEmployeeName(t.employee_id)}</td>
                                  <td className="p-3">
-                                     <span className={`px-2 py-1 rounded-full text-xs font-bold ${t.type === 'treasury_feed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                         {t.type === 'treasury_feed' ? 'إيداع/تغذية' : 'سحب/استرداد'}
+                                     <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                                        t.type === 'treasury_feed' ? 'bg-green-100 text-green-700' : 
+                                        t.type === 'expense' ? 'bg-orange-100 text-orange-700' :
+                                        'bg-red-100 text-red-700'
+                                     }`}>
+                                         {getTxTypeLabel(t.type)}
                                      </span>
                                  </td>
-                                 <td className="p-3 font-bold" dir="ltr">{t.from_amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} {t.from_currency}</td>
-                                 <td className="p-3 text-xs text-gray-500">{t.description}</td>
+                                 <td className={`p-3 font-bold ${t.type === 'expense' || t.type === 'treasury_withdraw' ? 'text-red-600' : 'text-green-600'}`} dir="ltr">
+                                    {t.type === 'expense' || t.type === 'treasury_withdraw' ? '-' : '+'}
+                                    {t.from_amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} {t.from_currency}
+                                 </td>
+                                 <td className="p-3 text-xs text-gray-500">{t.description || '-'}</td>
+                                 <td className="p-3 flex items-center gap-2">
+                                     {t.type === 'expense' && (
+                                         <button onClick={() => setViewTransaction(t)} className="text-blue-600 hover:bg-blue-50 p-2 rounded-full">
+                                            <Eye size={18} />
+                                         </button>
+                                     )}
+                                     {currentUser?.role === 'admin' && (
+                                         <button onClick={() => handleDelete(t.id)} className="text-red-600 hover:bg-red-50 p-2 rounded-full" title="حذف">
+                                             <Trash2 size={18} />
+                                         </button>
+                                     )}
+                                 </td>
                              </tr>
                          ))}
-                         {treasuryTx.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-gray-400">لا توجد حركات مطابقة للفلتر</td></tr>}
+                         {treasuryTx.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-gray-400">لا توجد حركات مطابقة للفلتر</td></tr>}
                      </tbody>
                  </table>
              </div>
