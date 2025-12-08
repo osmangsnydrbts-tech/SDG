@@ -76,7 +76,7 @@ export interface Transaction {
   id: number;
   company_id: number;
   employee_id?: number;
-  type: 'exchange' | 'e_wallet' | 'treasury_feed' | 'treasury_withdraw' | 'merchant_entry' | 'wallet_feed' | 'wallet_deposit' | 'wallet_withdrawal';
+  type: 'exchange' | 'e_wallet' | 'treasury_feed' | 'treasury_withdraw' | 'merchant_entry' | 'wallet_feed' | 'wallet_deposit' | 'wallet_withdrawal' | 'expense';
   from_currency?: string;
   to_currency?: string;
   from_amount: number;
