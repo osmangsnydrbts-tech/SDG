@@ -106,23 +106,6 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     }
   };
 
-  const handleCopyDetails = () => {
-    const details = `
-${company.name}
-${getTransactionType(transaction)}
-رقم الإشعار: ${transaction.receipt_number || transaction.id}
-التاريخ: ${new Date(transaction.created_at).toLocaleDateString('ar-SA')}
-المبلغ: ${transaction.from_amount.toLocaleString('ar-SA')} ${transaction.from_currency}
-${transaction.to_amount ? `المستلم: ${transaction.to_amount.toLocaleString('ar-SA')} ${transaction.to_currency}` : ''}
-الموظف: ${employee?.full_name || 'غير محدد'}
-    `.trim();
-
-    navigator.clipboard.writeText(details).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
   const getTransactionType = (t: Transaction) => {
     const types: Record<string, string> = {
       'exchange': 'عملية صرف عملة',
@@ -131,7 +114,8 @@ ${transaction.to_amount ? `المستلم: ${transaction.to_amount.toLocaleStrin
       'wallet_withdrawal': 'سحب محفظة',
       'treasury_feed': 'استلام نقدية',
       'treasury_withdraw': 'صرف نقدية',
-      'wallet_feed': 'تغذية محفظة'
+      'wallet_feed': 'تغذية محفظة',
+      'expense': 'سند صرف (منصرفات)'
     };
     return types[t.type] || 'عملية مالية';
   };
@@ -143,7 +127,8 @@ ${transaction.to_amount ? `المستلم: ${transaction.to_amount.toLocaleStrin
       'wallet_withdrawal': 'المبلغ المخصوم من المحفظة',
       'treasury_feed': 'المبلغ المستلم',
       'treasury_withdraw': 'المبلغ المسلم',
-      'wallet_feed': 'قيمة التغذية'
+      'wallet_feed': 'قيمة التغذية',
+      'expense': 'المبلغ المصروف'
     };
     return labels[t.type] || 'المبلغ';
   };
@@ -217,6 +202,14 @@ ${transaction.to_amount ? `المستلم: ${transaction.to_amount.toLocaleStrin
                         <span className="text-gray-500 font-medium">سعر الصرف:</span>
                         <span className="text-xl font-bold text-gray-900" dir="ltr">{transaction.rate}</span>
                      </div>
+                </div>
+            )}
+
+            {/* Description (For Expenses/Treasury) */}
+            {transaction.description && (
+                <div className="bg-gray-50 rounded-xl px-4 py-3 w-full text-center">
+                    <p className="text-gray-500 text-xs mb-1">البيان / الوصف</p>
+                    <p className="font-bold text-gray-800">{transaction.description}</p>
                 </div>
             )}
 
