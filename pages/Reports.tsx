@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Download, Filter, Calculator, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, TrendingUp, Wallet, Banknote, ArrowRightLeft, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { FileText, Download, Filter, Calculator, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, TrendingUp, Wallet, Banknote, ArrowRightLeft, ArrowUpRight, ArrowDownLeft, X } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -19,6 +19,7 @@ const Reports: React.FC = () => {
   
   // Modal State
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
+  const [expenseDetailCurrency, setExpenseDetailCurrency] = useState<'EGP' | 'SDG' | null>(null);
 
   // Helpers
   const getEmployeeName = (empId?: number) => {
@@ -118,6 +119,11 @@ const Reports: React.FC = () => {
       // Expenses
       expensesEgp: filtered.filter(t => t.type === 'expense' && t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
       expensesSdg: filtered.filter(t => t.type === 'expense' && t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
+  };
+
+  const getExpenseDetails = () => {
+    if (!expenseDetailCurrency) return [];
+    return filtered.filter(t => t.type === 'expense' && t.from_currency === expenseDetailCurrency);
   };
 
   const handleExport = () => {
@@ -274,12 +280,18 @@ const Reports: React.FC = () => {
                                 <TrendingUp size={20}/> إجمالي المنصرفات
                             </h4>
                             <div className="flex flex-wrap gap-8">
-                                <div className="bg-white/60 p-3 rounded-xl min-w-[150px]">
-                                    <span className="text-xs text-orange-600 font-bold block mb-1">منصرفات مصري</span>
+                                <div 
+                                    onClick={() => setExpenseDetailCurrency('EGP')}
+                                    className="bg-white/60 p-3 rounded-xl min-w-[150px] cursor-pointer hover:bg-white transition-colors border border-transparent hover:border-orange-200 group"
+                                >
+                                    <span className="text-xs text-orange-600 font-bold mb-1 flex items-center gap-1 group-hover:underline">منصرفات مصري <Eye size={12}/></span>
                                     <span className="text-2xl font-black text-gray-800" dir="ltr">{stats.expensesEgp.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm text-gray-400">EGP</span></span>
                                 </div>
-                                <div className="bg-white/60 p-3 rounded-xl min-w-[150px]">
-                                    <span className="text-xs text-orange-600 font-bold block mb-1">منصرفات سوداني</span>
+                                <div 
+                                    onClick={() => setExpenseDetailCurrency('SDG')}
+                                    className="bg-white/60 p-3 rounded-xl min-w-[150px] cursor-pointer hover:bg-white transition-colors border border-transparent hover:border-orange-200 group"
+                                >
+                                    <span className="text-xs text-orange-600 font-bold mb-1 flex items-center gap-1 group-hover:underline">منصرفات سوداني <Eye size={12}/></span>
                                     <span className="text-2xl font-black text-gray-800" dir="ltr">{stats.expensesSdg.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm text-gray-400">SDG</span></span>
                                 </div>
                             </div>
@@ -459,6 +471,58 @@ const Reports: React.FC = () => {
                 employee={getEmployee(viewTransaction.employee_id)} 
                 onClose={() => setViewTransaction(null)} 
             />
+        )}
+
+        {/* Expense Details Modal */}
+        {expenseDetailCurrency && (
+            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom-4">
+                    <div className="p-4 border-b flex justify-between items-center bg-orange-50 rounded-t-2xl">
+                        <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                            <FileText size={20} className="text-orange-600"/> 
+                            تفاصيل منصرفات {expenseDetailCurrency === 'EGP' ? 'مصري (EGP)' : 'سوداني (SDG)'}
+                        </h3>
+                        <button onClick={() => setExpenseDetailCurrency(null)} className="p-2 hover:bg-black/5 rounded-full">
+                            <X size={20} className="text-gray-500" />
+                        </button>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-4">
+                        <table className="w-full text-sm text-right">
+                            <thead className="bg-gray-50 text-gray-500 font-bold sticky top-0">
+                                <tr>
+                                    <th className="p-3 rounded-r-lg">التاريخ</th>
+                                    <th className="p-3">الموظف</th>
+                                    <th className="p-3">الوصف</th>
+                                    <th className="p-3 rounded-l-lg">المبلغ</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {getExpenseDetails().map(t => (
+                                    <tr key={t.id} className="hover:bg-gray-50">
+                                        <td className="p-3 whitespace-nowrap">
+                                            <div className="font-bold">{new Date(t.created_at).toLocaleDateString('ar-EG')}</div>
+                                            <div className="text-xs text-gray-400">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
+                                        </td>
+                                        <td className="p-3 font-medium">{getEmployeeName(t.employee_id)}</td>
+                                        <td className="p-3 text-gray-600">{t.description}</td>
+                                        <td className="p-3 font-bold text-red-600" dir="ltr">-{Math.round(t.from_amount).toLocaleString()}</td>
+                                    </tr>
+                                ))}
+                                 {getExpenseDetails().length === 0 && (
+                                    <tr>
+                                        <td colSpan={4} className="text-center p-8 text-gray-400">لا توجد تفاصيل</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div className="p-4 border-t bg-gray-50 rounded-b-2xl text-center text-sm text-gray-500">
+                        إجمالي المبلغ: <span className="font-bold text-gray-800 mx-1">{getExpenseDetails().reduce((sum, t) => sum + t.from_amount, 0).toLocaleString()}</span> {expenseDetailCurrency}
+                    </div>
+                </div>
+            </div>
         )}
     </div>
   );
