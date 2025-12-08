@@ -46,6 +46,13 @@ interface StoreData {
     receipt: string
   ) => Promise<{ success: boolean; message: string; transaction?: Transaction }>;
   
+  addExpense: (
+    employeeId: number,
+    currency: 'EGP' | 'SDG',
+    amount: number,
+    description: string
+  ) => Promise<{ success: boolean; message: string; transaction?: Transaction }>;
+
   deleteTransaction: (transactionId: number) => Promise<{ success: boolean; message: string }>;
 
   addMerchant: (companyId: number, name: string, phone: string) => Promise<void>;
@@ -522,31 +529,81 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return { success: true, message: 'تمت العملية بنجاح', transaction: newTx };
   };
 
+  const addExpense = async (
+    employeeId: number,
+    currency: 'EGP' | 'SDG',
+    amount: number,
+    description: string
+  ) => {
+    // Round input amount
+    const rAmount = Math.round(amount);
+    if (rAmount <= 0) return { success: false, message: 'المبلغ غير صحيح' };
+    if (!description.trim()) return { success: false, message: 'يرجى إدخال وصف للمنصرف' };
+
+    const empTreasury = treasuries.find(t => t.employee_id === employeeId);
+    if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+
+    const balanceKey = currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
+    
+    if (empTreasury[balanceKey] < rAmount) {
+         return { success: false, message: `رصيد ${currency} غير كافي` };
+    }
+
+    // Deduct from employee treasury
+    await supabase.from('treasuries').update({
+        [balanceKey]: empTreasury[balanceKey] - rAmount
+    }).eq('id', empTreasury.id);
+
+    const { data: newTx, error } = await supabase.from('transactions').insert({
+        company_id: empTreasury.company_id,
+        employee_id: employeeId,
+        type: 'expense',
+        from_currency: currency,
+        from_amount: rAmount,
+        description: description,
+        created_at: new Date().toISOString()
+    }).select().single();
+
+    if (error) return { success: false, message: 'فشل تسجيل المنصرف' };
+
+    await fetchData();
+    showToast('تم تسجيل المنصرف بنجاح', 'success');
+    return { success: true, message: 'تم تسجيل المنصرف', transaction: newTx };
+  };
+
   const deleteTransaction = async (transactionId: number) => {
     const transaction = transactions.find(t => t.id === transactionId);
-    if (!transaction || transaction.type !== 'exchange') {
-        return { success: false, message: 'لا يمكن حذف هذه العملية' };
-    }
+    if (!transaction) return { success: false, message: 'العملية غير موجودة' };
 
     const empTreasury = treasuries.find(t => t.employee_id === transaction.employee_id);
     if (!empTreasury) {
         return { success: false, message: 'خزينة الموظف غير موجودة لاسترداد المبلغ' };
     }
 
-    // Reverse logic
-    const fromAmount = transaction.from_amount;
-    const toAmount = transaction.to_amount || 0;
+    // Reverse logic based on type
+    if (transaction.type === 'exchange') {
+        const fromAmount = transaction.from_amount;
+        const toAmount = transaction.to_amount || 0;
 
-    if (transaction.from_currency === 'SDG') {
+        if (transaction.from_currency === 'SDG') {
+            await supabase.from('treasuries').update({
+                sdg_balance: empTreasury.sdg_balance - fromAmount,
+                egp_balance: empTreasury.egp_balance + toAmount
+            }).eq('id', empTreasury.id);
+        } else { 
+            await supabase.from('treasuries').update({
+                egp_balance: empTreasury.egp_balance - fromAmount,
+                sdg_balance: empTreasury.sdg_balance + toAmount
+            }).eq('id', empTreasury.id);
+        }
+    } else if (transaction.type === 'expense') {
+        const amount = transaction.from_amount;
+        const balanceKey = transaction.from_currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
         await supabase.from('treasuries').update({
-            sdg_balance: empTreasury.sdg_balance - fromAmount,
-            egp_balance: empTreasury.egp_balance + toAmount
+             [balanceKey]: empTreasury[balanceKey] + amount
         }).eq('id', empTreasury.id);
-    } else { 
-        await supabase.from('treasuries').update({
-            egp_balance: empTreasury.egp_balance - fromAmount,
-            sdg_balance: empTreasury.sdg_balance + toAmount
-        }).eq('id', empTreasury.id);
+    } else {
+         return { success: false, message: 'لا يمكن حذف هذا النوع من العمليات حالياً' };
     }
 
     await supabase.from('transactions').delete().eq('id', transactionId);
@@ -840,7 +897,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       toast, showToast, hideToast,
       login, logout, addCompany, updateCompany, renewSubscription, deleteCompany, toggleCompanyStatus, updateExchangeRate, 
       addEmployee, updateEmployee, updateEmployeePassword, deleteEmployee,
-      performExchange, deleteTransaction, addMerchant, deleteMerchant, addMerchantEntry, addEWallet, deleteEWallet, performEWalletTransfer, manageTreasury, feedEWallet,
+      performExchange, addExpense, deleteTransaction, addMerchant, deleteMerchant, addMerchantEntry, addEWallet, deleteEWallet, performEWalletTransfer, manageTreasury, feedEWallet,
       exportDatabase, importDatabase
     }}>
       {children}
