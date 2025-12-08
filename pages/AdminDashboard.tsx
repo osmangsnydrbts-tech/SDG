@@ -181,26 +181,8 @@ const AdminDashboard: React.FC = () => {
       setExpandedEmpId(expandedEmpId === id ? null : id);
   };
 
-  // Helper to calculate stats for expanded view
-  const getDetailedStats = (empId: number) => {
-      const treasury = treasuries.find(t => t.employee_id === empId);
-      const empTxs = transactions.filter(t => t.employee_id === empId);
-
-      // EGP Stats
-      // 1. Exchange Out (Buying SDG) - Round to integer
-      const egpExchange = Math.round(empTxs.filter(t => t.type === 'exchange' && t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0));
-      // 2. Wallet Volume (Deposit + Withdrawal) - Money moved via wallets - Round to integer
-      const egpWallet = Math.round(empTxs.filter(t => ['wallet_deposit', 'wallet_withdrawal'].includes(t.type)).reduce((sum, t) => sum + t.from_amount, 0));
-      // 3. Reverse (Sent back to Main Treasury) - Round to integer
-      const egpReverse = Math.round(empTxs.filter(t => t.type === 'treasury_withdraw' && t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0));
-
-      // SDG Stats
-      // 1. Exchange Out (Buying EGP) - Round to integer
-      const sdgExchange = Math.round(empTxs.filter(t => t.type === 'exchange' && t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0));
-      // 2. Reverse (Sent back to Main Treasury) - Round to integer
-      const sdgReverse = Math.round(empTxs.filter(t => t.type === 'treasury_withdraw' && t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0));
-
-      return { treasury, egpExchange, egpWallet, egpReverse, sdgExchange, sdgReverse };
+  const getEmployeeBalance = (empId: number) => {
+      return treasuries.find(t => t.employee_id === empId);
   };
 
   const QuickAction = ({ icon: Icon, label, onClick, color }: any) => (
@@ -422,7 +404,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
                     {companyEmployees.map(emp => {
                         const isExpanded = expandedEmpId === emp.id;
-                        const stats = isExpanded ? getDetailedStats(emp.id) : null;
+                        const treasury = getEmployeeBalance(emp.id);
 
                         return (
                             <div key={emp.id} className={`border rounded-xl overflow-hidden transition-all ${isExpanded ? 'border-blue-300 shadow-md' : 'border-gray-200'}`}>
@@ -456,55 +438,23 @@ const AdminDashboard: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        {/* Expanded Detail View */}
-                                        {isExpanded && stats && (
-                                            <div className="p-4 animate-in slide-in-from-top-4">
+                                        {/* Expanded Simplified Detail View */}
+                                        {isExpanded && treasury && (
+                                            <div className="p-4 animate-in slide-in-from-top-2 bg-gray-50/50">
                                                 
-                                                {/* EGP Section */}
-                                                <div className="bg-blue-50 rounded-xl p-3 mb-3 border border-blue-100">
-                                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-blue-100">
-                                                        <Banknote size={16} className="text-blue-600"/>
-                                                        <span className="font-bold text-blue-800 text-sm">المصري (EGP)</span>
+                                                {/* Simplified Balance Grid */}
+                                                <div className="grid grid-cols-2 gap-3 mb-4">
+                                                    <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100 flex flex-col items-center justify-center">
+                                                        <span className="text-xs font-bold text-blue-500 mb-1">الرصيد المصري (EGP)</span>
+                                                        <span className="text-xl font-bold text-gray-800" dir="ltr">
+                                                            {treasury.egp_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                                        </span>
                                                     </div>
-                                                    <div className="space-y-2 text-sm">
-                                                        <div className="flex justify-between">
-                                                            <span className="text-gray-500">رصيد الخزينة</span>
-                                                            <span className="font-bold text-lg text-blue-700">{stats.treasury?.egp_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-xs">
-                                                            <span className="text-gray-500 flex items-center gap-1"><ArrowRightLeft size={10}/> إجمالي الصرف</span>
-                                                            <span className="font-bold text-gray-700">{stats.egpExchange.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-xs">
-                                                            <span className="text-gray-500 flex items-center gap-1"><Smartphone size={10}/> إجمالي المحافظ</span>
-                                                            <span className="font-bold text-gray-700">{stats.egpWallet.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-xs">
-                                                            <span className="text-gray-500 flex items-center gap-1"><ArrowUpCircle size={10}/> توييد / عكسي</span>
-                                                            <span className="font-bold text-red-600">{stats.egpReverse.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* SDG Section */}
-                                                <div className="bg-emerald-50 rounded-xl p-3 mb-4 border border-emerald-100">
-                                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-emerald-100">
-                                                        <Banknote size={16} className="text-emerald-600"/>
-                                                        <span className="font-bold text-emerald-800 text-sm">السوداني (SDG)</span>
-                                                    </div>
-                                                    <div className="space-y-2 text-sm">
-                                                        <div className="flex justify-between">
-                                                            <span className="text-gray-500">رصيد الخزينة</span>
-                                                            <span className="font-bold text-lg text-emerald-700">{stats.treasury?.sdg_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-xs">
-                                                            <span className="text-gray-500 flex items-center gap-1"><ArrowRightLeft size={10}/> إجمالي الصرف</span>
-                                                            <span className="font-bold text-gray-700">{stats.sdgExchange.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-xs">
-                                                            <span className="text-gray-500 flex items-center gap-1"><ArrowUpCircle size={10}/> توييد / عكسي</span>
-                                                            <span className="font-bold text-red-600">{stats.sdgReverse.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                                                        </div>
+                                                    <div className="bg-white p-4 rounded-xl shadow-sm border border-emerald-100 flex flex-col items-center justify-center">
+                                                        <span className="text-xs font-bold text-emerald-500 mb-1">الرصيد السوداني (SDG)</span>
+                                                        <span className="text-xl font-bold text-gray-800" dir="ltr">
+                                                            {treasury.sdg_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                                        </span>
                                                     </div>
                                                 </div>
 
