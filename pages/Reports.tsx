@@ -5,7 +5,8 @@ import {
   FileText, Download, Filter, Search, Eye, Trash2, Calendar, 
   ListFilter, TrendingDown, Wallet, ArrowRightLeft, 
   ArrowUpRight, ArrowDownLeft, X, ChevronLeft, Coins, PieChart,
-  Banknote, ArrowUpCircle, ArrowDownCircle, Activity
+  Banknote, ArrowUpCircle, ArrowDownCircle, Activity,
+  Briefcase
 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
@@ -16,9 +17,10 @@ interface DetailViewData {
   title: string;
   transactions: Transaction[];
   total: number;
+  count: number;
   currency: string;
-  theme: 'blue' | 'green' | 'red' | 'orange' | 'purple' | 'indigo' | 'teal';
-  valueKey: 'from_amount' | 'commission';
+  theme: 'blue' | 'green' | 'red' | 'orange' | 'purple' | 'indigo' | 'teal' | 'gray';
+  valueKey?: 'from_amount' | 'commission' | 'to_amount';
 }
 
 const Reports: React.FC = () => {
@@ -28,7 +30,6 @@ const Reports: React.FC = () => {
   // Filtering States
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [selectedType, setSelectedType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   
   // Modals
@@ -100,18 +101,6 @@ const Reports: React.FC = () => {
 
         if (txDate < start || txDate > end) return false;
 
-        // 4. Type Check
-        if (selectedType !== 'all') {
-            if (selectedType === 'exchange' && t.type !== 'exchange') return false;
-            
-            if (selectedType === 'e_wallet') {
-                if (t.type !== 'e_wallet' && t.type !== 'wallet_deposit' && t.type !== 'wallet_withdrawal' && t.type !== 'wallet_feed') return false;
-            }
-
-            if (selectedType === 'treasury' && !['treasury_feed', 'treasury_withdraw'].includes(t.type)) return false;
-            if (selectedType === 'expense' && t.type !== 'expense') return false;
-        }
-
         return true;
       }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   };
@@ -120,16 +109,21 @@ const Reports: React.FC = () => {
 
   // --- Derived Lists for Breakdown ---
   const lists = {
+      // Exchange
       exchangeSdg: filtered.filter(t => t.type === 'exchange' && t.from_currency === 'SDG'),
       exchangeEgp: filtered.filter(t => t.type === 'exchange' && t.from_currency === 'EGP'),
       
-      walletDep: filtered.filter(t => t.type === 'wallet_deposit'),
-      walletWith: filtered.filter(t => t.type === 'wallet_withdrawal'),
+      // Wallet
+      walletDep: filtered.filter(t => t.type === 'wallet_deposit'), // Agent Deposit (Buying E-money)
+      walletWith: filtered.filter(t => t.type === 'wallet_withdrawal'), // Agent Withdraw (Selling E-money)
       commissions: filtered.filter(t => (t.commission || 0) > 0),
-      
+      walletFeed: filtered.filter(t => t.type === 'wallet_feed'),
+
+      // Expenses
       expEgp: filtered.filter(t => t.type === 'expense' && t.from_currency === 'EGP'),
       expSdg: filtered.filter(t => t.type === 'expense' && t.from_currency === 'SDG'),
-
+      
+      // Treasury (Internal)
       treasuryIn: filtered.filter(t => t.type === 'treasury_feed'),
       treasuryOut: filtered.filter(t => t.type === 'treasury_withdraw'),
   };
@@ -141,9 +135,13 @@ const Reports: React.FC = () => {
       walletDep: lists.walletDep.reduce((s, t) => s + t.from_amount, 0),
       walletWith: lists.walletWith.reduce((s, t) => s + t.from_amount, 0),
       commissions: lists.commissions.reduce((s, t) => s + (t.commission || 0), 0),
+      walletFeed: lists.walletFeed.reduce((s, t) => s + t.from_amount, 0),
       
       expEgp: lists.expEgp.reduce((s, t) => s + t.from_amount, 0),
       expSdg: lists.expSdg.reduce((s, t) => s + t.from_amount, 0),
+      
+      treasuryIn: lists.treasuryIn.reduce((s, t) => s + t.from_amount, 0),
+      treasuryOut: lists.treasuryOut.reduce((s, t) => s + t.from_amount, 0),
   };
 
   const openDetail = (
@@ -152,9 +150,17 @@ const Reports: React.FC = () => {
       total: number, 
       currency: string, 
       theme: DetailViewData['theme'],
-      valueKey: 'from_amount' | 'commission' = 'from_amount'
+      valueKey: 'from_amount' | 'commission' | 'to_amount' = 'from_amount'
   ) => {
-      setDetailView({ title, transactions, total, currency, theme, valueKey });
+      setDetailView({ 
+          title, 
+          transactions, 
+          total, 
+          count: transactions.length,
+          currency, 
+          theme, 
+          valueKey 
+      });
   };
 
   const handleExport = () => {
@@ -226,7 +232,7 @@ const Reports: React.FC = () => {
     count: number,
     currency: string, 
     icon: any, 
-    theme: 'blue' | 'green' | 'red' | 'orange' | 'purple' | 'indigo' | 'teal', 
+    theme: 'blue' | 'green' | 'red' | 'orange' | 'purple' | 'indigo' | 'teal' | 'gray', 
     onClick: () => void 
   }) => {
       const themes = {
@@ -237,6 +243,7 @@ const Reports: React.FC = () => {
           purple: { bg: 'bg-purple-500', text: 'text-purple-600', light: 'bg-purple-50' },
           indigo: { bg: 'bg-indigo-500', text: 'text-indigo-600', light: 'bg-indigo-50' },
           teal: { bg: 'bg-teal-500', text: 'text-teal-600', light: 'bg-teal-50' },
+          gray: { bg: 'bg-gray-500', text: 'text-gray-600', light: 'bg-gray-50' },
       };
 
       const t = themes[theme];
@@ -352,10 +359,10 @@ const Reports: React.FC = () => {
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                  
                  {/* Section: Exchange */}
-                 <div>
-                    <h3 className="text-gray-700 font-extrabold text-lg mb-4 flex items-center gap-2">
+                 <div className="space-y-4">
+                    <h3 className="text-gray-800 font-extrabold text-lg flex items-center gap-2">
                         <div className="bg-blue-100 p-2 rounded-lg text-blue-600"><ArrowRightLeft size={20}/></div>
-                        عمليات الصرف (بيع وشراء)
+                        عمليات الصرف (Buying/Selling)
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                         <SummaryCard 
@@ -365,7 +372,7 @@ const Reports: React.FC = () => {
                             currency="SDG" 
                             icon={Banknote} 
                             theme="indigo"
-                            onClick={() => openDetail('مقبوضات سوداني (شراء مصري)', lists.exchangeSdg, totals.exchangeSdg, 'SDG', 'indigo')}
+                            onClick={() => openDetail('شراء مصري (وارد سوداني)', lists.exchangeSdg, totals.exchangeSdg, 'SDG', 'indigo')}
                         />
                          <SummaryCard 
                             title="شراء سوداني (مقبوضات مصري)" 
@@ -374,18 +381,36 @@ const Reports: React.FC = () => {
                             currency="EGP" 
                             icon={Banknote} 
                             theme="blue"
-                            onClick={() => openDetail('مقبوضات مصري (شراء سوداني)', lists.exchangeEgp, totals.exchangeEgp, 'EGP', 'blue')}
+                            onClick={() => openDetail('شراء سوداني (وارد مصري)', lists.exchangeEgp, totals.exchangeEgp, 'EGP', 'blue')}
                         />
                     </div>
                  </div>
 
                  {/* Section: Wallets */}
-                 <div>
-                    <h3 className="text-gray-700 font-extrabold text-lg mb-4 flex items-center gap-2">
+                 <div className="space-y-4">
+                    <h3 className="text-gray-800 font-extrabold text-lg flex items-center gap-2">
                         <div className="bg-purple-100 p-2 rounded-lg text-purple-600"><Wallet size={20}/></div>
-                        المحافظ والتحويلات
+                        المحافظ الإلكترونية
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                        <SummaryCard 
+                            title="إيداعات للعملاء (شراء رصيد)" 
+                            amount={totals.walletDep} 
+                            count={lists.walletDep.length}
+                            currency="EGP" 
+                            icon={ArrowDownLeft} 
+                            theme="green"
+                            onClick={() => openDetail('إيداعات المحافظ (عملاء)', lists.walletDep, totals.walletDep, 'EGP', 'green')}
+                        />
+                        <SummaryCard 
+                            title="سحوبات للعملاء (بيع رصيد)" 
+                            amount={totals.walletWith} 
+                            count={lists.walletWith.length}
+                            currency="EGP" 
+                            icon={ArrowUpRight} 
+                            theme="red"
+                            onClick={() => openDetail('سحوبات المحافظ (عملاء)', lists.walletWith, totals.walletWith, 'EGP', 'red')}
+                        />
                         <SummaryCard 
                             title="صافي العمولات المكتسبة" 
                             amount={totals.commissions} 
@@ -395,36 +420,27 @@ const Reports: React.FC = () => {
                             theme="purple"
                             onClick={() => openDetail('عمولات المحافظ', lists.commissions, totals.commissions, 'EGP', 'purple', 'commission')}
                         />
-                        <SummaryCard 
-                            title="إيداعات للعملاء (استلام كاش)" 
-                            amount={totals.walletDep} 
-                            count={lists.walletDep.length}
+                         <SummaryCard 
+                            title="تغذية محافظ (سيولة داخلية)" 
+                            amount={totals.walletFeed} 
+                            count={lists.walletFeed.length}
                             currency="EGP" 
-                            icon={ArrowDownLeft} 
-                            theme="green"
-                            onClick={() => openDetail('إيداعات المحافظ (وارد نقدية)', lists.walletDep, totals.walletDep, 'EGP', 'green')}
-                        />
-                        <SummaryCard 
-                            title="سحوبات للعملاء (صرف كاش)" 
-                            amount={totals.walletWith} 
-                            count={lists.walletWith.length}
-                            currency="EGP" 
-                            icon={ArrowUpRight} 
-                            theme="red"
-                            onClick={() => openDetail('سحوبات المحافظ (صادر نقدية)', lists.walletWith, totals.walletWith, 'EGP', 'red')}
+                            icon={Activity} 
+                            theme="teal"
+                            onClick={() => openDetail('تغذية المحافظ (سيولة)', lists.walletFeed, totals.walletFeed, 'EGP', 'teal')}
                         />
                     </div>
                  </div>
 
-                 {/* Section: Expenses */}
-                 <div>
-                    <h3 className="text-gray-700 font-extrabold text-lg mb-4 flex items-center gap-2">
+                 {/* Section: Expenses & Treasury */}
+                 <div className="space-y-4">
+                    <h3 className="text-gray-800 font-extrabold text-lg flex items-center gap-2">
                         <div className="bg-orange-100 p-2 rounded-lg text-orange-600"><TrendingDown size={20}/></div>
-                        المصروفات والتشغيل
+                        المصروفات وحركة الخزينة
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                         <SummaryCard 
-                            title="إجمالي المصروفات (مصري)" 
+                            title="المصروفات (مصري)" 
                             amount={totals.expEgp} 
                             count={lists.expEgp.length}
                             currency="EGP" 
@@ -433,13 +449,31 @@ const Reports: React.FC = () => {
                             onClick={() => openDetail('سجل المصروفات (EGP)', lists.expEgp, totals.expEgp, 'EGP', 'orange')}
                         />
                          <SummaryCard 
-                            title="إجمالي المصروفات (سوداني)" 
+                            title="المصروفات (سوداني)" 
                             amount={totals.expSdg} 
                             count={lists.expSdg.length}
                             currency="SDG" 
                             icon={FileText} 
                             theme="orange"
                             onClick={() => openDetail('سجل المصروفات (SDG)', lists.expSdg, totals.expSdg, 'SDG', 'orange')}
+                        />
+                        <SummaryCard 
+                            title="تغذية الخزينة (وارد)" 
+                            amount={totals.treasuryIn} 
+                            count={lists.treasuryIn.length}
+                            currency="N/A" 
+                            icon={ArrowDownCircle} 
+                            theme="gray"
+                            onClick={() => openDetail('عمليات إيداع الخزينة', lists.treasuryIn, totals.treasuryIn, 'EGP', 'gray')}
+                        />
+                         <SummaryCard 
+                            title="سحب من الخزينة (صادر)" 
+                            amount={totals.treasuryOut} 
+                            count={lists.treasuryOut.length}
+                            currency="N/A" 
+                            icon={ArrowUpCircle} 
+                            theme="gray"
+                            onClick={() => openDetail('عمليات سحب الخزينة', lists.treasuryOut, totals.treasuryOut, 'EGP', 'gray')}
                         />
                     </div>
                  </div>
@@ -649,7 +683,7 @@ const Reports: React.FC = () => {
                     {/* Footer */}
                     <div className="p-6 border-t bg-gray-50/80 rounded-b-3xl flex justify-between items-center backdrop-blur-sm">
                         <div className="text-gray-500 font-medium text-sm">
-                            عدد العمليات: <span className="font-bold text-gray-800">{detailView.transactions.length}</span>
+                            عدد العمليات: <span className="font-bold text-gray-800">{detailView.count}</span>
                         </div>
                         <div className="flex items-center gap-3">
                             <span className="text-gray-600 font-bold">الإجمالي الكلي:</span>
