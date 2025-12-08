@@ -1,11 +1,20 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Download, Filter, Calculator, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, TrendingUp, Wallet, Banknote, ArrowRightLeft, ArrowUpRight, ArrowDownLeft, X } from 'lucide-react';
+import { FileText, Download, Filter, Calculator, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, TrendingUp, Wallet, Banknote, ArrowRightLeft, ArrowUpRight, ArrowDownLeft, X, ChevronLeft, Coins, PieChart } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
 type TabType = 'breakdown' | 'transactions';
+
+interface DetailViewData {
+  title: string;
+  transactions: Transaction[];
+  total: number;
+  currency: string;
+  theme: 'blue' | 'green' | 'red' | 'orange' | 'purple' | 'indigo';
+  valueKey: 'from_amount' | 'commission';
+}
 
 const Reports: React.FC = () => {
   const { transactions, currentUser, users, companies, deleteTransaction } = useStore();
@@ -17,9 +26,9 @@ const Reports: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Modal State
+  // Modals
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
-  const [expenseDetailCurrency, setExpenseDetailCurrency] = useState<'EGP' | 'SDG' | null>(null);
+  const [detailView, setDetailView] = useState<DetailViewData | null>(null);
 
   // Helpers
   const getEmployeeName = (empId?: number) => {
@@ -33,6 +42,8 @@ const Reports: React.FC = () => {
   const handleDelete = async (id: number) => {
       if (window.confirm('هل أنت متأكد من حذف هذه العملية؟ سيتم عكس التأثير المالي على الخزينة.')) {
           await deleteTransaction(id);
+          // If detailed view is open, close it to avoid stale data
+          setDetailView(null);
       }
   };
 
@@ -102,28 +113,37 @@ const Reports: React.FC = () => {
   };
 
   const filtered = getFilteredTransactions();
-  
-  // Stats Calculation
-  const stats = {
-      count: filtered.length,
-      
-      // Exchange Volume
-      exchangeSdgIn: filtered.filter(t => t.type === 'exchange' && t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
-      exchangeEgpIn: filtered.filter(t => t.type === 'exchange' && t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
-      
-      // Wallet Volume
-      walletDeposit: filtered.filter(t => t.type === 'wallet_deposit').reduce((sum, t) => sum + t.from_amount, 0),
-      walletWithdraw: filtered.filter(t => t.type === 'wallet_withdrawal').reduce((sum, t) => sum + t.from_amount, 0),
-      walletCommission: filtered.reduce((sum, t) => sum + (t.commission || 0), 0),
 
-      // Expenses
-      expensesEgp: filtered.filter(t => t.type === 'expense' && t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
-      expensesSdg: filtered.filter(t => t.type === 'expense' && t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
+  // --- Derived Lists for Breakdown ---
+  const lists = {
+      exchangeSdg: filtered.filter(t => t.type === 'exchange' && t.from_currency === 'SDG'),
+      exchangeEgp: filtered.filter(t => t.type === 'exchange' && t.from_currency === 'EGP'),
+      walletDep: filtered.filter(t => t.type === 'wallet_deposit'),
+      walletWith: filtered.filter(t => t.type === 'wallet_withdrawal'),
+      commissions: filtered.filter(t => (t.commission || 0) > 0),
+      expEgp: filtered.filter(t => t.type === 'expense' && t.from_currency === 'EGP'),
+      expSdg: filtered.filter(t => t.type === 'expense' && t.from_currency === 'SDG'),
   };
 
-  const getExpenseDetails = () => {
-    if (!expenseDetailCurrency) return [];
-    return filtered.filter(t => t.type === 'expense' && t.from_currency === expenseDetailCurrency);
+  const totals = {
+      exchangeSdg: lists.exchangeSdg.reduce((s, t) => s + t.from_amount, 0),
+      exchangeEgp: lists.exchangeEgp.reduce((s, t) => s + t.from_amount, 0),
+      walletDep: lists.walletDep.reduce((s, t) => s + t.from_amount, 0),
+      walletWith: lists.walletWith.reduce((s, t) => s + t.from_amount, 0),
+      commissions: lists.commissions.reduce((s, t) => s + (t.commission || 0), 0),
+      expEgp: lists.expEgp.reduce((s, t) => s + t.from_amount, 0),
+      expSdg: lists.expSdg.reduce((s, t) => s + t.from_amount, 0),
+  };
+
+  const openDetail = (
+      title: string, 
+      transactions: Transaction[], 
+      total: number, 
+      currency: string, 
+      theme: DetailViewData['theme'],
+      valueKey: 'from_amount' | 'commission' = 'from_amount'
+  ) => {
+      setDetailView({ title, transactions, total, currency, theme, valueKey });
   };
 
   const handleExport = () => {
@@ -174,10 +194,68 @@ const Reports: React.FC = () => {
   const getTxColor = (type: string) => {
        if (type === 'exchange') return 'bg-blue-100 text-blue-700';
        if (type === 'expense') return 'bg-orange-100 text-orange-700';
-       if (type === 'wallet_deposit') return 'bg-green-100 text-green-700'; // Cash In
-       if (type === 'wallet_withdrawal') return 'bg-red-100 text-red-700'; // Cash Out (to customer)
+       if (type === 'wallet_deposit') return 'bg-green-100 text-green-700';
+       if (type === 'wallet_withdrawal') return 'bg-red-100 text-red-700';
        if (type.includes('withdraw')) return 'bg-red-100 text-red-700';
        return 'bg-gray-100 text-gray-700';
+  };
+
+  // Reusable Summary Card Component
+  const SummaryCard = ({ 
+    title, 
+    amount, 
+    currency, 
+    icon: Icon, 
+    theme, 
+    onClick 
+  }: { 
+    title: string, 
+    amount: number, 
+    currency: string, 
+    icon: any, 
+    theme: 'blue' | 'green' | 'red' | 'orange' | 'purple' | 'indigo', 
+    onClick: () => void 
+  }) => {
+      const themes = {
+          blue: 'bg-blue-50 border-blue-100 text-blue-700 hover:border-blue-300',
+          green: 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:border-emerald-300',
+          red: 'bg-red-50 border-red-100 text-red-700 hover:border-red-300',
+          orange: 'bg-orange-50 border-orange-100 text-orange-700 hover:border-orange-300',
+          purple: 'bg-purple-50 border-purple-100 text-purple-700 hover:border-purple-300',
+          indigo: 'bg-indigo-50 border-indigo-100 text-indigo-700 hover:border-indigo-300',
+      };
+
+      const iconThemes = {
+          blue: 'bg-blue-200 text-blue-700',
+          green: 'bg-emerald-200 text-emerald-700',
+          red: 'bg-red-200 text-red-700',
+          orange: 'bg-orange-200 text-orange-700',
+          purple: 'bg-purple-200 text-purple-700',
+          indigo: 'bg-indigo-200 text-indigo-700',
+      };
+
+      return (
+          <div 
+            onClick={onClick}
+            className={`p-5 rounded-2xl border transition-all cursor-pointer shadow-sm hover:shadow-md active:scale-95 group ${themes[theme]}`}
+          >
+              <div className="flex justify-between items-start mb-3">
+                  <div className={`p-3 rounded-xl ${iconThemes[theme]}`}>
+                      <Icon size={24} />
+                  </div>
+                  <div className="bg-white/60 p-1 rounded-full opacity-0 group-hover:opacity-100 transition">
+                      <ChevronLeft size={20} />
+                  </div>
+              </div>
+              <div>
+                  <h4 className="font-bold text-sm opacity-80 mb-1">{title}</h4>
+                  <p className="text-2xl font-black tracking-tight" dir="ltr">
+                      {amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} 
+                      <span className="text-xs font-bold opacity-60 ml-1">{currency}</span>
+                  </p>
+              </div>
+          </div>
+      );
   };
 
   return (
@@ -264,95 +342,105 @@ const Reports: React.FC = () => {
             </button>
         </div>
 
-        {/* Detailed Breakdown Tab */}
+        {/* ================= Detailed Breakdown Tab ================= */}
         {activeTab === 'breakdown' && (
-             <div className="space-y-4 animate-in fade-in duration-300">
-                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <FileText size={24} className="text-blue-600" />
-                        إحصائيات الفترة المحددة
+             <div className="space-y-6 animate-in fade-in duration-300">
+                 
+                 {/* Section: Exchange */}
+                 <div className="space-y-3">
+                    <h3 className="text-gray-500 font-bold text-sm flex items-center gap-2 px-1">
+                        <ArrowRightLeft size={16}/> عمليات الصرف (شراء)
                     </h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {/* Expenses Stats */}
-                        <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 col-span-1 lg:col-span-3">
-                            <h4 className="font-bold text-orange-800 mb-3 flex items-center gap-2 text-lg">
-                                <TrendingUp size={20}/> إجمالي المنصرفات
-                            </h4>
-                            <div className="flex flex-wrap gap-8">
-                                <div 
-                                    onClick={() => setExpenseDetailCurrency('EGP')}
-                                    className="bg-white/60 p-3 rounded-xl min-w-[150px] cursor-pointer hover:bg-white transition-colors border border-transparent hover:border-orange-200 group"
-                                >
-                                    <span className="text-xs text-orange-600 font-bold mb-1 flex items-center gap-1 group-hover:underline">منصرفات مصري <Eye size={12}/></span>
-                                    <span className="text-2xl font-black text-gray-800" dir="ltr">{stats.expensesEgp.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm text-gray-400">EGP</span></span>
-                                </div>
-                                <div 
-                                    onClick={() => setExpenseDetailCurrency('SDG')}
-                                    className="bg-white/60 p-3 rounded-xl min-w-[150px] cursor-pointer hover:bg-white transition-colors border border-transparent hover:border-orange-200 group"
-                                >
-                                    <span className="text-xs text-orange-600 font-bold mb-1 flex items-center gap-1 group-hover:underline">منصرفات سوداني <Eye size={12}/></span>
-                                    <span className="text-2xl font-black text-gray-800" dir="ltr">{stats.expensesSdg.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm text-gray-400">SDG</span></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Exchange Stats */}
-                        <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 col-span-1 lg:col-span-2">
-                             <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2 text-lg">
-                                <ArrowRightLeft size={20}/> حركة الصرف (شراء)
-                            </h4>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <span className="text-xs text-blue-600 font-bold block">مقبوضات سوداني</span>
-                                    <span className="text-xl font-black text-gray-800" dir="ltr">{stats.exchangeSdgIn.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs text-gray-400">SDG</span></span>
-                                </div>
-                                <div>
-                                    <span className="text-xs text-blue-600 font-bold block">مقبوضات مصري</span>
-                                    <span className="text-xl font-black text-gray-800" dir="ltr">{stats.exchangeEgpIn.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs text-gray-400">EGP</span></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Wallet Commission */}
-                        <div className="bg-green-50 p-5 rounded-2xl border border-green-100">
-                            <h4 className="font-bold text-green-800 mb-3 flex items-center gap-2 text-lg">
-                                <Calculator size={20} /> عمولات المحافظ
-                            </h4>
-                            <div className="text-3xl font-black text-green-700" dir="ltr">{stats.walletCommission.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm">EGP</span></div>
-                        </div>
-
-                        {/* Wallet Volume */}
-                         <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200 col-span-1 lg:col-span-3">
-                             <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2 text-lg">
-                                <Wallet size={20}/> حركة المحافظ الإلكترونية
-                            </h4>
-                            <div className="flex flex-wrap gap-8">
-                                 <div>
-                                    <span className="text-xs text-green-600 font-bold block flex items-center gap-1"><ArrowDownLeft size={12}/> إيداعات (استلام كاش)</span>
-                                    <span className="text-xl font-bold text-gray-800" dir="ltr">{stats.walletDeposit.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
-                                </div>
-                                <div>
-                                    <span className="text-xs text-red-600 font-bold block flex items-center gap-1"><ArrowUpRight size={12}/> سحوبات (دفع كاش)</span>
-                                    <span className="text-xl font-bold text-gray-800" dir="ltr">{stats.walletWithdraw.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
-                                </div>
-                            </div>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <SummaryCard 
+                            title="مقبوضات سوداني (شراء مصري)" 
+                            amount={totals.exchangeSdg} 
+                            currency="SDG" 
+                            icon={ArrowDownLeft} 
+                            theme="blue"
+                            onClick={() => openDetail('مقبوضات سوداني', lists.exchangeSdg, totals.exchangeSdg, 'SDG', 'blue')}
+                        />
+                         <SummaryCard 
+                            title="مقبوضات مصري (شراء سوداني)" 
+                            amount={totals.exchangeEgp} 
+                            currency="EGP" 
+                            icon={ArrowDownLeft} 
+                            theme="indigo"
+                            onClick={() => openDetail('مقبوضات مصري', lists.exchangeEgp, totals.exchangeEgp, 'EGP', 'indigo')}
+                        />
                     </div>
+                 </div>
 
-                    <div className="pt-4 mt-6 border-t text-sm text-gray-500 text-center">
-                        عدد العمليات الإجمالي: <b className="text-gray-900">{stats.count}</b> عملية
+                 {/* Section: Wallets */}
+                 <div className="space-y-3">
+                    <h3 className="text-gray-500 font-bold text-sm flex items-center gap-2 px-1">
+                        <Wallet size={16}/> المحافظ الإلكترونية
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <SummaryCard 
+                            title="صافي العمولات" 
+                            amount={totals.commissions} 
+                            currency="EGP" 
+                            icon={Coins} 
+                            theme="purple"
+                            onClick={() => openDetail('عمولات المحافظ', lists.commissions, totals.commissions, 'EGP', 'purple', 'commission')}
+                        />
+                        <SummaryCard 
+                            title="إيداعات (استلام كاش)" 
+                            amount={totals.walletDep} 
+                            currency="EGP" 
+                            icon={ArrowDownLeft} 
+                            theme="green"
+                            onClick={() => openDetail('إيداعات المحافظ', lists.walletDep, totals.walletDep, 'EGP', 'green')}
+                        />
+                        <SummaryCard 
+                            title="سحوبات (دفع كاش)" 
+                            amount={totals.walletWith} 
+                            currency="EGP" 
+                            icon={ArrowUpRight} 
+                            theme="red"
+                            onClick={() => openDetail('سحوبات المحافظ', lists.walletWith, totals.walletWith, 'EGP', 'red')}
+                        />
                     </div>
+                 </div>
+
+                 {/* Section: Expenses */}
+                 <div className="space-y-3">
+                    <h3 className="text-gray-500 font-bold text-sm flex items-center gap-2 px-1">
+                        <TrendingDown size={16}/> المصروفات
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <SummaryCard 
+                            title="مصروفات (مصري)" 
+                            amount={totals.expEgp} 
+                            currency="EGP" 
+                            icon={FileText} 
+                            theme="orange"
+                            onClick={() => openDetail('مصروفات (EGP)', lists.expEgp, totals.expEgp, 'EGP', 'orange')}
+                        />
+                         <SummaryCard 
+                            title="مصروفات (سوداني)" 
+                            amount={totals.expSdg} 
+                            currency="SDG" 
+                            icon={FileText} 
+                            theme="orange"
+                            onClick={() => openDetail('مصروفات (SDG)', lists.expSdg, totals.expSdg, 'SDG', 'orange')}
+                        />
+                    </div>
+                 </div>
+
+                 <div className="pt-4 text-center text-gray-400 text-sm">
+                     عدد العمليات: {filtered.length}
                  </div>
              </div>
         )}
 
-        {/* All Transactions Log */}
+        {/* ================= All Transactions Log ================= */}
         {activeTab === 'transactions' && (
             <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-in fade-in duration-300">
                 <div className="p-4 bg-gray-50 font-bold border-b text-sm text-gray-700 flex justify-between items-center">
                     <span>سجل كل العمليات</span>
-                    <span className="text-xs font-normal bg-white px-2 py-1 rounded border shadow-sm">{stats.count} عملية</span>
+                    <span className="text-xs font-normal bg-white px-2 py-1 rounded border shadow-sm">{filtered.length} عملية</span>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-right text-sm">
@@ -387,7 +475,7 @@ const Reports: React.FC = () => {
                                         </span>
                                     </td>
 
-                                    {/* Financial Details (The Smart Column) */}
+                                    {/* Financial Details */}
                                     <td className="p-4">
                                         {t.type === 'exchange' ? (
                                             <div className="flex flex-col gap-1 text-xs">
@@ -404,7 +492,6 @@ const Reports: React.FC = () => {
                                         ) : t.type === 'expense' ? (
                                             <div className="flex flex-col gap-1">
                                                 <span className="font-bold text-red-600 text-sm" dir="ltr">-{Math.round(t.from_amount).toLocaleString()} {t.from_currency}</span>
-                                                <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md w-fit">{t.description}</span>
                                             </div>
                                         ) : ['wallet_deposit', 'wallet_withdrawal', 'wallet_feed'].includes(t.type) ? (
                                             <div className="flex flex-col gap-1">
@@ -414,7 +501,6 @@ const Reports: React.FC = () => {
                                                 {t.commission ? <span className="text-[10px] text-green-600">+ {t.commission} عمولة</span> : null}
                                             </div>
                                         ) : (
-                                            // Treasury Ops
                                             <div className="flex flex-col gap-1">
                                                 <span className={`font-bold text-sm ${t.type.includes('withdraw') ? 'text-red-600' : 'text-green-600'}`} dir="ltr">
                                                      {t.type.includes('withdraw') ? '-' : '+'}{Math.round(t.from_amount).toLocaleString()} {t.from_currency}
@@ -427,7 +513,7 @@ const Reports: React.FC = () => {
                                     <td className="p-4 text-sm text-gray-600">
                                         <div className="flex flex-col gap-1">
                                             {t.receipt_number && <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-xs text-gray-500 w-fit">#{t.receipt_number}</span>}
-                                            {t.type !== 'expense' && t.description && <span className="text-xs italic truncate max-w-[150px]">{t.description}</span>}
+                                            {t.description && <span className="text-xs italic truncate max-w-[150px]">{t.description}</span>}
                                         </div>
                                     </td>
 
@@ -473,53 +559,82 @@ const Reports: React.FC = () => {
             />
         )}
 
-        {/* Expense Details Modal */}
-        {expenseDetailCurrency && (
-            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom-4">
-                    <div className="p-4 border-b flex justify-between items-center bg-orange-50 rounded-t-2xl">
-                        <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                            <FileText size={20} className="text-orange-600"/> 
-                            تفاصيل منصرفات {expenseDetailCurrency === 'EGP' ? 'مصري (EGP)' : 'سوداني (SDG)'}
-                        </h3>
-                        <button onClick={() => setExpenseDetailCurrency(null)} className="p-2 hover:bg-black/5 rounded-full">
-                            <X size={20} className="text-gray-500" />
+        {/* Detailed List Modal */}
+        {detailView && (
+            <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom-4">
+                    {/* Header */}
+                    <div className={`p-5 border-b rounded-t-2xl flex justify-between items-center bg-gray-50`}>
+                        <div>
+                            <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2">
+                                <PieChart size={20} className="text-gray-500"/> 
+                                {detailView.title}
+                            </h3>
+                            <p className="text-xs text-gray-500 mt-1">
+                                الفترة من {new Date(startDate).toLocaleDateString('ar-EG')} إلى {new Date(endDate).toLocaleDateString('ar-EG')}
+                            </p>
+                        </div>
+                        <button onClick={() => setDetailView(null)} className="p-2 hover:bg-gray-200 rounded-full transition">
+                            <X size={20} className="text-gray-600" />
                         </button>
                     </div>
                     
+                    {/* List */}
                     <div className="flex-1 overflow-y-auto p-4">
                         <table className="w-full text-sm text-right">
-                            <thead className="bg-gray-50 text-gray-500 font-bold sticky top-0">
+                            <thead className="bg-gray-50 text-gray-500 font-bold sticky top-0 z-10">
                                 <tr>
                                     <th className="p-3 rounded-r-lg">التاريخ</th>
                                     <th className="p-3">الموظف</th>
-                                    <th className="p-3">الوصف</th>
-                                    <th className="p-3 rounded-l-lg">المبلغ</th>
+                                    <th className="p-3">البيان / الوصف</th>
+                                    <th className="p-3 rounded-l-lg text-left">المبلغ</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {getExpenseDetails().map(t => (
-                                    <tr key={t.id} className="hover:bg-gray-50">
-                                        <td className="p-3 whitespace-nowrap">
-                                            <div className="font-bold">{new Date(t.created_at).toLocaleDateString('ar-EG')}</div>
-                                            <div className="text-xs text-gray-400">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
-                                        </td>
-                                        <td className="p-3 font-medium">{getEmployeeName(t.employee_id)}</td>
-                                        <td className="p-3 text-gray-600">{t.description}</td>
-                                        <td className="p-3 font-bold text-red-600" dir="ltr">-{Math.round(t.from_amount).toLocaleString()}</td>
-                                    </tr>
-                                ))}
-                                 {getExpenseDetails().length === 0 && (
+                                {detailView.transactions.map(t => {
+                                    const amount = detailView.valueKey === 'commission' ? (t.commission || 0) : t.from_amount;
+                                    return (
+                                        <tr key={t.id} className="hover:bg-gray-50 transition">
+                                            <td className="p-3 whitespace-nowrap">
+                                                <div className="font-bold text-gray-800">{new Date(t.created_at).toLocaleDateString('ar-EG')}</div>
+                                                <div className="text-xs text-gray-400 font-mono">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
+                                            </td>
+                                            <td className="p-3 font-medium text-gray-700">{getEmployeeName(t.employee_id)}</td>
+                                            <td className="p-3">
+                                                <div className="text-gray-600 text-xs font-medium bg-gray-100 w-fit px-2 py-1 rounded">
+                                                    {t.description || getTxTypeLabel(t.type)}
+                                                </div>
+                                                {t.receipt_number && <div className="text-[10px] text-gray-400 mt-1">#{t.receipt_number}</div>}
+                                            </td>
+                                            <td className="p-3 text-left">
+                                                <span className="font-bold text-gray-900" dir="ltr">
+                                                    {Math.round(amount).toLocaleString()}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                 {detailView.transactions.length === 0 && (
                                     <tr>
-                                        <td colSpan={4} className="text-center p-8 text-gray-400">لا توجد تفاصيل</td>
+                                        <td colSpan={4} className="text-center p-12 text-gray-400">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <Filter size={32} className="opacity-20"/>
+                                                <span>لا توجد تفاصيل لهذه الفترة</span>
+                                            </div>
+                                        </td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
                     
-                    <div className="p-4 border-t bg-gray-50 rounded-b-2xl text-center text-sm text-gray-500">
-                        إجمالي المبلغ: <span className="font-bold text-gray-800 mx-1">{getExpenseDetails().reduce((sum, t) => sum + t.from_amount, 0).toLocaleString()}</span> {expenseDetailCurrency}
+                    {/* Footer */}
+                    <div className="p-5 border-t bg-gray-50 rounded-b-2xl flex justify-between items-center">
+                        <span className="text-gray-500 font-medium">الإجمالي الكلي:</span>
+                        <div className="text-xl font-black text-gray-900 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+                            {detailView.total.toLocaleString(undefined, { maximumFractionDigits: 0 })} 
+                            <span className="text-sm font-bold text-gray-400 ml-1">{detailView.currency}</span>
+                        </div>
                     </div>
                 </div>
             </div>
