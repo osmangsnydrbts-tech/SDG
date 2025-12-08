@@ -1,7 +1,12 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Download, Filter, Calculator, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, TrendingUp, Wallet, Banknote, ArrowRightLeft, ArrowUpRight, ArrowDownLeft, X, ChevronLeft, Coins, PieChart } from 'lucide-react';
+import { 
+  FileText, Download, Filter, Search, Eye, Trash2, Calendar, 
+  ListFilter, TrendingDown, Wallet, ArrowRightLeft, 
+  ArrowUpRight, ArrowDownLeft, X, ChevronLeft, Coins, PieChart,
+  Banknote, ArrowUpCircle, ArrowDownCircle, Activity
+} from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -12,7 +17,7 @@ interface DetailViewData {
   transactions: Transaction[];
   total: number;
   currency: string;
-  theme: 'blue' | 'green' | 'red' | 'orange' | 'purple' | 'indigo';
+  theme: 'blue' | 'green' | 'red' | 'orange' | 'purple' | 'indigo' | 'teal';
   valueKey: 'from_amount' | 'commission';
 }
 
@@ -42,8 +47,7 @@ const Reports: React.FC = () => {
   const handleDelete = async (id: number) => {
       if (window.confirm('هل أنت متأكد من حذف هذه العملية؟ سيتم عكس التأثير المالي على الخزينة.')) {
           await deleteTransaction(id);
-          // If detailed view is open, close it to avoid stale data
-          setDetailView(null);
+          setDetailView(null); // Close detail view to prevent stale data
       }
   };
 
@@ -118,19 +122,26 @@ const Reports: React.FC = () => {
   const lists = {
       exchangeSdg: filtered.filter(t => t.type === 'exchange' && t.from_currency === 'SDG'),
       exchangeEgp: filtered.filter(t => t.type === 'exchange' && t.from_currency === 'EGP'),
+      
       walletDep: filtered.filter(t => t.type === 'wallet_deposit'),
       walletWith: filtered.filter(t => t.type === 'wallet_withdrawal'),
       commissions: filtered.filter(t => (t.commission || 0) > 0),
+      
       expEgp: filtered.filter(t => t.type === 'expense' && t.from_currency === 'EGP'),
       expSdg: filtered.filter(t => t.type === 'expense' && t.from_currency === 'SDG'),
+
+      treasuryIn: filtered.filter(t => t.type === 'treasury_feed'),
+      treasuryOut: filtered.filter(t => t.type === 'treasury_withdraw'),
   };
 
   const totals = {
       exchangeSdg: lists.exchangeSdg.reduce((s, t) => s + t.from_amount, 0),
       exchangeEgp: lists.exchangeEgp.reduce((s, t) => s + t.from_amount, 0),
+      
       walletDep: lists.walletDep.reduce((s, t) => s + t.from_amount, 0),
       walletWith: lists.walletWith.reduce((s, t) => s + t.from_amount, 0),
       commissions: lists.commissions.reduce((s, t) => s + (t.commission || 0), 0),
+      
       expEgp: lists.expEgp.reduce((s, t) => s + t.from_amount, 0),
       expSdg: lists.expSdg.reduce((s, t) => s + t.from_amount, 0),
   };
@@ -200,10 +211,11 @@ const Reports: React.FC = () => {
        return 'bg-gray-100 text-gray-700';
   };
 
-  // Reusable Summary Card Component
+  // --- REUSABLE CARD COMPONENT ---
   const SummaryCard = ({ 
     title, 
     amount, 
+    count,
     currency, 
     icon: Icon, 
     theme, 
@@ -211,48 +223,52 @@ const Reports: React.FC = () => {
   }: { 
     title: string, 
     amount: number, 
+    count: number,
     currency: string, 
     icon: any, 
-    theme: 'blue' | 'green' | 'red' | 'orange' | 'purple' | 'indigo', 
+    theme: 'blue' | 'green' | 'red' | 'orange' | 'purple' | 'indigo' | 'teal', 
     onClick: () => void 
   }) => {
       const themes = {
-          blue: 'bg-blue-50 border-blue-100 text-blue-700 hover:border-blue-300',
-          green: 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:border-emerald-300',
-          red: 'bg-red-50 border-red-100 text-red-700 hover:border-red-300',
-          orange: 'bg-orange-50 border-orange-100 text-orange-700 hover:border-orange-300',
-          purple: 'bg-purple-50 border-purple-100 text-purple-700 hover:border-purple-300',
-          indigo: 'bg-indigo-50 border-indigo-100 text-indigo-700 hover:border-indigo-300',
+          blue: { bg: 'bg-blue-500', text: 'text-blue-600', light: 'bg-blue-50' },
+          green: { bg: 'bg-emerald-500', text: 'text-emerald-600', light: 'bg-emerald-50' },
+          red: { bg: 'bg-red-500', text: 'text-red-600', light: 'bg-red-50' },
+          orange: { bg: 'bg-orange-500', text: 'text-orange-600', light: 'bg-orange-50' },
+          purple: { bg: 'bg-purple-500', text: 'text-purple-600', light: 'bg-purple-50' },
+          indigo: { bg: 'bg-indigo-500', text: 'text-indigo-600', light: 'bg-indigo-50' },
+          teal: { bg: 'bg-teal-500', text: 'text-teal-600', light: 'bg-teal-50' },
       };
 
-      const iconThemes = {
-          blue: 'bg-blue-200 text-blue-700',
-          green: 'bg-emerald-200 text-emerald-700',
-          red: 'bg-red-200 text-red-700',
-          orange: 'bg-orange-200 text-orange-700',
-          purple: 'bg-purple-200 text-purple-700',
-          indigo: 'bg-indigo-200 text-indigo-700',
-      };
+      const t = themes[theme];
 
       return (
           <div 
             onClick={onClick}
-            className={`p-5 rounded-2xl border transition-all cursor-pointer shadow-sm hover:shadow-md active:scale-95 group ${themes[theme]}`}
+            className="relative bg-white p-5 rounded-2xl shadow-sm border border-gray-100 cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group overflow-hidden"
           >
-              <div className="flex justify-between items-start mb-3">
-                  <div className={`p-3 rounded-xl ${iconThemes[theme]}`}>
-                      <Icon size={24} />
+              <div className={`absolute left-0 top-0 bottom-0 w-1 ${t.bg}`}></div>
+              <div className="flex justify-between items-start mb-4">
+                  <div className={`p-3 rounded-xl ${t.light} ${t.text} transition-colors`}>
+                      <Icon size={26} />
                   </div>
-                  <div className="bg-white/60 p-1 rounded-full opacity-0 group-hover:opacity-100 transition">
-                      <ChevronLeft size={20} />
+                  <div className="text-right">
+                      <span className="text-xs font-bold text-gray-400 block mb-0.5">عدد العمليات</span>
+                      <span className="text-sm font-bold text-gray-600 bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-100">{count}</span>
                   </div>
               </div>
+              
               <div>
-                  <h4 className="font-bold text-sm opacity-80 mb-1">{title}</h4>
-                  <p className="text-2xl font-black tracking-tight" dir="ltr">
-                      {amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} 
-                      <span className="text-xs font-bold opacity-60 ml-1">{currency}</span>
-                  </p>
+                  <h4 className="text-gray-500 text-sm font-bold mb-1">{title}</h4>
+                  <div className="flex items-baseline gap-1">
+                      <p className="text-2xl font-black text-gray-800 tracking-tight" dir="ltr">
+                          {amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </p>
+                      <span className="text-xs font-bold text-gray-400">{currency}</span>
+                  </div>
+              </div>
+
+              <div className="absolute right-0 bottom-0 opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none">
+                  <Icon size={80} className={t.text} />
               </div>
           </div>
       );
@@ -261,186 +277,181 @@ const Reports: React.FC = () => {
   return (
     <div className="space-y-6">
         {/* Controls Section */}
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-4">
-            <div className="flex justify-between items-center">
-                <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                    <Filter size={20} className="text-blue-600" /> فلترة التقارير
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+            <div className="flex flex-wrap justify-between items-center gap-4">
+                <h2 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
+                    <PieChart size={24} className="text-blue-600" /> تقارير الأداء المالي
                 </h2>
-                <button 
-                    onClick={handleExport}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-green-700 transition shadow-sm"
-                >
-                    <Download size={16} /> تصدير Excel
-                </button>
+                <div className="flex gap-2">
+                     <div className="flex bg-gray-100 p-1 rounded-lg">
+                        <button 
+                            onClick={() => setActiveTab('breakdown')} 
+                            className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'breakdown' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}
+                        >
+                            <Activity size={16} className="inline-block ml-1"/> الملخص
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('transactions')} 
+                            className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'transactions' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}
+                        >
+                            <ListFilter size={16} className="inline-block ml-1"/> السجل
+                        </button>
+                    </div>
+                    <button 
+                        onClick={handleExport}
+                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-emerald-700 transition shadow-sm font-bold"
+                    >
+                        <Download size={18} /> تصدير
+                    </button>
+                </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2 border-t border-gray-50">
                 {/* Search */}
-                <div className="relative md:col-span-4">
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-3">
+                <div className="md:col-span-4 relative">
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                         <Search size={18} className="text-gray-400" />
                     </span>
                     <input 
                         type="text" 
-                        placeholder="بحث (اسم الموظف، رقم الإشعار، الوصف...)" 
+                        placeholder="بحث (اسم، رقم، بيان...)" 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pr-10 pl-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition"
+                        className="w-full pr-10 pl-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition"
                     />
                 </div>
 
                 {/* Date Range */}
-                <div className="md:col-span-2 space-y-2">
-                    <label className="text-xs text-gray-500 font-bold flex items-center gap-1"><Calendar size={14}/> الفترة الزمنية</label>
-                    <div className="flex gap-2 items-center">
-                        <input 
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="flex-1 p-2 border rounded-lg bg-gray-50 text-sm"
-                        />
-                        <span className="text-gray-400">إلى</span>
-                        <input 
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="flex-1 p-2 border rounded-lg bg-gray-50 text-sm"
-                        />
-                    </div>
-                    <div className="flex gap-2 text-xs">
-                        <button onClick={setFilterToday} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100">اليوم</button>
-                        <button onClick={setFilterMonth} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100">هذا الشهر</button>
-                        <button onClick={setFilterAll} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200">الكل</button>
-                    </div>
+                <div className="md:col-span-5 flex gap-2 items-center bg-gray-50 p-1 rounded-xl border border-gray-200">
+                    <input 
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="flex-1 bg-transparent border-none text-sm focus:ring-0 p-1"
+                    />
+                    <span className="text-gray-300">|</span>
+                    <input 
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="flex-1 bg-transparent border-none text-sm focus:ring-0 p-1"
+                    />
                 </div>
 
-                {/* Type Filter */}
-                <div className="md:col-span-2 space-y-2">
-                    <label className="text-xs text-gray-500 font-bold flex items-center gap-1"><ListFilter size={14}/> نوع العملية</label>
-                    <select 
-                        value={selectedType} 
-                        onChange={(e) => setSelectedType(e.target.value)}
-                        className="w-full p-2 border rounded-lg bg-gray-50 text-sm h-[40px]"
-                    >
-                        <option value="all">عرض كل العمليات</option>
-                        <option value="exchange">صرف عملة فقط</option>
-                        <option value="expense">منصرفات فقط</option>
-                        <option value="e_wallet">محافظ إلكترونية</option>
-                        <option value="treasury">حركة خزينة</option>
-                    </select>
+                {/* Quick Filters */}
+                <div className="md:col-span-3 flex gap-2 justify-end">
+                    <button onClick={setFilterToday} className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 text-xs font-bold rounded-xl hover:bg-blue-100 transition">اليوم</button>
+                    <button onClick={setFilterMonth} className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 text-xs font-bold rounded-xl hover:bg-blue-100 transition">الشهر</button>
+                    <button onClick={setFilterAll} className="flex-1 px-3 py-2 bg-gray-100 text-gray-600 text-xs font-bold rounded-xl hover:bg-gray-200 transition">الكل</button>
                 </div>
             </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex bg-white p-1 rounded-xl border border-gray-200">
-            <button onClick={() => setActiveTab('breakdown')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg transition ${activeTab === 'breakdown' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
-                الملخص المالي
-            </button>
-            <button onClick={() => setActiveTab('transactions')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg transition ${activeTab === 'transactions' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
-                سجل العمليات (الكل)
-            </button>
-        </div>
-
         {/* ================= Detailed Breakdown Tab ================= */}
         {activeTab === 'breakdown' && (
-             <div className="space-y-6 animate-in fade-in duration-300">
+             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                  
                  {/* Section: Exchange */}
-                 <div className="space-y-3">
-                    <h3 className="text-gray-500 font-bold text-sm flex items-center gap-2 px-1">
-                        <ArrowRightLeft size={16}/> عمليات الصرف (شراء)
+                 <div>
+                    <h3 className="text-gray-700 font-extrabold text-lg mb-4 flex items-center gap-2">
+                        <div className="bg-blue-100 p-2 rounded-lg text-blue-600"><ArrowRightLeft size={20}/></div>
+                        عمليات الصرف (بيع وشراء)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                         <SummaryCard 
-                            title="مقبوضات سوداني (شراء مصري)" 
+                            title="شراء مصري (مقبوضات سوداني)" 
                             amount={totals.exchangeSdg} 
+                            count={lists.exchangeSdg.length}
                             currency="SDG" 
-                            icon={ArrowDownLeft} 
-                            theme="blue"
-                            onClick={() => openDetail('مقبوضات سوداني', lists.exchangeSdg, totals.exchangeSdg, 'SDG', 'blue')}
+                            icon={Banknote} 
+                            theme="indigo"
+                            onClick={() => openDetail('مقبوضات سوداني (شراء مصري)', lists.exchangeSdg, totals.exchangeSdg, 'SDG', 'indigo')}
                         />
                          <SummaryCard 
-                            title="مقبوضات مصري (شراء سوداني)" 
+                            title="شراء سوداني (مقبوضات مصري)" 
                             amount={totals.exchangeEgp} 
+                            count={lists.exchangeEgp.length}
                             currency="EGP" 
-                            icon={ArrowDownLeft} 
-                            theme="indigo"
-                            onClick={() => openDetail('مقبوضات مصري', lists.exchangeEgp, totals.exchangeEgp, 'EGP', 'indigo')}
+                            icon={Banknote} 
+                            theme="blue"
+                            onClick={() => openDetail('مقبوضات مصري (شراء سوداني)', lists.exchangeEgp, totals.exchangeEgp, 'EGP', 'blue')}
                         />
                     </div>
                  </div>
 
                  {/* Section: Wallets */}
-                 <div className="space-y-3">
-                    <h3 className="text-gray-500 font-bold text-sm flex items-center gap-2 px-1">
-                        <Wallet size={16}/> المحافظ الإلكترونية
+                 <div>
+                    <h3 className="text-gray-700 font-extrabold text-lg mb-4 flex items-center gap-2">
+                        <div className="bg-purple-100 p-2 rounded-lg text-purple-600"><Wallet size={20}/></div>
+                        المحافظ والتحويلات
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                         <SummaryCard 
-                            title="صافي العمولات" 
+                            title="صافي العمولات المكتسبة" 
                             amount={totals.commissions} 
+                            count={lists.commissions.length}
                             currency="EGP" 
                             icon={Coins} 
                             theme="purple"
                             onClick={() => openDetail('عمولات المحافظ', lists.commissions, totals.commissions, 'EGP', 'purple', 'commission')}
                         />
                         <SummaryCard 
-                            title="إيداعات (استلام كاش)" 
+                            title="إيداعات للعملاء (استلام كاش)" 
                             amount={totals.walletDep} 
+                            count={lists.walletDep.length}
                             currency="EGP" 
                             icon={ArrowDownLeft} 
                             theme="green"
-                            onClick={() => openDetail('إيداعات المحافظ', lists.walletDep, totals.walletDep, 'EGP', 'green')}
+                            onClick={() => openDetail('إيداعات المحافظ (وارد نقدية)', lists.walletDep, totals.walletDep, 'EGP', 'green')}
                         />
                         <SummaryCard 
-                            title="سحوبات (دفع كاش)" 
+                            title="سحوبات للعملاء (صرف كاش)" 
                             amount={totals.walletWith} 
+                            count={lists.walletWith.length}
                             currency="EGP" 
                             icon={ArrowUpRight} 
                             theme="red"
-                            onClick={() => openDetail('سحوبات المحافظ', lists.walletWith, totals.walletWith, 'EGP', 'red')}
+                            onClick={() => openDetail('سحوبات المحافظ (صادر نقدية)', lists.walletWith, totals.walletWith, 'EGP', 'red')}
                         />
                     </div>
                  </div>
 
                  {/* Section: Expenses */}
-                 <div className="space-y-3">
-                    <h3 className="text-gray-500 font-bold text-sm flex items-center gap-2 px-1">
-                        <TrendingDown size={16}/> المصروفات
+                 <div>
+                    <h3 className="text-gray-700 font-extrabold text-lg mb-4 flex items-center gap-2">
+                        <div className="bg-orange-100 p-2 rounded-lg text-orange-600"><TrendingDown size={20}/></div>
+                        المصروفات والتشغيل
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                         <SummaryCard 
-                            title="مصروفات (مصري)" 
+                            title="إجمالي المصروفات (مصري)" 
                             amount={totals.expEgp} 
+                            count={lists.expEgp.length}
                             currency="EGP" 
                             icon={FileText} 
                             theme="orange"
-                            onClick={() => openDetail('مصروفات (EGP)', lists.expEgp, totals.expEgp, 'EGP', 'orange')}
+                            onClick={() => openDetail('سجل المصروفات (EGP)', lists.expEgp, totals.expEgp, 'EGP', 'orange')}
                         />
                          <SummaryCard 
-                            title="مصروفات (سوداني)" 
+                            title="إجمالي المصروفات (سوداني)" 
                             amount={totals.expSdg} 
+                            count={lists.expSdg.length}
                             currency="SDG" 
                             icon={FileText} 
                             theme="orange"
-                            onClick={() => openDetail('مصروفات (SDG)', lists.expSdg, totals.expSdg, 'SDG', 'orange')}
+                            onClick={() => openDetail('سجل المصروفات (SDG)', lists.expSdg, totals.expSdg, 'SDG', 'orange')}
                         />
                     </div>
-                 </div>
-
-                 <div className="pt-4 text-center text-gray-400 text-sm">
-                     عدد العمليات: {filtered.length}
                  </div>
              </div>
         )}
 
         {/* ================= All Transactions Log ================= */}
         {activeTab === 'transactions' && (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-in fade-in duration-300">
-                <div className="p-4 bg-gray-50 font-bold border-b text-sm text-gray-700 flex justify-between items-center">
-                    <span>سجل كل العمليات</span>
-                    <span className="text-xs font-normal bg-white px-2 py-1 rounded border shadow-sm">{filtered.length} عملية</span>
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 animate-in fade-in duration-300">
+                <div className="p-5 bg-white border-b border-gray-100 flex justify-between items-center">
+                    <h3 className="font-bold text-gray-800">سجل العمليات التفصيلي</h3>
+                    <span className="text-xs font-bold bg-gray-100 text-gray-600 px-3 py-1 rounded-full">{filtered.length} عملية</span>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-right text-sm">
@@ -456,7 +467,7 @@ const Reports: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {filtered.map(t => (
-                                <tr key={t.id} className="hover:bg-blue-50/50 transition-colors">
+                                <tr key={t.id} className="hover:bg-blue-50/30 transition-colors group">
                                     {/* Date & Time */}
                                     <td className="p-4 text-gray-600 whitespace-nowrap">
                                         <div className="font-bold text-gray-900">{new Date(t.created_at).toLocaleDateString('ar-EG')}</div>
@@ -470,7 +481,7 @@ const Reports: React.FC = () => {
 
                                     {/* Type Badge */}
                                     <td className="p-4 whitespace-nowrap">
-                                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${getTxColor(t.type)}`}>
+                                        <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${getTxColor(t.type).replace('text-', 'border-').replace('bg-', 'bg-opacity-20 ')}`}>
                                             {getTxTypeLabel(t.type)}
                                         </span>
                                     </td>
@@ -480,14 +491,14 @@ const Reports: React.FC = () => {
                                         {t.type === 'exchange' ? (
                                             <div className="flex flex-col gap-1 text-xs">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-gray-400 w-4">من:</span>
+                                                    <span className="text-gray-400 w-6">من:</span>
                                                     <span className="font-bold text-gray-800 text-sm" dir="ltr">{Math.round(t.from_amount).toLocaleString()} {t.from_currency}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-gray-400 w-4">إلى:</span>
+                                                    <span className="text-gray-400 w-6">إلى:</span>
                                                     <span className="font-bold text-blue-600 text-sm" dir="ltr">{Math.round(t.to_amount || 0).toLocaleString()} {t.to_currency}</span>
                                                 </div>
-                                                <span className="text-[10px] text-gray-400 bg-gray-100 px-1 rounded w-fit">سعر: {t.rate}</span>
+                                                {t.rate && <span className="text-[10px] text-gray-400 bg-gray-50 px-1 rounded w-fit border">سعر: {t.rate}</span>}
                                             </div>
                                         ) : t.type === 'expense' ? (
                                             <div className="flex flex-col gap-1">
@@ -498,7 +509,7 @@ const Reports: React.FC = () => {
                                                 <span className={`font-bold text-sm ${t.type === 'wallet_withdrawal' ? 'text-red-600' : 'text-green-600'}`} dir="ltr">
                                                     {t.type === 'wallet_withdrawal' ? '-' : '+'}{Math.round(t.from_amount).toLocaleString()} {t.from_currency}
                                                 </span>
-                                                {t.commission ? <span className="text-[10px] text-green-600">+ {t.commission} عمولة</span> : null}
+                                                {t.commission ? <span className="text-[10px] text-green-600 bg-green-50 px-1 rounded w-fit">+ {t.commission} عمولة</span> : null}
                                             </div>
                                         ) : (
                                             <div className="flex flex-col gap-1">
@@ -512,19 +523,19 @@ const Reports: React.FC = () => {
                                     {/* Receipt / Notes */}
                                     <td className="p-4 text-sm text-gray-600">
                                         <div className="flex flex-col gap-1">
-                                            {t.receipt_number && <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-xs text-gray-500 w-fit">#{t.receipt_number}</span>}
-                                            {t.description && <span className="text-xs italic truncate max-w-[150px]">{t.description}</span>}
+                                            {t.receipt_number && <span className="font-mono bg-yellow-50 text-yellow-700 border border-yellow-100 px-2 py-0.5 rounded text-xs w-fit">#{t.receipt_number}</span>}
+                                            {t.description && <span className="text-xs italic truncate max-w-[150px] text-gray-500">{t.description}</span>}
                                         </div>
                                     </td>
 
                                     {/* Actions */}
                                     <td className="p-4 text-center">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <button onClick={() => setViewTransaction(t)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors" title="عرض الإشعار">
+                                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => setViewTransaction(t)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-colors" title="عرض الإشعار">
                                                 <Eye size={18} />
                                             </button>
                                             {currentUser?.role === 'admin' && (
-                                                <button onClick={() => handleDelete(t.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors" title="حذف العملية">
+                                                <button onClick={() => handleDelete(t.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors" title="حذف العملية">
                                                     <Trash2 size={18} />
                                                 </button>
                                             )}
@@ -561,53 +572,60 @@ const Reports: React.FC = () => {
 
         {/* Detailed List Modal */}
         {detailView && (
-            <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom-4">
+            <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4 animate-in fade-in duration-200 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom-6 border border-gray-200">
                     {/* Header */}
-                    <div className={`p-5 border-b rounded-t-2xl flex justify-between items-center bg-gray-50`}>
+                    <div className="p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/50 rounded-t-3xl">
                         <div>
-                            <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2">
-                                <PieChart size={20} className="text-gray-500"/> 
-                                {detailView.title}
-                            </h3>
-                            <p className="text-xs text-gray-500 mt-1">
-                                الفترة من {new Date(startDate).toLocaleDateString('ar-EG')} إلى {new Date(endDate).toLocaleDateString('ar-EG')}
+                            <div className="flex items-center gap-2 mb-1">
+                                <div className="bg-blue-600 w-1 h-6 rounded-full"></div>
+                                <h3 className="font-extrabold text-gray-800 text-xl">
+                                    {detailView.title}
+                                </h3>
+                            </div>
+                            <p className="text-sm text-gray-500 font-medium flex items-center gap-2">
+                                <Calendar size={14} />
+                                الفترة: {new Date(startDate).toLocaleDateString('ar-EG')} - {new Date(endDate).toLocaleDateString('ar-EG')}
                             </p>
                         </div>
-                        <button onClick={() => setDetailView(null)} className="p-2 hover:bg-gray-200 rounded-full transition">
-                            <X size={20} className="text-gray-600" />
+                        <button onClick={() => setDetailView(null)} className="p-2 hover:bg-red-50 hover:text-red-500 rounded-full transition text-gray-400">
+                            <X size={24} />
                         </button>
                     </div>
                     
                     {/* List */}
-                    <div className="flex-1 overflow-y-auto p-4">
+                    <div className="flex-1 overflow-y-auto p-0">
                         <table className="w-full text-sm text-right">
-                            <thead className="bg-gray-50 text-gray-500 font-bold sticky top-0 z-10">
+                            <thead className="bg-gray-50 text-gray-500 font-bold sticky top-0 z-10 shadow-sm">
                                 <tr>
-                                    <th className="p-3 rounded-r-lg">التاريخ</th>
-                                    <th className="p-3">الموظف</th>
-                                    <th className="p-3">البيان / الوصف</th>
-                                    <th className="p-3 rounded-l-lg text-left">المبلغ</th>
+                                    <th className="p-4 text-xs uppercase tracking-wider">التاريخ</th>
+                                    <th className="p-4 text-xs uppercase tracking-wider">الموظف</th>
+                                    <th className="p-4 text-xs uppercase tracking-wider">البيان / الوصف</th>
+                                    <th className="p-4 text-xs uppercase tracking-wider text-left">المبلغ ({detailView.currency})</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {detailView.transactions.map(t => {
+                            <tbody className="divide-y divide-gray-50">
+                                {detailView.transactions.map((t, idx) => {
                                     const amount = detailView.valueKey === 'commission' ? (t.commission || 0) : t.from_amount;
                                     return (
-                                        <tr key={t.id} className="hover:bg-gray-50 transition">
-                                            <td className="p-3 whitespace-nowrap">
+                                        <tr key={t.id} className={`hover:bg-blue-50/30 transition ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                                            <td className="p-4 whitespace-nowrap">
                                                 <div className="font-bold text-gray-800">{new Date(t.created_at).toLocaleDateString('ar-EG')}</div>
-                                                <div className="text-xs text-gray-400 font-mono">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
+                                                <div className="text-xs text-gray-400 font-mono mt-0.5">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
                                             </td>
-                                            <td className="p-3 font-medium text-gray-700">{getEmployeeName(t.employee_id)}</td>
-                                            <td className="p-3">
-                                                <div className="text-gray-600 text-xs font-medium bg-gray-100 w-fit px-2 py-1 rounded">
+                                            <td className="p-4 font-medium text-gray-700">{getEmployeeName(t.employee_id)}</td>
+                                            <td className="p-4">
+                                                <div className="text-gray-700 font-medium text-sm">
                                                     {t.description || getTxTypeLabel(t.type)}
                                                 </div>
-                                                {t.receipt_number && <div className="text-[10px] text-gray-400 mt-1">#{t.receipt_number}</div>}
+                                                {t.receipt_number && (
+                                                    <span className="inline-block mt-1 text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                                                        #{t.receipt_number}
+                                                    </span>
+                                                )}
                                             </td>
-                                            <td className="p-3 text-left">
-                                                <span className="font-bold text-gray-900" dir="ltr">
+                                            <td className="p-4 text-left">
+                                                <span className="font-bold text-lg text-gray-900 font-mono" dir="ltr">
                                                     {Math.round(amount).toLocaleString()}
                                                 </span>
                                             </td>
@@ -616,10 +634,10 @@ const Reports: React.FC = () => {
                                 })}
                                  {detailView.transactions.length === 0 && (
                                     <tr>
-                                        <td colSpan={4} className="text-center p-12 text-gray-400">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <Filter size={32} className="opacity-20"/>
-                                                <span>لا توجد تفاصيل لهذه الفترة</span>
+                                        <td colSpan={4} className="text-center p-16 text-gray-400">
+                                            <div className="flex flex-col items-center gap-3">
+                                                <Filter size={40} className="opacity-20"/>
+                                                <span className="font-medium">لا توجد تفاصيل لهذه الفترة</span>
                                             </div>
                                         </td>
                                     </tr>
@@ -629,11 +647,16 @@ const Reports: React.FC = () => {
                     </div>
                     
                     {/* Footer */}
-                    <div className="p-5 border-t bg-gray-50 rounded-b-2xl flex justify-between items-center">
-                        <span className="text-gray-500 font-medium">الإجمالي الكلي:</span>
-                        <div className="text-xl font-black text-gray-900 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
-                            {detailView.total.toLocaleString(undefined, { maximumFractionDigits: 0 })} 
-                            <span className="text-sm font-bold text-gray-400 ml-1">{detailView.currency}</span>
+                    <div className="p-6 border-t bg-gray-50/80 rounded-b-3xl flex justify-between items-center backdrop-blur-sm">
+                        <div className="text-gray-500 font-medium text-sm">
+                            عدد العمليات: <span className="font-bold text-gray-800">{detailView.transactions.length}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-gray-600 font-bold">الإجمالي الكلي:</span>
+                            <div className="text-2xl font-black text-blue-600 bg-white px-5 py-2 rounded-xl shadow-sm border border-blue-100">
+                                {detailView.total.toLocaleString(undefined, { maximumFractionDigits: 0 })} 
+                                <span className="text-sm font-bold text-gray-400 ml-2 uppercase">{detailView.currency}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
