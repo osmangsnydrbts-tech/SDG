@@ -594,12 +594,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             await supabase.from('treasuries').update({ egp_balance: mainTreasury.egp_balance + amount }).eq('id', mainTreasury.id);
         }
         else if (transaction.type === 'wallet_deposit') {
-             // Deposit: (Amount + Commission) added to wallet
-             // Reverse: Remove from wallet
-             const amountToRemove = transaction.to_amount || transaction.from_amount;
+             // Deposit: (Amount + Commission) added to wallet. Cash was deducted from Employee Treasury.
+             // Reverse: Remove from wallet, Refund Employee Treasury.
+             const amountToRemove = transaction.to_amount || transaction.from_amount; // Wallet Balance Increase
+             const cashToRefund = transaction.from_amount; // Original Cash
+
              if (wallet.balance < amountToRemove) return { success: false, message: 'رصيد المحفظة لا يكفي للاسترداد' };
              
              await supabase.from('e_wallets').update({ balance: wallet.balance - amountToRemove }).eq('id', wallet.id);
+             
+             const empTreasury = treasuries.find(t => t.employee_id === transaction.employee_id);
+             if (empTreasury) {
+                 await supabase.from('treasuries').update({ egp_balance: empTreasury.egp_balance + cashToRefund }).eq('id', empTreasury.id);
+             }
         }
         else if (transaction.type === 'wallet_withdrawal') {
             // Withdraw: Removed from Wallet, Added to Emp Treasury (Amount + Commission)
@@ -804,7 +811,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const transactionType = type === 'withdraw' ? 'wallet_withdrawal' : 'wallet_deposit';
 
       if (type === 'withdraw') {
-          // Withdrawal: 
+          // Withdrawal: Agent SELLS E-Money (Sends from Wallet). Agent RECEIVES Cash.
+          // Wallet Balance Decreases. Treasury Increases.
           if (wallet.balance < rAmount) {
               return { success: false, message: `رصيد المحفظة غير كافي للسحب` };
           }
@@ -819,11 +827,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }).eq('id', empTreasury.id);
 
       } else {
-          // Deposit:
+          // Deposit: Agent BUYS E-Money (Receives to Wallet). Agent PAYS Cash.
+          // Wallet Balance Increases. Treasury Decreases.
+          if (empTreasury.egp_balance < rAmount) {
+              return { success: false, message: 'رصيد الخزينة (النقدية) لا يكفي لإتمام عملية الإيداع (شراء رصيد)' };
+          }
+
           const totalToAdd = rAmount + commission;
           await supabase.from('e_wallets').update({
             balance: wallet.balance + totalToAdd
           }).eq('id', walletId);
+          
+          await supabase.from('treasuries').update({
+            egp_balance: empTreasury.egp_balance - rAmount
+          }).eq('id', empTreasury.id);
       }
 
       const { data: newTx, error } = await supabase.from('transactions').insert({
