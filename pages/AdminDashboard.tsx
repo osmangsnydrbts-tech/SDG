@@ -1,13 +1,13 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock } from 'lucide-react';
 import { User, Transaction } from '../types';
 
 const AdminDashboard: React.FC = () => {
   const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies, treasuries, transactions, showToast } = useStore();
-  const history = useHistory();
+  const navigate = useNavigate();
   const rateData = exchangeRates.find(r => r.company_id === currentUser?.company_id);
   const company = companies.find(c => c.id === currentUser?.company_id);
 
@@ -228,19 +228,19 @@ ${phones}
         <QuickAction 
             icon={Landmark} 
             label="إدارة الخزينة" 
-            onClick={() => history.push('/admin/treasury')} 
+            onClick={() => navigate('/admin/treasury')} 
             color="bg-teal-600" 
         />
         <QuickAction 
             icon={Users} 
             label="إدارة التجار" 
-            onClick={() => history.push('/admin/merchants')} 
+            onClick={() => navigate('/admin/merchants')} 
             color="bg-indigo-600" 
         />
         <QuickAction 
             icon={Wallet} 
             label="المحافظ الإلكترونية" 
-            onClick={() => history.push('/admin/ewallets')} 
+            onClick={() => navigate('/admin/ewallets')} 
             color="bg-pink-600" 
         />
       </div>
