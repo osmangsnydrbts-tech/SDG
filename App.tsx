@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Switch, Route, Redirect } from 'react-router-dom';
 import { StoreProvider, useStore } from './context/StoreContext';
 import Login from './components/Login';
 import Layout from './components/Layout';
@@ -13,106 +14,111 @@ import Reports from './pages/Reports';
 import EWallets from './pages/EWallets';
 import WalletTransfer from './pages/WalletTransfer';
 
-const ProtectedRoute: React.FC<{ children: React.ReactElement, allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
+const ProtectedRoute: React.FC<{ children: React.ReactNode, allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
   const { currentUser } = useStore();
   
-  if (!currentUser) return <Navigate to="/login" replace />;
+  if (!currentUser) return <Redirect to="/login" />;
   
   if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
     // Redirect based on role
-    if (currentUser.role === 'super_admin') return <Navigate to="/super-admin" replace />;
-    if (currentUser.role === 'admin') return <Navigate to="/admin" replace />;
-    return <Navigate to="/employee" replace />;
+    if (currentUser.role === 'super_admin') return <Redirect to="/super-admin" />;
+    if (currentUser.role === 'admin') return <Redirect to="/admin" />;
+    return <Redirect to="/employee" />;
   }
 
-  return children;
+  return <>{children}</>;
 };
 
 const AppRoutes = () => {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
+    <Switch>
+      <Route path="/login">
+        <Login />
+      </Route>
       
       {/* Super Admin Routes */}
-      <Route path="/super-admin" element={
+      <Route path="/super-admin">
         <ProtectedRoute allowedRoles={['super_admin']}>
           <Layout title="لوحة المدير العام">
             <SuperAdminDashboard />
           </Layout>
         </ProtectedRoute>
-      } />
+      </Route>
 
       {/* Admin Routes */}
-      <Route path="/admin" element={
+      {/* Use exact for /admin to avoid matching sub-routes like /admin/treasury */}
+      <Route exact path="/admin">
         <ProtectedRoute allowedRoles={['admin']}>
           <Layout title="لوحة التحكم">
             <AdminDashboard />
           </Layout>
         </ProtectedRoute>
-      } />
+      </Route>
       
-      <Route path="/admin/treasury" element={
+      <Route path="/admin/treasury">
         <ProtectedRoute allowedRoles={['admin']}>
           <Layout title="إدارة الخزينة">
             <Treasury />
           </Layout>
         </ProtectedRoute>
-      } />
+      </Route>
 
-      <Route path="/admin/merchants" element={
+      <Route path="/admin/merchants">
         <ProtectedRoute allowedRoles={['admin']}>
           <Layout title="إدارة التجار">
             <Merchants />
           </Layout>
         </ProtectedRoute>
-      } />
+      </Route>
 
-      <Route path="/admin/ewallets" element={
+      <Route path="/admin/ewallets">
         <ProtectedRoute allowedRoles={['admin']}>
           <Layout title="إدارة المحافظ">
             <EWallets />
           </Layout>
         </ProtectedRoute>
-      } />
+      </Route>
 
       {/* Employee Routes */}
-      <Route path="/employee" element={
+      <Route path="/employee">
         <ProtectedRoute allowedRoles={['employee']}>
           <Layout title="لوحة الموظف">
             <EmployeeDashboard />
           </Layout>
         </ProtectedRoute>
-      } />
+      </Route>
 
       {/* Exchange - Restricted to Employee Only */}
-      <Route path="/exchange" element={
+      <Route path="/exchange">
         <ProtectedRoute allowedRoles={['employee']}>
           <Layout title="نظام الصرف">
             <Exchange />
           </Layout>
         </ProtectedRoute>
-      } />
+      </Route>
 
       {/* Wallet Transfer - Restricted to Employee Only */}
-      <Route path="/wallet-transfer" element={
+      <Route path="/wallet-transfer">
         <ProtectedRoute allowedRoles={['employee']}>
           <Layout title="تحويل محفظة">
             <WalletTransfer />
           </Layout>
         </ProtectedRoute>
-      } />
+      </Route>
 
       {/* Shared Routes */}
-      <Route path="/reports" element={
+      <Route path="/reports">
         <ProtectedRoute>
           <Layout title="التقارير">
             <Reports />
           </Layout>
         </ProtectedRoute>
-      } />
+      </Route>
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+      <Route path="*">
+        <Redirect to="/login" />
+      </Route>
+    </Switch>
   );
 };
 
