@@ -1,16 +1,16 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { useNavigate } from 'react-router-dom';
+import { withRouter, RouteComponentProps } from 'react-router-dom';
 import { ArrowRightLeft, Wallet, ArrowUpRight, ArrowDownLeft, Smartphone, FileMinus, Loader2, CheckCircle } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 import FormattedInput from '../components/FormattedInput';
 
-const EmployeeDashboard: React.FC = () => {
-  const { currentUser, treasuries, transactions, companies, users, eWallets, addExpense } = useStore();
-  const navigate = useNavigate();
+const EmployeeDashboard: React.FC<RouteComponentProps> = ({ history }) => {
+  const { currentUser, treasuries, fetchRecentTransactions, companies, users, eWallets, addExpense } = useStore();
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   
   // Expense Modal State
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -21,14 +21,16 @@ const EmployeeDashboard: React.FC = () => {
   const [msg, setMsg] = useState('');
 
   const myTreasury = treasuries.find(t => t.employee_id === currentUser?.id);
-  const myTransactions = transactions
-    .filter(t => t.employee_id === currentUser?.id)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 5);
-
+  
   const myWalletsBalance = eWallets
     .filter(w => w.employee_id === currentUser?.id && w.is_active)
     .reduce((sum, w) => sum + w.balance, 0);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      fetchRecentTransactions(currentUser.id).then(setRecentTransactions);
+    }
+  }, [currentUser, treasuries]); // Re-fetch when treasuries update (signal of new tx)
 
   const getCompany = (companyId: number) => companies.find(c => c.id === companyId);
   const getEmployee = (empId?: number) => users.find(u => u.id === empId);
@@ -51,10 +53,8 @@ const EmployeeDashboard: React.FC = () => {
               setMsg(res.message);
               setExpenseAmount('');
               setExpenseDesc('');
-              if (res.transaction) {
-                  // Optional: View receipt after expense
-                  // setViewTransaction(res.transaction);
-              }
+              // Update list
+              fetchRecentTransactions(currentUser.id).then(setRecentTransactions);
               setTimeout(() => { setShowExpenseModal(false); setMsg(''); }, 1000);
           } else {
               setMsg(res.message);
@@ -68,12 +68,10 @@ const EmployeeDashboard: React.FC = () => {
 
   const getTransactionIcon = (type: string) => {
       if (type === 'exchange' || type === 'e_wallet' || type === 'treasury_withdraw' || type === 'wallet_withdrawal') {
-          // Money Leaving (Red Arrow Up) - Or Money Moving Out of Wallet
           return { icon: <ArrowUpRight size={16} />, bg: 'bg-red-100', text: 'text-red-600' };
       } else if (type === 'expense') {
           return { icon: <FileMinus size={16} />, bg: 'bg-orange-100', text: 'text-orange-600' };
       } else {
-          // Money Coming In (Green Arrow Down)
           return { icon: <ArrowDownLeft size={16} />, bg: 'bg-green-100', text: 'text-green-600' };
       }
   };
@@ -109,60 +107,38 @@ const EmployeeDashboard: React.FC = () => {
             </div>
         </div>
         
-        {/* Wallet Balance Section */}
         <div className="mt-4 pt-4 border-t border-gray-100">
             <div className="p-3 bg-pink-50 rounded-xl flex justify-between items-center">
                 <div>
                     <p className="text-xs text-pink-400 mb-1 flex items-center gap-1"><Smartphone size={12}/> رصيد المحافظ</p>
                     <p className="text-xl font-bold text-pink-700">{myWalletsBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</p>
                 </div>
-                <button 
-                    onClick={() => navigate('/wallet-transfer')}
-                    className="text-xs bg-white text-pink-600 px-3 py-1 rounded-lg shadow-sm font-bold"
-                >
-                    تحويل
-                </button>
+                <button onClick={() => history.push('/wallet-transfer')} className="text-xs bg-white text-pink-600 px-3 py-1 rounded-lg shadow-sm font-bold">تحويل</button>
             </div>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-          <button 
-            onClick={() => navigate('/exchange')}
-            className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 transition transform active:scale-95"
-          >
-            <ArrowRightLeft size={24}/>
-            <span className="font-bold">صرف عملة</span>
+          <button onClick={() => history.push('/exchange')} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 transition transform active:scale-95">
+            <ArrowRightLeft size={24}/><span className="font-bold">صرف عملة</span>
           </button>
           
-          <button 
-            onClick={() => setShowExpenseModal(true)}
-            className="bg-orange-500 text-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 transition transform active:scale-95"
-          >
-            <FileMinus size={24}/>
-            <span className="font-bold">تسجيل منصرف</span>
+          <button onClick={() => setShowExpenseModal(true)} className="bg-orange-500 text-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 transition transform active:scale-95">
+            <FileMinus size={24}/><span className="font-bold">تسجيل منصرف</span>
           </button>
       </div>
 
       <div>
           <h3 className="font-bold text-gray-800 mb-3">آخر العمليات</h3>
           <div className="space-y-3">
-              {myTransactions.map(t => {
+              {recentTransactions.map(t => {
                   const style = getTransactionIcon(t.type);
                   return (
-                    <div 
-                        key={t.id} 
-                        onClick={() => setViewTransaction(t)}
-                        className="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center cursor-pointer hover:bg-gray-50 transition active:scale-95"
-                    >
+                    <div key={t.id} onClick={() => setViewTransaction(t)} className="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center cursor-pointer hover:bg-gray-50 transition active:scale-95">
                         <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-full ${style.bg} ${style.text}`}>
-                                {style.icon}
-                            </div>
+                            <div className={`p-2 rounded-full ${style.bg} ${style.text}`}>{style.icon}</div>
                             <div>
-                                <p className="text-sm font-bold">
-                                    {getTransactionLabel(t.type)}
-                                </p>
+                                <p className="text-sm font-bold">{getTransactionLabel(t.type)}</p>
                                 <p className="text-xs text-gray-400">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</p>
                             </div>
                         </div>
@@ -173,26 +149,18 @@ const EmployeeDashboard: React.FC = () => {
                     </div>
                   );
               })}
-              {myTransactions.length === 0 && <p className="text-center text-gray-400 text-sm">لا توجد عمليات اليوم</p>}
+              {recentTransactions.length === 0 && <p className="text-center text-gray-400 text-sm">لا توجد عمليات اليوم</p>}
           </div>
       </div>
 
       {viewTransaction && (
-        <ReceiptModal 
-            transaction={viewTransaction} 
-            company={getCompany(viewTransaction.company_id)} 
-            employee={getEmployee(viewTransaction.employee_id)} 
-            onClose={() => setViewTransaction(null)} 
-        />
+        <ReceiptModal transaction={viewTransaction} company={getCompany(viewTransaction.company_id)} employee={getEmployee(viewTransaction.employee_id)} onClose={() => setViewTransaction(null)} />
       )}
 
-      {/* Add Expense Modal */}
       {showExpenseModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-sm p-6 animate-in slide-in-from-bottom-4">
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                    <FileMinus className="text-orange-500"/> تسجيل منصرف
-                </h3>
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><FileMinus className="text-orange-500"/> تسجيل منصرف</h3>
                 <p className="text-xs text-gray-500 mb-4">يتم خصم المبلغ من خزينة الموظف</p>
 
                 <form onSubmit={handleAddExpense} className="space-y-4">
@@ -201,23 +169,8 @@ const EmployeeDashboard: React.FC = () => {
                         <button type="button" onClick={() => setExpenseCurrency('SDG')} className={`flex-1 py-2 rounded-md text-sm font-bold transition ${expenseCurrency === 'SDG' ? 'bg-white shadow text-green-600' : 'text-gray-500'}`}>سوداني SDG</button>
                     </div>
 
-                    <FormattedInput 
-                        value={expenseAmount}
-                        onChange={setExpenseAmount}
-                        className="w-full p-3 border rounded-xl text-lg font-bold"
-                        placeholder="المبلغ"
-                        autoFocus
-                        required
-                    />
-
-                    <input 
-                        type="text"
-                        value={expenseDesc}
-                        onChange={e => setExpenseDesc(e.target.value)}
-                        className="w-full p-3 border rounded-xl"
-                        placeholder="بند الصرف (مثال: نثريات، غداء...)"
-                        required
-                    />
+                    <FormattedInput value={expenseAmount} onChange={setExpenseAmount} className="w-full p-3 border rounded-xl text-lg font-bold" placeholder="المبلغ" autoFocus required />
+                    <input type="text" value={expenseDesc} onChange={e => setExpenseDesc(e.target.value)} className="w-full p-3 border rounded-xl" placeholder="بند الصرف (مثال: نثريات، غداء...)" required />
 
                     {msg && <div className={`p-2 rounded text-center text-sm font-bold ${msg.includes('بنجاح') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>{msg}</div>}
 
@@ -231,9 +184,8 @@ const EmployeeDashboard: React.FC = () => {
             </div>
         </div>
       )}
-
     </div>
   );
 };
 
-export default EmployeeDashboard;
+export default withRouter(EmployeeDashboard);
