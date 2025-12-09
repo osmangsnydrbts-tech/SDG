@@ -388,13 +388,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // Customer GIVES EGP, TAKES SDG.
         // We must have enough SDG in treasury to give to customer.
         if (empTreasury.sdg_balance < toAmount) {
-             return { success: false, message: `رصيد السوادني غير كافي في الخزينة. المطلوب: ${toAmount.toLocaleString()}، المتوفر: ${empTreasury.sdg_balance.toLocaleString()}` };
+             return { success: false, message: `عفواً، رصيد السوادني في الخزينة لا يكفي. (المطلوب: ${toAmount.toLocaleString()} | المتوفر: ${empTreasury.sdg_balance.toLocaleString()})` };
         }
     } else {
         // Customer GIVES SDG, TAKES EGP.
         // We must have enough EGP in treasury to give to customer.
         if (empTreasury.egp_balance < toAmount) {
-             return { success: false, message: `رصيد المصري غير كافي في الخزينة. المطلوب: ${toAmount.toLocaleString()}، المتوفر: ${empTreasury.egp_balance.toLocaleString()}` };
+             return { success: false, message: `عفواً، رصيد المصري في الخزينة لا يكفي. (المطلوب: ${toAmount.toLocaleString()} | المتوفر: ${empTreasury.egp_balance.toLocaleString()})` };
         }
     }
 
