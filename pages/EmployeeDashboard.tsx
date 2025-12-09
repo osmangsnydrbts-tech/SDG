@@ -11,7 +11,6 @@ const EmployeeDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
 
   // Expense Form State
   const [expAmount, setExpAmount] = useState('');
@@ -81,6 +80,7 @@ const EmployeeDashboard: React.FC = () => {
   const handleShareRates = async () => {
     if (!rateData || !company) return;
 
+    // Use footer_message if available, otherwise fall back to phone_numbers
     const footer = company.footer_message ? `\n\n${company.footer_message}` : (company.phone_numbers ? `\n📞 ${company.phone_numbers}` : '');
 
     const text = `
@@ -137,10 +137,14 @@ ${footer}
                      </div>
                  </div>
              </div>
-             <button onClick={handleShareRates} className="bg-white/20 p-3 rounded-full hover:bg-white/30 transition backdrop-blur-sm">
+             <button onClick={handleShareRates} className="bg-white/20 p-3 rounded-full hover:bg-white/30 transition backdrop-blur-sm flex flex-col items-center justify-center gap-1 min-w-[70px]">
                  <Share2 size={24} />
+                 <span className="text-[10px] font-bold">مشاركة</span>
              </button>
           </div>
+          {/* Decorative circles */}
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
+          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
       </div>
 
       {/* Treasury Cards */}
@@ -168,7 +172,7 @@ ${footer}
                 </div>
                 <button 
                     onClick={() => navigate('/wallet-transfer')}
-                    className="text-xs bg-white text-pink-600 px-3 py-1 rounded-lg shadow-sm font-bold"
+                    className="text-xs bg-white text-pink-600 px-3 py-1 rounded-lg shadow-sm font-bold border border-pink-100 hover:bg-pink-50"
                 >
                     تحويل
                 </button>
@@ -179,14 +183,14 @@ ${footer}
       <div className="grid grid-cols-2 gap-4">
         <button 
             onClick={() => navigate('/exchange')}
-            className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition"
+            className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:bg-blue-700"
         >
             <ArrowRightLeft size={24}/>
             <span className="font-bold text-sm">صرف عملة</span>
         </button>
         <button 
             onClick={() => setShowExpenseModal(true)}
-            className="bg-red-50 text-red-600 border border-red-100 p-4 rounded-2xl shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition"
+            className="bg-red-50 text-red-600 border border-red-100 p-4 rounded-2xl shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:bg-red-100"
         >
             <TrendingDown size={24}/>
             <span className="font-bold text-sm">تسجيل منصرف</span>
@@ -218,6 +222,7 @@ ${footer}
                         <div className="text-right">
                             <p className="text-sm font-bold">{t.from_amount.toLocaleString()} <span className="text-xs">{t.from_currency}</span></p>
                             {t.to_amount && <p className="text-xs text-gray-500">➜ {t.to_amount.toLocaleString()} {t.to_currency}</p>}
+                            {t.type === 'expense' && <p className="text-xs text-gray-500 max-w-[100px] truncate">{t.description}</p>}
                         </div>
                     </div>
                   );
@@ -241,13 +246,17 @@ ${footer}
               <div className="bg-white rounded-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95">
                   <div className="flex justify-between items-center mb-4">
                       <h3 className="font-bold text-lg text-gray-800">تسجيل منصرفات</h3>
-                      <button onClick={() => setShowExpenseModal(false)}><X size={20} className="text-gray-400"/></button>
+                      <button onClick={() => setShowExpenseModal(false)} className="p-1 hover:bg-gray-100 rounded-full"><X size={20} className="text-gray-400"/></button>
                   </div>
                   
                   <form onSubmit={handleRecordExpense} className="space-y-4">
                       <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
                           <button type="button" onClick={() => setExpCurrency('EGP')} className={`flex-1 py-2 rounded text-sm font-bold transition ${expCurrency === 'EGP' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}>مصري</button>
                           <button type="button" onClick={() => setExpCurrency('SDG')} className={`flex-1 py-2 rounded text-sm font-bold transition ${expCurrency === 'SDG' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}>سوداني</button>
+                      </div>
+
+                      <div className="bg-yellow-50 p-3 rounded-lg text-xs text-yellow-800 border border-yellow-100">
+                          سيتم خصم المبلغ مباشرة من رصيد عهدتك الحالي.
                       </div>
 
                       <div>
@@ -270,7 +279,7 @@ ${footer}
                               value={expDesc}
                               onChange={e => setExpDesc(e.target.value)}
                               className="w-full p-3 border rounded-xl outline-none focus:border-blue-500"
-                              placeholder="مثال: وقود، نثريات..."
+                              placeholder="مثال: وقود، نثريات، كهرباء..."
                               required 
                           />
                       </div>
