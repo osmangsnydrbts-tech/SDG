@@ -22,7 +22,7 @@ const Reports: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   
   // Interactive Filter State
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'EGP' | 'SDG' | 'EXPENSE' | 'COMMISSION'>('ALL');
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'EGP_IN' | 'SDG_IN' | 'EXPENSE' | 'COMMISSION'>('ALL');
   
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
 
@@ -62,9 +62,11 @@ const Reports: React.FC = () => {
 
           if (t.type === 'exchange') {
               if (t.from_currency === 'SDG') {
+                  // User GIVES SDG (In), TAKES EGP (Out)
                   sdgIn += amount;
                   egpOut += toAmount;
               } else {
+                  // User GIVES EGP (In), TAKES SDG (Out)
                   egpIn += amount;
                   sdgOut += toAmount;
               }
@@ -77,11 +79,12 @@ const Reports: React.FC = () => {
                   expenseSdg += amount;
               }
           } else if (t.type === 'wallet_deposit') {
-              // Deposit into wallet means money leaving treasury
+              // Deposit into wallet: Money leaves Treasury (Out) to go to Wallet Provider
               egpOut += amount;
               if (t.commission) commissions += t.commission;
           } else if (t.type === 'wallet_withdrawal') {
-              // Withdraw from wallet means money entering treasury
+              // Withdraw from wallet: Money comes to Treasury (In) from Wallet Provider
+              // Note: Usually withdrawal means Cash IN to Treasury.
               egpIn += toAmount; 
               if (t.commission) commissions += t.commission;
           } else if (t.type === 'wallet_feed') {
@@ -108,14 +111,18 @@ const Reports: React.FC = () => {
       let filtered = transactions;
 
       // Card Filter Logic
-      if (activeFilter === 'EGP') {
+      if (activeFilter === 'EGP_IN') {
+          // Show transactions where EGP came IN
           filtered = filtered.filter(t => 
-              t.from_currency === 'EGP' || t.to_currency === 'EGP' || 
-              ['wallet_deposit', 'wallet_withdrawal', 'wallet_feed'].includes(t.type)
+              (t.type === 'exchange' && t.from_currency === 'EGP') ||
+              (t.type === 'treasury_feed' && t.from_currency === 'EGP') ||
+              t.type === 'wallet_withdrawal'
           );
-      } else if (activeFilter === 'SDG') {
-          filtered = filtered.filter(t => 
-             t.from_currency === 'SDG' || t.to_currency === 'SDG'
+      } else if (activeFilter === 'SDG_IN') {
+          // Show transactions where SDG came IN
+           filtered = filtered.filter(t => 
+              (t.type === 'exchange' && t.from_currency === 'SDG') ||
+              (t.type === 'treasury_feed' && t.from_currency === 'SDG')
           );
       } else if (activeFilter === 'EXPENSE') {
           filtered = filtered.filter(t => t.type === 'expense');
@@ -168,96 +175,107 @@ const Reports: React.FC = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
         {/* Controls Header */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-200 w-full md:w-auto">
-                <button onClick={setToday} className="px-3 py-2 bg-white rounded-lg shadow-sm text-xs font-bold hover:bg-gray-100 transition text-gray-700">اليوم</button>
-                <div className="h-4 w-px bg-gray-300 mx-1"></div>
-                <div className="flex items-center gap-1 px-2">
-                    <Calendar size={16} className="text-gray-400" />
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-sm font-bold w-full focus:ring-0 outline-none text-gray-700" />
-                </div>
-                <span className="text-gray-400">←</span>
-                <div className="flex items-center gap-1 px-2">
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-sm font-bold w-full focus:ring-0 outline-none text-gray-700" />
-                </div>
-            </div>
-
-            {currentUser?.role !== 'employee' && (
-                <div className="w-full md:w-64">
-                    <select 
-                        value={selectedEmployeeId} 
-                        onChange={e => setSelectedEmployeeId(e.target.value)}
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                    >
-                        <option value="all">كل الموظفين</option>
-                        {companyEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-                    </select>
-                </div>
-            )}
-        </div>
-
-        {/* Summary Cards (Interactive Filters) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* EGP Card */}
-            <div 
-                onClick={() => setActiveFilter(activeFilter === 'EGP' ? 'ALL' : 'EGP')} 
-                className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
-                    activeFilter === 'EGP' 
-                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
-                    : 'border-white bg-white hover:border-blue-200 shadow-sm'
-                }`}
-            >
-                <div className="flex justify-between items-center mb-4">
-                    <span className={`text-xs font-bold ${activeFilter === 'EGP' ? 'text-blue-700' : 'text-gray-500'}`}>حركة المصري (EGP)</span>
-                    <div className={`p-2 rounded-full ${activeFilter === 'EGP' ? 'bg-white text-blue-600' : 'bg-gray-50 text-gray-400'}`}>
-                        <Banknote size={20} />
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+            <div className="flex flex-col md:flex-row gap-4 items-center">
+                {/* Date Filter */}
+                <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-200 w-full md:w-auto flex-1">
+                    <button onClick={setToday} className="px-4 py-2 bg-white rounded-lg shadow-sm text-xs font-bold hover:bg-gray-100 transition text-blue-700 whitespace-nowrap">اليوم</button>
+                    <div className="h-4 w-px bg-gray-300 mx-1"></div>
+                    <div className="flex items-center gap-1 px-2 flex-1">
+                        <Calendar size={16} className="text-gray-400" />
+                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-sm font-bold w-full focus:ring-0 outline-none text-gray-700" />
+                    </div>
+                    <span className="text-gray-400">←</span>
+                    <div className="flex items-center gap-1 px-2 flex-1">
+                        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-sm font-bold w-full focus:ring-0 outline-none text-gray-700" />
                     </div>
                 </div>
-                <div className="text-2xl font-black text-gray-800" dir="ltr">{stats.egpNet.toLocaleString()}</div>
-                <div className="flex gap-4 mt-4 pt-3 border-t border-dashed border-gray-200 text-xs">
-                    <span className="text-green-600 font-bold flex items-center gap-1"><ArrowDownCircle size={14}/> {stats.egpIn.toLocaleString()}</span>
-                    <span className="text-red-500 font-bold flex items-center gap-1"><ArrowUpCircle size={14}/> {stats.egpOut.toLocaleString()}</span>
-                </div>
+
+                {/* Employee Select */}
+                {currentUser?.role !== 'employee' && (
+                    <div className="w-full md:w-48">
+                        <select 
+                            value={selectedEmployeeId} 
+                            onChange={e => setSelectedEmployeeId(e.target.value)}
+                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                        >
+                            <option value="all">كل الموظفين</option>
+                            {companyEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                        </select>
+                    </div>
+                )}
             </div>
 
-            {/* SDG Card */}
+            {/* Search Bar */}
+            <div className="relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <input 
+                    type="text" 
+                    placeholder="بحث برقم الإشعار، اسم الموظف، أو التفاصيل..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+            </div>
+        </div>
+
+        {/* 4 Cards Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            {/* Card 1: Receipts in SDG (المقبوضات بالسوداني) */}
             <div 
-                onClick={() => setActiveFilter(activeFilter === 'SDG' ? 'ALL' : 'SDG')} 
+                onClick={() => setActiveFilter(activeFilter === 'SDG_IN' ? 'ALL' : 'SDG_IN')} 
                 className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
-                    activeFilter === 'SDG' 
+                    activeFilter === 'SDG_IN' 
                     ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' 
                     : 'border-white bg-white hover:border-emerald-200 shadow-sm'
                 }`}
             >
                 <div className="flex justify-between items-center mb-4">
-                    <span className={`text-xs font-bold ${activeFilter === 'SDG' ? 'text-emerald-700' : 'text-gray-500'}`}>حركة السوداني (SDG)</span>
-                    <div className={`p-2 rounded-full ${activeFilter === 'SDG' ? 'bg-white text-emerald-600' : 'bg-gray-50 text-gray-400'}`}>
+                    <span className={`text-sm font-bold ${activeFilter === 'SDG_IN' ? 'text-emerald-700' : 'text-gray-600'}`}>المقبوضات بالسوداني</span>
+                    <div className={`p-2 rounded-full ${activeFilter === 'SDG_IN' ? 'bg-white text-emerald-600' : 'bg-green-50 text-green-600'}`}>
                         <Banknote size={20} />
                     </div>
                 </div>
-                <div className="text-2xl font-black text-gray-800" dir="ltr">{stats.sdgNet.toLocaleString()}</div>
-                <div className="flex gap-4 mt-4 pt-3 border-t border-dashed border-gray-200 text-xs">
-                    <span className="text-green-600 font-bold flex items-center gap-1"><ArrowDownCircle size={14}/> {stats.sdgIn.toLocaleString()}</span>
-                    <span className="text-red-500 font-bold flex items-center gap-1"><ArrowUpCircle size={14}/> {stats.sdgOut.toLocaleString()}</span>
-                </div>
+                <div className="text-2xl font-black text-gray-800" dir="ltr">{stats.sdgIn.toLocaleString()}</div>
+                <div className="text-xs text-gray-400 mt-2">إجمالي الداخل (SDG)</div>
             </div>
 
-            {/* Expenses Card */}
+            {/* Card 2: Receipts in EGP (المقبوضات بالمصري) */}
+            <div 
+                onClick={() => setActiveFilter(activeFilter === 'EGP_IN' ? 'ALL' : 'EGP_IN')} 
+                className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
+                    activeFilter === 'EGP_IN' 
+                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
+                    : 'border-white bg-white hover:border-blue-200 shadow-sm'
+                }`}
+            >
+                <div className="flex justify-between items-center mb-4">
+                    <span className={`text-sm font-bold ${activeFilter === 'EGP_IN' ? 'text-blue-700' : 'text-gray-600'}`}>المقبوضات بالمصري</span>
+                    <div className={`p-2 rounded-full ${activeFilter === 'EGP_IN' ? 'bg-white text-blue-600' : 'bg-blue-50 text-blue-600'}`}>
+                        <Banknote size={20} />
+                    </div>
+                </div>
+                <div className="text-2xl font-black text-gray-800" dir="ltr">{stats.egpIn.toLocaleString()}</div>
+                <div className="text-xs text-gray-400 mt-2">إجمالي الداخل (EGP)</div>
+            </div>
+
+            {/* Card 3: Expenses (اجمالي المنصرفات) */}
             <div 
                 onClick={() => setActiveFilter(activeFilter === 'EXPENSE' ? 'ALL' : 'EXPENSE')} 
                 className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
                     activeFilter === 'EXPENSE' 
-                    ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200' 
-                    : 'border-white bg-white hover:border-orange-200 shadow-sm'
+                    ? 'border-red-500 bg-red-50 ring-2 ring-red-200' 
+                    : 'border-white bg-white hover:border-red-200 shadow-sm'
                 }`}
             >
                 <div className="flex justify-between items-center mb-4">
-                    <span className={`text-xs font-bold ${activeFilter === 'EXPENSE' ? 'text-orange-700' : 'text-gray-500'}`}>المنصرفات</span>
-                    <div className={`p-2 rounded-full ${activeFilter === 'EXPENSE' ? 'bg-white text-orange-600' : 'bg-gray-50 text-gray-400'}`}>
+                    <span className={`text-sm font-bold ${activeFilter === 'EXPENSE' ? 'text-red-700' : 'text-gray-600'}`}>اجمالي المنصرفات</span>
+                    <div className={`p-2 rounded-full ${activeFilter === 'EXPENSE' ? 'bg-white text-red-600' : 'bg-red-50 text-red-600'}`}>
                         <FileMinus size={20} />
                     </div>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                     <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-gray-800" dir="ltr">{stats.expenseEgp.toLocaleString()}</span>
                         <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">EGP</span>
@@ -269,7 +287,7 @@ const Reports: React.FC = () => {
                 </div>
             </div>
 
-            {/* Commissions Card */}
+            {/* Card 4: Commissions (اجمالي العمولات) */}
             <div 
                 onClick={() => setActiveFilter(activeFilter === 'COMMISSION' ? 'ALL' : 'COMMISSION')} 
                 className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
@@ -279,15 +297,13 @@ const Reports: React.FC = () => {
                 }`}
             >
                 <div className="flex justify-between items-center mb-4">
-                    <span className={`text-xs font-bold ${activeFilter === 'COMMISSION' ? 'text-purple-700' : 'text-gray-500'}`}>أرباح العمولات</span>
-                    <div className={`p-2 rounded-full ${activeFilter === 'COMMISSION' ? 'bg-white text-purple-600' : 'bg-gray-50 text-gray-400'}`}>
+                    <span className={`text-sm font-bold ${activeFilter === 'COMMISSION' ? 'text-purple-700' : 'text-gray-600'}`}>اجمالي العمولات</span>
+                    <div className={`p-2 rounded-full ${activeFilter === 'COMMISSION' ? 'bg-white text-purple-600' : 'bg-purple-50 text-purple-600'}`}>
                         <Wallet size={20} />
                     </div>
                 </div>
                 <div className="text-2xl font-black text-purple-700" dir="ltr">{stats.commissions.toLocaleString()}</div>
-                <div className="text-xs text-gray-400 mt-4 pt-3 border-t border-dashed border-gray-200">
-                    إجمالي عمولات التحويلات
-                </div>
+                <div className="text-xs text-gray-400 mt-2">أرباح التحويلات</div>
             </div>
         </div>
 
@@ -301,8 +317,8 @@ const Reports: React.FC = () => {
                     <X size={14} /> 
                     <span>
                         إلغاء تصفية: 
-                        {activeFilter === 'EGP' && ' المصري'}
-                        {activeFilter === 'SDG' && ' السوداني'}
+                        {activeFilter === 'EGP_IN' && ' مقبوضات المصري'}
+                        {activeFilter === 'SDG_IN' && ' مقبوضات السوداني'}
                         {activeFilter === 'EXPENSE' && ' المنصرفات'}
                         {activeFilter === 'COMMISSION' && ' العمولات'}
                     </span>
@@ -341,7 +357,7 @@ const Reports: React.FC = () => {
                                 </td>
                                 <td className="p-4 align-top">
                                     <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap
-                                        ${t.type === 'expense' ? 'bg-orange-100 text-orange-700' : 
+                                        ${t.type === 'expense' ? 'bg-red-100 text-red-700' : 
                                           t.type === 'exchange' ? 'bg-blue-100 text-blue-700' : 
                                           t.type.includes('wallet') ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
                                         }`}>
@@ -395,7 +411,7 @@ const Reports: React.FC = () => {
                         <div className="flex justify-between items-start">
                             <div className="flex flex-col">
                                 <span className={`text-xs font-bold px-2 py-1 rounded-md w-fit
-                                    ${t.type === 'expense' ? 'bg-orange-100 text-orange-700' : 
+                                    ${t.type === 'expense' ? 'bg-red-100 text-red-700' : 
                                       t.type === 'exchange' ? 'bg-blue-100 text-blue-700' : 
                                       t.type.includes('wallet') ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
                                     }`}>
