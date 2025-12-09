@@ -2,7 +2,7 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Home, ArrowRightLeft, Landmark, BarChart3, Building, Smartphone } from 'lucide-react';
+import { LogOut, Home, ArrowRightLeft, Landmark, BarChart3, Building, Smartphone, Settings } from 'lucide-react';
 import Toast from './Toast';
 
 interface LayoutProps {
@@ -29,10 +29,10 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
     return (
       <button 
         onClick={() => navigate(to)}
-        className={`flex flex-col items-center justify-center w-full py-2 ${isActive ? 'text-blue-600' : 'text-gray-500'}`}
+        className={`flex flex-col items-center justify-center w-full py-2 ${isActive ? 'text-blue-600' : 'text-gray-400'}`}
       >
-        <Icon size={24} />
-        <span className="text-xs mt-1 font-medium">{label}</span>
+        <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
+        <span className="text-[10px] mt-1 font-medium">{label}</span>
       </button>
     );
   };
@@ -64,7 +64,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
                 <span className="text-xs text-blue-100">{currentUser?.full_name}</span>
              </div>
           </div>
-          <button onClick={handleLogout} className="p-2 hover:bg-blue-700 rounded-full">
+          <button onClick={handleLogout} className="p-2 hover:bg-blue-700 rounded-full text-blue-100 hover:text-white transition">
             <LogOut size={20} />
           </button>
         </div>
@@ -76,7 +76,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
       </main>
 
       {/* Bottom Navigation for Mobile */}
-      <nav className="bg-white border-t border-gray-200 fixed bottom-0 w-full z-10 pb-safe">
+      <nav className="bg-white border-t border-gray-200 fixed bottom-0 w-full z-10 pb-safe shadow-top-lg">
         <div className="flex justify-around items-center h-16">
           {currentUser?.role === 'super_admin' && (
              <NavItem to="/super-admin" icon={Home} label="الرئيسية" />
@@ -87,6 +87,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
               <NavItem to="/admin" icon={Home} label="الرئيسية" />
               <NavItem to="/admin/treasury" icon={Landmark} label="الخزينة" />
               <NavItem to="/reports" icon={BarChart3} label="التقارير" />
+              <NavItem to="/admin/settings" icon={Settings} label="الإعدادات" />
             </>
           )}
 
