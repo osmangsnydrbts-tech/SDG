@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { Lock, User as UserIcon, Info, Phone, MessageCircle, X, Loader2 } from 'lucide-react';
 import Toast from './Toast';
@@ -12,7 +12,7 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   
   const { login, toast, hideToast, showToast } = useStore();
-  const history = useHistory();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,9 +20,9 @@ const Login: React.FC = () => {
     try {
       const user = await login(username, password);
       if (user) {
-        if (user.role === 'super_admin') history.push('/super-admin');
-        else if (user.role === 'admin') history.push('/admin');
-        else history.push('/employee');
+        if (user.role === 'super_admin') navigate('/super-admin');
+        else if (user.role === 'admin') navigate('/admin');
+        else navigate('/employee');
       } else {
         showToast('بيانات الدخول غير صحيحة أو الاشتراك منتهي', 'error');
       }
