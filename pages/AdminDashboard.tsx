@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, ChevronDown, ChevronUp, Banknote, ArrowRightLeft, Smartphone, ArrowUpCircle } from 'lucide-react';
-import { User } from '../types';
+import { useHistory } from 'react-router-dom';
+import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock } from 'lucide-react';
+import { User, Transaction } from '../types';
 
 const AdminDashboard: React.FC = () => {
-  const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies, treasuries } = useStore();
+  const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies, treasuries, transactions, showToast } = useStore();
+  const history = useHistory();
   const rateData = exchangeRates.find(r => r.company_id === currentUser?.company_id);
   const company = companies.find(c => c.id === currentUser?.company_id);
-  const navigate = useNavigate();
 
   const [showRateModal, setShowRateModal] = useState(false);
   const [showEmpModal, setShowEmpModal] = useState(false);
@@ -19,8 +20,8 @@ const AdminDashboard: React.FC = () => {
   const [editPassId, setEditPassId] = useState<number | null>(null);
   const [editInfoId, setEditInfoId] = useState<User | null>(null);
 
-  // New States for Employee List
-  const [expandedEmpId, setExpandedEmpId] = useState<number | null>(null);
+  // New States for Employee Report & Secure Delete
+  const [selectedEmpReport, setSelectedEmpReport] = useState<User | null>(null);
   const [empToDelete, setEmpToDelete] = useState<number | null>(null);
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -35,22 +36,12 @@ const AdminDashboard: React.FC = () => {
   const [empName, setEmpName] = useState('');
   const [empUser, setEmpUser] = useState('');
   const [empPass, setEmpPass] = useState('');
-  const [empPhone, setEmpPhone] = useState('');
   const [error, setError] = useState('');
 
   // Emp Edit Form
   const [editName, setEditName] = useState('');
   const [editUser, setEditUser] = useState('');
-  const [editPhone, setEditPhone] = useState('');
   const [newPass, setNewPass] = useState('');
-
-  // Custom Share Text State
-  const [customShareText, setCustomShareText] = useState(() => localStorage.getItem('customShareText') || '');
-
-  // Persist Custom Share Text
-  useEffect(() => {
-    localStorage.setItem('customShareText', customShareText);
-  }, [customShareText]);
 
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee' && u.is_active);
 
@@ -73,7 +64,9 @@ const AdminDashboard: React.FC = () => {
   const handleShareRates = async () => {
     if (!rateData || !company) return;
 
-    let text = `
+    const phones = company.phone_numbers ? `\n📞 للتواصل: ${company.phone_numbers}` : '';
+
+    const text = `
 *${company.name}*
 نشرة أسعار الصرف اليومية
 📅 ${new Date().toLocaleDateString('ar-EG')}
@@ -84,12 +77,9 @@ const AdminDashboard: React.FC = () => {
 
 📦 *الجملة:*
 السعر: ${rateData.wholesale_rate}
-أقل كمية: ${rateData.wholesale_threshold.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP
+أقل كمية: ${rateData.wholesale_threshold.toLocaleString()} EGP
+${phones}
     `.trim();
-
-    if (customShareText.trim()) {
-        text += `\n\n${customShareText.trim()}`;
-    }
 
     if (navigator.share) {
       try {
@@ -115,10 +105,10 @@ const AdminDashboard: React.FC = () => {
       setError('');
       if(currentUser?.company_id) {
           setIsProcessing(true);
-          const res = await addEmployee(currentUser.company_id, empName, empUser, empPass, empPhone);
+          const res = await addEmployee(currentUser.company_id, empName, empUser, empPass);
           if (res.success) {
             setShowEmpModal(false);
-            setEmpName(''); setEmpUser(''); setEmpPass(''); setEmpPhone('');
+            setEmpName(''); setEmpUser(''); setEmpPass('');
           } else {
             setError(res.message);
           }
@@ -130,14 +120,13 @@ const AdminDashboard: React.FC = () => {
       setEditInfoId(user);
       setEditName(user.full_name);
       setEditUser(user.username);
-      setEditPhone(user.phone || '');
       setError('');
   };
 
   const handleUpdateInfo = async () => {
       if (!editInfoId) return;
       setIsProcessing(true);
-      const res = await updateEmployee(editInfoId.id, { full_name: editName, username: editUser, phone: editPhone });
+      const res = await updateEmployee(editInfoId.id, { full_name: editName, username: editUser });
       if (res.success) {
           setEditInfoId(null);
       } else {
@@ -165,6 +154,8 @@ const AdminDashboard: React.FC = () => {
       e.preventDefault();
       if (!empToDelete || !currentUser) return;
       
+      // Simple security check (Checking current user password vs input)
+      // Note: In a real app, verify against server. Here we compare with local state.
       if (confirmPassword === currentUser.password) {
         setIsProcessing(true);
         await deleteEmployee(empToDelete);
@@ -176,20 +167,20 @@ const AdminDashboard: React.FC = () => {
       }
   };
 
-  const toggleEmployeeExpand = (id: number) => {
-      setExpandedEmpId(expandedEmpId === id ? null : id);
-  };
-
-  const getEmployeeBalance = (empId: number) => {
-      return treasuries.find(t => t.employee_id === empId);
-  };
-
   const QuickAction = ({ icon: Icon, label, onClick, color }: any) => (
     <button onClick={onClick} className={`${color} text-white p-4 rounded-xl shadow-md flex flex-col items-center justify-center gap-2 active:scale-95 transition`}>
       <Icon size={28} />
       <span className="font-bold text-sm">{label}</span>
     </button>
   );
+
+  // Helper for Employee Report
+  const getEmpStats = (empId: number) => {
+      const treasury = treasuries.find(t => t.employee_id === empId);
+      const txs = transactions.filter(t => t.employee_id === empId).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const recentTxs = txs.slice(0, 5);
+      return { treasury, recentTxs, totalTxs: txs.length };
+  };
 
   return (
     <div className="space-y-6">
@@ -237,19 +228,19 @@ const AdminDashboard: React.FC = () => {
         <QuickAction 
             icon={Landmark} 
             label="إدارة الخزينة" 
-            onClick={() => navigate('/admin/treasury')} 
+            onClick={() => history.push('/admin/treasury')} 
             color="bg-teal-600" 
         />
         <QuickAction 
             icon={Users} 
             label="إدارة التجار" 
-            onClick={() => navigate('/admin/merchants')} 
+            onClick={() => history.push('/admin/merchants')} 
             color="bg-indigo-600" 
         />
         <QuickAction 
             icon={Wallet} 
             label="المحافظ الإلكترونية" 
-            onClick={() => navigate('/admin/ewallets')} 
+            onClick={() => history.push('/admin/ewallets')} 
             color="bg-pink-600" 
         />
       </div>
@@ -257,64 +248,44 @@ const AdminDashboard: React.FC = () => {
       {/* Share Modal */}
       {showShareModal && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-            <div className="w-full max-w-sm flex flex-col max-h-[90vh]">
-                <div className="flex-1 overflow-y-auto no-scrollbar">
-                    <div id="rate-card-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden mb-4">
-                        <div className="bg-blue-600 p-6 text-white text-center">
-                            {company?.logo && <img src={company.logo} alt="Logo" className="h-16 w-16 mx-auto bg-white rounded-lg p-1 object-contain mb-3" crossOrigin="anonymous"/>}
-                            <h2 className="text-2xl font-bold">{company?.name}</h2>
-                            <p className="text-blue-200 text-sm mt-1">نشرة أسعار الصرف اليومية</p>
+            <div className="w-full max-w-sm">
+                <div id="rate-card-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                    <div className="bg-blue-600 p-6 text-white text-center">
+                        {company?.logo && <img src={company.logo} alt="Logo" className="h-16 w-16 mx-auto bg-white rounded-lg p-1 object-contain mb-3" crossOrigin="anonymous"/>}
+                        <h2 className="text-2xl font-bold">{company?.name}</h2>
+                        <p className="text-blue-200 text-sm mt-1">نشرة أسعار الصرف اليومية</p>
+                        {company?.phone_numbers && (
+                           <p className="text-blue-100 text-xs mt-2 font-mono" dir="ltr">{company.phone_numbers}</p>
+                        )}
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span className="text-gray-500 font-medium">سوداني {'->'} مصري</span>
+                            <span className="text-3xl font-bold text-gray-800">{rateData?.sd_to_eg_rate}</span>
                         </div>
-                        <div className="p-6 space-y-4">
-                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                                <span className="text-gray-500 font-medium">سوداني {'->'} مصري</span>
-                                <span className="text-3xl font-bold text-gray-800">{rateData?.sd_to_eg_rate}</span>
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span className="text-gray-500 font-medium">مصري {'->'} سوداني</span>
+                            <span className="text-3xl font-bold text-gray-800">{rateData?.eg_to_sd_rate}</span>
+                        </div>
+                        
+                        <div className="border-t pt-4 mt-2">
+                            <div className="flex justify-between text-sm mb-2">
+                                <span className="text-gray-500">سعر الجملة</span>
+                                <span className="font-bold text-blue-600">{rateData?.wholesale_rate}</span>
                             </div>
-                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                                <span className="text-gray-500 font-medium">مصري {'->'} سوداني</span>
-                                <span className="text-3xl font-bold text-gray-800">{rateData?.eg_to_sd_rate}</span>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-500">أقل كمية للجملة</span>
+                                <span className="font-bold text-gray-800">{rateData?.wholesale_threshold.toLocaleString()} EGP</span>
                             </div>
-                            
-                            <div className="border-t pt-4 mt-2">
-                                <div className="flex justify-between text-sm mb-2">
-                                    <span className="text-gray-500">سعر الجملة</span>
-                                    <span className="font-bold text-blue-600">{rateData?.wholesale_rate}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">أقل كمية للجملة</span>
-                                    <span className="font-bold text-gray-800">{rateData?.wholesale_threshold.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
-                                </div>
-                            </div>
-                            
-                            {/* Custom Text Preview */}
-                            {customShareText && (
-                                <div className="mt-2 pt-2 border-t border-dashed border-gray-200 text-center text-sm font-medium text-gray-700 whitespace-pre-line">
-                                    {customShareText}
-                                </div>
-                            )}
+                        </div>
 
-                            <div className="text-center text-xs text-gray-400 mt-4 pt-4 border-t">
-                                {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                            </div>
+                        <div className="text-center text-xs text-gray-400 mt-4 pt-4 border-t">
+                            {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         </div>
                     </div>
                 </div>
 
-                {/* Custom Text Input */}
-                <div className="bg-white p-3 rounded-xl shadow-lg mb-3">
-                    <label className="text-xs font-bold text-gray-500 mb-2 flex items-center justify-between">
-                        <span>نص إضافي (توقيع / ملاحظات)</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">يُحفظ تلقائياً</span>
-                    </label>
-                    <textarea 
-                        value={customShareText}
-                        onChange={(e) => setCustomShareText(e.target.value)}
-                        placeholder="أضف نصاً سيظهر في كل مشاركة (مثال: نسعد بخدمتكم...)"
-                        className="w-full p-2 border border-gray-200 rounded-lg text-sm h-16 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </div>
-
-                <div className="flex gap-3 shrink-0">
+                <div className="mt-4 flex gap-3">
                     <button onClick={() => setShowShareModal(false)} className="bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-50">
                         <X size={24} />
                     </button>
@@ -361,7 +332,7 @@ const AdminDashboard: React.FC = () => {
                     </div>
 
                     <button disabled={isProcessing} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center">
-                         {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'تحديث'}
+                        {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'حفظ التغييرات'}
                     </button>
                     <button type="button" onClick={() => setShowRateModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                 </form>
@@ -373,17 +344,14 @@ const AdminDashboard: React.FC = () => {
       {showEmpModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-sm p-6">
-                <h3 className="text-lg font-bold mb-4">إضافة موظف جديد</h3>
+                <h3 className="text-lg font-bold mb-4 text-gray-800">إضافة موظف جديد</h3>
                 <form onSubmit={handleAddEmployee} className="space-y-3">
                     <input type="text" placeholder="الاسم الكامل" value={empName} onChange={e => setEmpName(e.target.value)} className="w-full p-3 border rounded-lg" required />
                     <input type="text" placeholder="اسم المستخدم" value={empUser} onChange={e => setEmpUser(e.target.value)} className="w-full p-3 border rounded-lg" required />
-                    <input type="text" placeholder="كلمة المرور" value={empPass} onChange={e => setEmpPass(e.target.value)} className="w-full p-3 border rounded-lg" required />
-                    <input type="tel" placeholder="رقم الهاتف (اختياري)" value={empPhone} onChange={e => setEmpPhone(e.target.value)} className="w-full p-3 border rounded-lg" />
-                    
-                    {error && <p className="text-red-500 text-sm">{error}</p>}
-                    
+                    <input type="password" inputMode="numeric" placeholder="كلمة المرور (أرقام)" value={empPass} onChange={e => setEmpPass(e.target.value)} className="w-full p-3 border rounded-lg" required />
+                    {error && <p className="text-red-500 text-xs">{error}</p>}
                     <button disabled={isProcessing} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center">
-                        {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'حفظ'}
+                         {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'إضافة'}
                     </button>
                     <button type="button" onClick={() => setShowEmpModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                 </form>
@@ -394,157 +362,182 @@ const AdminDashboard: React.FC = () => {
       {/* Manage Employees Modal */}
       {showManageEmpModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-sm p-6 h-[85vh] flex flex-col">
+            <div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold">قائمة الموظفين</h3>
-                    <button onClick={() => setShowManageEmpModal(false)} className="bg-gray-100 p-2 rounded-full"><X size={18}/></button>
+                    <h3 className="text-lg font-bold text-gray-800">إدارة الموظفين</h3>
+                    <button onClick={() => setShowManageEmpModal(false)} className="text-gray-500">إغلاق</button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
-                    {companyEmployees.map(emp => {
-                        const isExpanded = expandedEmpId === emp.id;
-                        const treasury = getEmployeeBalance(emp.id);
-
-                        return (
-                            <div key={emp.id} className={`border rounded-xl overflow-hidden transition-all ${isExpanded ? 'border-blue-300 shadow-md' : 'border-gray-200'}`}>
-                                {editInfoId?.id === emp.id ? (
-                                    <div className="p-4 space-y-2 bg-gray-50">
-                                        <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded-lg" placeholder="الاسم" />
-                                        <input type="text" value={editUser} onChange={e => setEditUser(e.target.value)} className="w-full p-2 border rounded-lg" placeholder="Username" />
-                                        <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} className="w-full p-2 border rounded-lg" placeholder="رقم الهاتف" />
-                                        <div className="flex gap-2 pt-2">
-                                            <button onClick={handleUpdateInfo} disabled={isProcessing} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-sm font-bold">حفظ</button>
-                                            <button onClick={() => setEditInfoId(null)} className="flex-1 bg-gray-300 text-gray-800 py-2 rounded-lg text-sm font-bold">إلغاء</button>
-                                        </div>
-                                        {error && <p className="text-red-500 text-xs text-center">{error}</p>}
+                <div className="space-y-4">
+                    {companyEmployees.map(emp => (
+                        <div key={emp.id} className="border p-3 rounded-xl bg-gray-50 transition hover:border-blue-300">
+                            {editInfoId?.id === emp.id ? (
+                                <div className="space-y-2 mb-2">
+                                    <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded" placeholder="الاسم" />
+                                    <input value={editUser} onChange={e => setEditUser(e.target.value)} className="w-full p-2 border rounded" placeholder="اسم المستخدم" />
+                                    {error && <p className="text-red-500 text-xs">{error}</p>}
+                                    <div className="flex gap-2">
+                                        <button onClick={handleUpdateInfo} disabled={isProcessing} className="bg-green-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1 min-w-[60px] justify-center">
+                                            {isProcessing ? <Loader2 className="animate-spin" size={12}/> : 'حفظ'}
+                                        </button>
+                                        <button onClick={() => setEditInfoId(null)} className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm">إلغاء</button>
                                     </div>
-                                ) : (
-                                    <>
-                                        {/* Header - Click to Expand */}
-                                        <div 
-                                            onClick={() => toggleEmployeeExpand(emp.id)}
-                                            className={`p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 ${isExpanded ? 'bg-gray-50 border-b border-gray-100' : ''}`}
-                                        >
-                                            <div>
-                                                <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                                                    {emp.full_name}
-                                                    {emp.phone && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{emp.phone}</span>}
-                                                </h4>
-                                                <p className="text-xs text-gray-400 mt-0.5">@{emp.username}</p>
-                                            </div>
-                                            <div className="text-gray-400">
-                                                {isExpanded ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
-                                            </div>
-                                        </div>
+                                </div>
+                            ) : (
+                                <div className="flex justify-between items-center">
+                                    <div 
+                                        className="cursor-pointer flex-1" 
+                                        onClick={() => setSelectedEmpReport(emp)}
+                                        title="اضغط لعرض التقرير"
+                                    >
+                                        <p className="font-bold text-blue-700 hover:underline">{emp.full_name}</p>
+                                        <p className="text-xs text-gray-500">user: {emp.username}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => openEditInfo(emp)} className="p-2 bg-indigo-100 text-indigo-600 rounded-lg" title="تعديل البيانات">
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button onClick={() => setEditPassId(editPassId === emp.id ? null : emp.id)} className="p-2 bg-blue-100 text-blue-600 rounded-lg" title="تغيير كلمة المرور">
+                                            <Key size={16} />
+                                        </button>
+                                        <button onClick={() => initiateDeleteEmployee(emp.id)} className="p-2 bg-red-100 text-red-600 rounded-lg" title="حذف الموظف">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
-                                        {/* Expanded Simplified Detail View */}
-                                        {isExpanded && treasury && (
-                                            <div className="p-4 animate-in slide-in-from-top-2 bg-gray-50/50">
-                                                
-                                                {/* Simplified Balance Grid */}
-                                                <div className="grid grid-cols-2 gap-3 mb-4">
-                                                    <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100 flex flex-col items-center justify-center">
-                                                        <span className="text-xs font-bold text-blue-500 mb-1">الرصيد المصري (EGP)</span>
-                                                        <span className="text-xl font-bold text-gray-800" dir="ltr">
-                                                            {treasury.egp_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                                                        </span>
-                                                    </div>
-                                                    <div className="bg-white p-4 rounded-xl shadow-sm border border-emerald-100 flex flex-col items-center justify-center">
-                                                        <span className="text-xs font-bold text-emerald-500 mb-1">الرصيد السوداني (SDG)</span>
-                                                        <span className="text-xl font-bold text-gray-800" dir="ltr">
-                                                            {treasury.sdg_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Coordinated Action Toolbar */}
-                                                <div className="grid grid-cols-3 gap-2 border-t pt-3">
-                                                    <button 
-                                                        onClick={() => openEditInfo(emp)} 
-                                                        className="flex flex-col items-center justify-center p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition"
-                                                    >
-                                                        <Pencil size={18} className="text-blue-600 mb-1"/>
-                                                        <span className="text-[10px] font-bold text-gray-600">تعديل البيانات</span>
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => setEditPassId(emp.id)} 
-                                                        className="flex flex-col items-center justify-center p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition"
-                                                    >
-                                                        <Key size={18} className="text-yellow-600 mb-1"/>
-                                                        <span className="text-[10px] font-bold text-gray-600">تغيير السر</span>
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => initiateDeleteEmployee(emp.id)} 
-                                                        className="flex flex-col items-center justify-center p-2 rounded-lg bg-red-50 hover:bg-red-100 transition"
-                                                    >
-                                                        <Trash2 size={18} className="text-red-600 mb-1"/>
-                                                        <span className="text-[10px] font-bold text-red-600">حذف الموظف</span>
-                                                    </button>
-                                                </div>
-
-                                                {/* Inline Password Change */}
-                                                {editPassId === emp.id && (
-                                                    <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-100 animate-in fade-in">
-                                                        <label className="text-xs font-bold text-yellow-800 mb-1 block">كلمة المرور الجديدة</label>
-                                                        <div className="flex gap-2">
-                                                            <input 
-                                                                type="text" 
-                                                                className="border rounded-lg px-3 py-2 text-sm w-full outline-none focus:ring-1 focus:ring-yellow-500"
-                                                                value={newPass}
-                                                                onChange={e => setNewPass(e.target.value)}
-                                                                placeholder="أدخل كلمة المرور"
-                                                            />
-                                                            <button onClick={() => handleChangePassword(emp.id)} disabled={isProcessing} className="bg-green-500 text-white px-3 rounded-lg">
-                                                                <CheckIcon size={18} />
-                                                            </button>
-                                                            <button onClick={() => setEditPassId(null)} className="bg-gray-300 text-black px-3 rounded-lg">
-                                                                <X size={18} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Inline Delete Confirm */}
-                                                {empToDelete === emp.id && (
-                                                    <div className="mt-3 bg-red-50 p-3 rounded-lg border border-red-100 animate-in fade-in">
-                                                        <p className="text-xs text-red-700 font-bold mb-2">أدخل كلمة مرورك (المدير) للتأكيد:</p>
-                                                        <form onSubmit={confirmDeleteEmployee} className="flex gap-2">
-                                                            <input 
-                                                                type="password" 
-                                                                className="border rounded-lg px-3 py-2 text-sm w-full outline-none focus:ring-1 focus:ring-red-500"
-                                                                value={confirmPassword}
-                                                                onChange={e => setConfirmPassword(e.target.value)}
-                                                                placeholder="كلمة مرور المدير"
-                                                                autoFocus
-                                                            />
-                                                            <button type="submit" disabled={isProcessing} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">
-                                                                حذف نهائي
-                                                            </button>
-                                                        </form>
-                                                        <button onClick={() => setEmpToDelete(null)} className="text-xs text-gray-500 mt-2 hover:underline">إلغاء</button>
-                                                        {error && <p className="text-red-600 text-xs mt-2 font-bold">{error}</p>}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        );
-                    })}
-                    {companyEmployees.length === 0 && <p className="text-center text-gray-500 mt-10">لا يوجد موظفين</p>}
+                            {editPassId === emp.id && (
+                                <div className="mt-3 flex gap-2 border-t pt-2">
+                                    <input 
+                                        type="text" 
+                                        inputMode="numeric"
+                                        placeholder="كلمة المرور الجديدة (أرقام)" 
+                                        className="flex-1 p-2 border rounded-lg text-sm"
+                                        value={newPass}
+                                        onChange={e => setNewPass(e.target.value)}
+                                    />
+                                    <button onClick={() => handleChangePassword(emp.id)} disabled={isProcessing} className="bg-green-600 text-white px-3 rounded-lg text-sm flex items-center min-w-[60px] justify-center">
+                                         {isProcessing ? <Loader2 className="animate-spin" size={14}/> : 'تغيير'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                    {companyEmployees.length === 0 && <p className="text-center text-gray-500">لا يوجد موظفين</p>}
                 </div>
             </div>
         </div>
       )}
 
+      {/* Employee Detail Report Modal */}
+      {selectedEmpReport && (
+          <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                  <div className="bg-blue-600 p-4 text-white flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                          <FileText size={20} />
+                          <h3 className="font-bold">تقرير الموظف</h3>
+                      </div>
+                      <button onClick={() => setSelectedEmpReport(null)} className="p-1 hover:bg-white/20 rounded-full"><X size={20}/></button>
+                  </div>
+                  
+                  <div className="p-5">
+                      <div className="text-center mb-6">
+                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 text-blue-600 font-bold text-xl">
+                              {selectedEmpReport.full_name.charAt(0)}
+                          </div>
+                          <h4 className="font-bold text-lg text-gray-800">{selectedEmpReport.full_name}</h4>
+                          <p className="text-xs text-gray-500">@{selectedEmpReport.username}</p>
+                      </div>
+
+                      {(() => {
+                          const stats = getEmpStats(selectedEmpReport.id);
+                          return (
+                              <div className="space-y-4">
+                                  <div className="grid grid-cols-2 gap-3">
+                                      <div className="bg-gray-50 p-3 rounded-xl border text-center">
+                                          <span className="text-xs text-gray-500 block">رصيد (EGP)</span>
+                                          <span className="font-bold text-lg">{stats.treasury?.egp_balance.toLocaleString()}</span>
+                                      </div>
+                                      <div className="bg-gray-50 p-3 rounded-xl border text-center">
+                                          <span className="text-xs text-gray-500 block">رصيد (SDG)</span>
+                                          <span className="font-bold text-lg">{stats.treasury?.sdg_balance.toLocaleString()}</span>
+                                      </div>
+                                  </div>
+
+                                  <div className="border-t pt-3">
+                                      <p className="text-xs font-bold text-gray-500 mb-2">آخر العمليات ({stats.totalTxs})</p>
+                                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                          {stats.recentTxs.map(tx => (
+                                              <div key={tx.id} className="flex justify-between text-xs bg-gray-50 p-2 rounded border border-gray-100">
+                                                  <span className={tx.from_currency === 'SDG' ? 'text-orange-600' : 'text-blue-600'}>
+                                                      {tx.type === 'exchange' ? 'صرف' : 'حركة'} {tx.from_amount.toLocaleString()} {tx.from_currency}
+                                                  </span>
+                                                  <span className="text-gray-400">{new Date(tx.created_at).toLocaleDateString()}</span>
+                                              </div>
+                                          ))}
+                                          {stats.recentTxs.length === 0 && <p className="text-center text-gray-400 text-xs py-2">لا توجد عمليات</p>}
+                                      </div>
+                                  </div>
+                              </div>
+                          );
+                      })()}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {empToDelete && (
+          <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-xs p-6 shadow-2xl">
+                  <div className="text-center mb-4">
+                      <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <Lock size={24} className="text-red-600" />
+                      </div>
+                      <h3 className="font-bold text-gray-800">تأكيد الحذف</h3>
+                      <p className="text-xs text-gray-500 mt-1">لحذف الموظف، يرجى إدخال كلمة مرور المدير</p>
+                  </div>
+                  
+                  <form onSubmit={confirmDeleteEmployee}>
+                      <input 
+                          type="password" 
+                          autoFocus
+                          placeholder="كلمة مرور المدير" 
+                          className="w-full p-3 border rounded-lg mb-2 text-center"
+                          value={confirmPassword}
+                          onChange={e => setConfirmPassword(e.target.value)}
+                      />
+                      {error && <p className="text-red-500 text-xs text-center mb-2">{error}</p>}
+                      
+                      <div className="flex gap-2">
+                          <button 
+                              type="submit" 
+                              disabled={isProcessing}
+                              className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold flex justify-center"
+                          >
+                              {isProcessing ? <Loader2 className="animate-spin" size={16}/> : 'حذف نهائي'}
+                          </button>
+                          <button 
+                              type="button" 
+                              onClick={() => { setEmpToDelete(null); setConfirmPassword(''); }}
+                              className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg font-bold"
+                          >
+                              إلغاء
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* Subscription Info Footer */}
+      <div className="text-center text-xs text-gray-400 pt-4">
+          ينتهي الاشتراك في: {company ? new Date(company.subscription_end).toLocaleDateString('ar-EG') : '-'}
+      </div>
     </div>
   );
 };
-
-// Helper Icon for Password Save
-const CheckIcon = ({ size }: { size: number }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-);
 
 export default AdminDashboard;
