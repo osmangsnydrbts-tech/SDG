@@ -9,6 +9,8 @@ export interface Company {
   subscription_end: string;
   is_active: boolean;
   logo?: string; // Base64 string
+  phone_numbers?: string;
+  footer_message?: string; // New field for shared message footer (address, emails, etc)
 }
 
 export interface User {
@@ -18,7 +20,6 @@ export interface User {
   role: Role;
   full_name: string;
   company_id: number | null;
-  phone?: string;
   is_active: boolean;
 }
 
