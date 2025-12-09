@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useHistory } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { Lock, User as UserIcon, Info, Phone, MessageCircle, X, Loader2 } from 'lucide-react';
 import Toast from './Toast';
@@ -10,26 +11,22 @@ const Login: React.FC = () => {
   const [showAbout, setShowAbout] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  const navigate = useNavigate();
   const { login, toast, hideToast, showToast } = useStore();
+  const history = useHistory();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const result = await login(username, password);
-      
-      if (result.success && result.role) {
-        // Navigate based on the returned role immediately
-        if (result.role === 'super_admin') navigate('/super-admin');
-        else if (result.role === 'admin') navigate('/admin');
-        else navigate('/employee');
+      const user = await login(username, password);
+      if (user) {
+        if (user.role === 'super_admin') history.push('/super-admin');
+        else if (user.role === 'admin') history.push('/admin');
+        else history.push('/employee');
       } else {
-        // Only stop loading if login failed
         showToast('بيانات الدخول غير صحيحة أو الاشتراك منتهي', 'error');
-        setIsLoading(false);
       }
-    } catch (error) {
+    } finally {
       setIsLoading(false);
     }
   };
@@ -101,14 +98,7 @@ const Login: React.FC = () => {
             disabled={isLoading}
             className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors flex items-center justify-center gap-2 ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
           >
-            {isLoading ? (
-              <>
-                <Loader2 className="animate-spin" size={20} />
-                جاري الدخول...
-              </>
-            ) : (
-              'دخول'
-            )}
+            {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'دخول'}
           </button>
         </form>
       </div>
