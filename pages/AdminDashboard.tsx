@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock } from 'lucide-react';
-import { User, Transaction } from '../types';
+import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock, RefreshCw } from 'lucide-react';
+import { User } from '../types';
 
 const AdminDashboard: React.FC = () => {
   const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies, treasuries, transactions, showToast } = useStore();
@@ -64,7 +64,8 @@ const AdminDashboard: React.FC = () => {
   const handleShareRates = async () => {
     if (!rateData || !company) return;
 
-    const phones = company.phone_numbers ? `\n📞 للتواصل: ${company.phone_numbers}` : '';
+    // Use footer_message if available, otherwise fall back to phone_numbers
+    const footer = company.footer_message ? `\n\n${company.footer_message}` : (company.phone_numbers ? `\n📞 ${company.phone_numbers}` : '');
 
     const text = `
 *${company.name}*
@@ -78,7 +79,7 @@ const AdminDashboard: React.FC = () => {
 📦 *الجملة:*
 السعر: ${rateData.wholesale_rate}
 أقل كمية: ${rateData.wholesale_threshold.toLocaleString()} EGP
-${phones}
+${footer}
     `.trim();
 
     if (navigator.share) {
@@ -155,7 +156,6 @@ ${phones}
       if (!empToDelete || !currentUser) return;
       
       // Simple security check (Checking current user password vs input)
-      // Note: In a real app, verify against server. Here we compare with local state.
       if (confirmPassword === currentUser.password) {
         setIsProcessing(true);
         await deleteEmployee(empToDelete);
@@ -207,12 +207,20 @@ ${phones}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
+        {/* Updated Buttons */}
         <QuickAction 
-            icon={Settings} 
+            icon={RefreshCw} 
             label="تحديث الأسعار" 
             onClick={() => setShowRateModal(true)} 
             color="bg-slate-700" 
         />
+        <QuickAction 
+            icon={Settings} 
+            label="إعدادات الشركة" 
+            onClick={() => navigate('/admin/settings')} 
+            color="bg-gray-800" 
+        />
+        
         <QuickAction 
             icon={UserPlus} 
             label="إضافة موظف" 
@@ -230,12 +238,6 @@ ${phones}
             label="إدارة الخزينة" 
             onClick={() => navigate('/admin/treasury')} 
             color="bg-teal-600" 
-        />
-        <QuickAction 
-            icon={Users} 
-            label="إدارة التجار" 
-            onClick={() => navigate('/admin/merchants')} 
-            color="bg-indigo-600" 
         />
         <QuickAction 
             icon={Wallet} 
@@ -278,8 +280,14 @@ ${phones}
                                 <span className="font-bold text-gray-800">{rateData?.wholesale_threshold.toLocaleString()} EGP</span>
                             </div>
                         </div>
+                        
+                        {company?.footer_message && (
+                            <div className="bg-gray-50 p-3 rounded-lg text-xs text-gray-600 text-center whitespace-pre-wrap">
+                                {company.footer_message}
+                            </div>
+                        )}
 
-                        <div className="text-center text-xs text-gray-400 mt-4 pt-4 border-t">
+                        <div className="text-center text-xs text-gray-400 mt-2 pt-2 border-t">
                             {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         </div>
                     </div>
