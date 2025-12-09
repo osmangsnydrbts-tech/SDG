@@ -1,106 +1,135 @@
+
 import React from 'react';
-import { useStore } from '../context/StoreContext';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Home, ArrowRightLeft, Landmark, BarChart3, Building, Smartphone } from 'lucide-react';
-import Toast from './Toast';
+import { HashRouter, Switch, Route, Redirect } from 'react-router-dom';
+import { StoreProvider, useStore } from './context/StoreContext';
+import Login from './components/Login';
+import Layout from './components/Layout';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import EmployeeDashboard from './pages/EmployeeDashboard';
+import Exchange from './pages/Exchange';
+import Treasury from './pages/Treasury';
+import Merchants from './pages/Merchants';
+import Reports from './pages/Reports';
+import EWallets from './pages/EWallets';
+import WalletTransfer from './pages/WalletTransfer';
 
-interface LayoutProps {
-  children: React.ReactNode;
-  title: string;
-}
+const ProtectedRoute: React.FC<{ children: React.ReactNode, allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
+  const { currentUser } = useStore();
+  
+  if (!currentUser) return <Redirect to="/login" />;
+  
+  if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
+    // Redirect based on role
+    if (currentUser.role === 'super_admin') return <Redirect to="/super-admin" />;
+    if (currentUser.role === 'admin') return <Redirect to="/admin" />;
+    return <Redirect to="/employee" />;
+  }
 
-const Layout: React.FC<LayoutProps> = ({ children, title }) => {
-  const { currentUser, logout, companies, toast, hideToast } = useStore();
-  const navigate = useNavigate();
-  const location = useLocation();
+  return <>{children}</>;
+};
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const currentCompany = currentUser?.company_id 
-    ? companies.find(c => c.id === currentUser.company_id) 
-    : null;
-
-  const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
-    const isActive = location.pathname === to;
-    return (
-      <button 
-        onClick={() => navigate(to)}
-        className={`flex flex-col items-center justify-center w-full py-2 ${isActive ? 'text-blue-600' : 'text-gray-500'}`}
-      >
-        <Icon size={24} />
-        <span className="text-xs mt-1 font-medium">{label}</span>
-      </button>
-    );
-  };
-
+const AppRoutes = () => {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Toast Notification */}
-      {toast && (
-        <Toast 
-          message={toast.message} 
-          type={toast.type} 
-          onClose={hideToast} 
-        />
-      )}
+    <Switch>
+      <Route path="/login">
+        <Login />
+      </Route>
+      
+      {/* Super Admin Routes */}
+      <Route path="/super-admin">
+        <ProtectedRoute allowedRoles={['super_admin']}>
+          <Layout title="لوحة المدير العام">
+            <SuperAdminDashboard />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
 
-      {/* Header */}
-      <header className="bg-blue-600 text-white shadow-lg sticky top-0 z-10">
-        <div className="flex justify-between items-center p-4">
-          <div className="flex items-center gap-3">
-             {currentCompany?.logo ? (
-                <img src={currentCompany.logo} alt="Logo" className="w-10 h-10 rounded-full bg-white object-cover" />
-             ) : (
-                <div className="bg-white/20 p-2 rounded-full">
-                    <Building size={20} className="text-white" />
-                </div>
-             )}
-             <div className="flex flex-col">
-                <h1 className="text-lg font-bold">{title}</h1>
-                <span className="text-xs text-blue-100">{currentUser?.full_name}</span>
-             </div>
-          </div>
-          <button onClick={handleLogout} className="p-2 hover:bg-blue-700 rounded-full">
-            <LogOut size={20} />
-          </button>
-        </div>
-      </header>
+      {/* Admin Routes */}
+      {/* Use exact for /admin to avoid matching sub-routes like /admin/treasury */}
+      <Route exact path="/admin">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <Layout title="لوحة التحكم">
+            <AdminDashboard />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/admin/treasury">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <Layout title="إدارة الخزينة">
+            <Treasury />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
 
-      {/* Main Content */}
-      <main className="flex-grow p-4 pb-24 overflow-y-auto no-scrollbar">
-        {children}
-      </main>
+      <Route path="/admin/merchants">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <Layout title="إدارة التجار">
+            <Merchants />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
 
-      {/* Bottom Navigation for Mobile */}
-      <nav className="bg-white border-t border-gray-200 fixed bottom-0 w-full z-10 pb-safe">
-        <div className="flex justify-around items-center h-16">
-          {currentUser?.role === 'super_admin' && (
-             <NavItem to="/super-admin" icon={Home} label="الرئيسية" />
-          )}
+      <Route path="/admin/ewallets">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <Layout title="إدارة المحافظ">
+            <EWallets />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
 
-          {currentUser?.role === 'admin' && (
-            <>
-              <NavItem to="/admin" icon={Home} label="الرئيسية" />
-              <NavItem to="/admin/treasury" icon={Landmark} label="الخزينة" />
-              <NavItem to="/reports" icon={BarChart3} label="التقارير" />
-            </>
-          )}
+      {/* Employee Routes */}
+      <Route path="/employee">
+        <ProtectedRoute allowedRoles={['employee']}>
+          <Layout title="لوحة الموظف">
+            <EmployeeDashboard />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
 
-          {currentUser?.role === 'employee' && (
-            <>
-              <NavItem to="/employee" icon={Home} label="الرئيسية" />
-              <NavItem to="/exchange" icon={ArrowRightLeft} label="الصرف" />
-              <NavItem to="/wallet-transfer" icon={Smartphone} label="تحويل" />
-              <NavItem to="/reports" icon={BarChart3} label="التقارير" />
-            </>
-          )}
-        </div>
-      </nav>
-    </div>
+      {/* Exchange - Restricted to Employee Only */}
+      <Route path="/exchange">
+        <ProtectedRoute allowedRoles={['employee']}>
+          <Layout title="نظام الصرف">
+            <Exchange />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Wallet Transfer - Restricted to Employee Only */}
+      <Route path="/wallet-transfer">
+        <ProtectedRoute allowedRoles={['employee']}>
+          <Layout title="تحويل محفظة">
+            <WalletTransfer />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Shared Routes */}
+      <Route path="/reports">
+        <ProtectedRoute>
+          <Layout title="التقارير">
+            <Reports />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="*">
+        <Redirect to="/login" />
+      </Route>
+    </Switch>
   );
 };
 
-export default Layout;
+const App: React.FC = () => {
+  return (
+    <StoreProvider>
+      <HashRouter>
+        <AppRoutes />
+      </HashRouter>
+    </StoreProvider>
+  );
+};
+
+export default App;
