@@ -46,6 +46,14 @@ interface StoreData {
     receipt: string
   ) => Promise<{ success: boolean; message: string; transaction?: Transaction }>;
   
+  recordExpense: (
+    employeeId: number,
+    companyId: number,
+    currency: 'EGP' | 'SDG',
+    amount: number,
+    description: string
+  ) => Promise<{ success: boolean; message: string }>;
+
   deleteTransaction: (transactionId: number) => Promise<{ success: boolean; message: string }>;
 
   addMerchant: (companyId: number, name: string, phone: string) => Promise<void>;
@@ -293,22 +301,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const deleteCompany = async (companyId: number) => {
     try {
-      // Hard delete sequence to handle Foreign Keys manually if cascade isn't set on DB level
-      // 1. Delete Transactions
       await supabase.from('transactions').delete().eq('company_id', companyId);
-      // 2. Delete Merchant Entries
       await supabase.from('merchant_entries').delete().eq('company_id', companyId);
-      // 3. Delete Merchants
       await supabase.from('merchants').delete().eq('company_id', companyId);
-      // 4. Delete E-Wallets
       await supabase.from('e_wallets').delete().eq('company_id', companyId);
-      // 5. Delete Treasuries
       await supabase.from('treasuries').delete().eq('company_id', companyId);
-      // 6. Delete Exchange Rates
       await supabase.from('exchange_rates').delete().eq('company_id', companyId);
-      // 7. Delete Users
       await supabase.from('users').delete().eq('company_id', companyId);
-      // 8. Delete Company
       await supabase.from('companies').delete().eq('id', companyId);
 
       await fetchData();
@@ -344,7 +343,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addEmployee = async (companyId: number, fullName: string, username: string, pass: string) => {
-    // Basic check first
     if (isUsernameTaken(username)) {
       return { success: false, message: 'اسم المستخدم مسجل مسبقاً' };
     }
@@ -361,7 +359,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (error) {
           console.error("Supabase insert error:", error);
-          // Handle unique constraint violation specifically if possible
           if (error.code === '23505') {
                return { success: false, message: 'اسم المستخدم مسجل مسبقاً (قاعدة البيانات)' };
           }
@@ -423,7 +420,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     amount: number, 
     receipt: string
   ) => {
-    // 1. DUPLICATE CHECK
     if (receipt) {
         const duplicate = transactions.find(t => 
             t.company_id === companyId && 
@@ -504,35 +500,76 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return { success: true, message: 'تمت العملية بنجاح', transaction: newTx };
   };
 
+  const recordExpense = async (
+    employeeId: number,
+    companyId: number,
+    currency: 'EGP' | 'SDG',
+    amount: number,
+    description: string
+  ) => {
+    const empTreasury = treasuries.find(t => t.employee_id === employeeId);
+    if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+
+    const balanceKey = currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
+    
+    if (empTreasury[balanceKey] < amount) {
+        return { success: false, message: `رصيد ${currency} غير كافي لتسجيل المنصرف` };
+    }
+
+    // Deduct
+    await supabase.from('treasuries').update({
+        [balanceKey]: empTreasury[balanceKey] - amount
+    }).eq('id', empTreasury.id);
+
+    // Record Transaction
+    await supabase.from('transactions').insert({
+        company_id: companyId,
+        employee_id: employeeId,
+        type: 'expense',
+        from_currency: currency,
+        from_amount: amount,
+        description: description || 'منصرفات عامة',
+        created_at: new Date().toISOString()
+    });
+
+    await fetchData();
+    showToast('تم تسجيل المنصرف بنجاح', 'success');
+    return { success: true, message: 'تم التسجيل بنجاح' };
+  };
+
   const deleteTransaction = async (transactionId: number) => {
     const transaction = transactions.find(t => t.id === transactionId);
-    if (!transaction || transaction.type !== 'exchange') {
-        return { success: false, message: 'لا يمكن حذف هذه العملية' };
-    }
+    if (!transaction) return { success: false, message: 'العملية غير موجودة' };
 
     const empTreasury = treasuries.find(t => t.employee_id === transaction.employee_id);
-    if (!empTreasury) {
-        return { success: false, message: 'خزينة الموظف غير موجودة لاسترداد المبلغ' };
-    }
+    if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
 
-    // Reverse logic
-    const fromAmount = transaction.from_amount;
-    const toAmount = transaction.to_amount || 0;
+    if (transaction.type === 'exchange') {
+        const fromAmount = transaction.from_amount;
+        const toAmount = transaction.to_amount || 0;
 
-    if (transaction.from_currency === 'SDG') {
-        // Was: Employee got SDG, Gave EGP
-        // Reverse: Remove SDG, Add EGP back
+        if (transaction.from_currency === 'SDG') {
+            await supabase.from('treasuries').update({
+                sdg_balance: empTreasury.sdg_balance - fromAmount,
+                egp_balance: empTreasury.egp_balance + toAmount
+            }).eq('id', empTreasury.id);
+        } else {
+            await supabase.from('treasuries').update({
+                egp_balance: empTreasury.egp_balance - fromAmount,
+                sdg_balance: empTreasury.sdg_balance + toAmount
+            }).eq('id', empTreasury.id);
+        }
+    } else if (transaction.type === 'expense') {
+        const currency = transaction.from_currency as 'EGP' | 'SDG';
+        const amount = transaction.from_amount;
+        const balanceKey = currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
+        
         await supabase.from('treasuries').update({
-            sdg_balance: empTreasury.sdg_balance - fromAmount,
-            egp_balance: empTreasury.egp_balance + toAmount
+            [balanceKey]: empTreasury[balanceKey] + amount
         }).eq('id', empTreasury.id);
-    } else { // EGP -> SDG
-        // Was: Employee got EGP, Gave SDG
-        // Reverse: Remove EGP, Add SDG back
-        await supabase.from('treasuries').update({
-            egp_balance: empTreasury.egp_balance - fromAmount,
-            sdg_balance: empTreasury.sdg_balance + toAmount
-        }).eq('id', empTreasury.id);
+    } else {
+        // Handle other types if necessary or block
+        return { success: false, message: 'لا يمكن حذف هذا النوع من العمليات حالياً' };
     }
 
     await supabase.from('transactions').delete().eq('id', transactionId);
@@ -698,7 +735,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }).eq('id', walletId);
 
           // 2. DO NOT Update Employee Treasury for Deposits (User Request)
-          // Previously: Added to Treasury
       }
 
       const { data: newTx, error } = await supabase.from('transactions').insert({
@@ -708,7 +744,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           from_currency: 'EGP',
           to_currency: 'EGP',
           from_amount: amount,
-          to_amount: amount + commission, // Storing total impact or just amount is debatable, using total here for ref
+          to_amount: amount + commission, 
           commission: commission,
           receipt_number: receipt,
           description: `${type === 'withdraw' ? 'سحب' : 'إيداع'} - ${recipientPhone} via ${wallet.provider}`,
@@ -815,7 +851,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       toast, showToast, hideToast,
       login, logout, addCompany, updateCompany, renewSubscription, deleteCompany, toggleCompanyStatus, updateExchangeRate, 
       addEmployee, updateEmployee, updateEmployeePassword, deleteEmployee,
-      performExchange, deleteTransaction, addMerchant, deleteMerchant, addMerchantEntry, addEWallet, deleteEWallet, performEWalletTransfer, manageTreasury, feedEWallet,
+      performExchange, recordExpense, deleteTransaction, addMerchant, deleteMerchant, addMerchantEntry, addEWallet, deleteEWallet, performEWalletTransfer, manageTreasury, feedEWallet,
       exportDatabase, importDatabase
     }}>
       {children}
@@ -828,4 +864,3 @@ export const useStore = () => {
   if (!context) throw new Error('useStore must be used within StoreProvider');
   return context;
 };
-    
