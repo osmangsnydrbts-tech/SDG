@@ -1,23 +1,21 @@
 
 import React from 'react';
 import { useStore } from '../context/StoreContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { withRouter, RouteComponentProps } from 'react-router-dom';
 import { LogOut, Home, ArrowRightLeft, Landmark, BarChart3, Building, Smartphone } from 'lucide-react';
 import Toast from './Toast';
 
-interface LayoutProps {
+interface LayoutProps extends RouteComponentProps {
   children: React.ReactNode;
   title: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, title }) => {
+const Layout: React.FC<LayoutProps> = ({ children, title, history, location }) => {
   const { currentUser, logout, companies, toast, hideToast } = useStore();
-  const navigate = useNavigate();
-  const location = useLocation();
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    history.push('/login');
   };
 
   const currentCompany = currentUser?.company_id 
@@ -28,7 +26,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
     const isActive = location.pathname === to;
     return (
       <button 
-        onClick={() => navigate(to)}
+        onClick={() => history.push(to)}
         className={`flex flex-col items-center justify-center w-full py-2 ${isActive ? 'text-blue-600' : 'text-gray-500'}`}
       >
         <Icon size={24} />
@@ -104,4 +102,4 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
   );
 };
 
-export default Layout;
+export default withRouter(Layout);
