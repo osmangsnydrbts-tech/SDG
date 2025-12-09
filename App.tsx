@@ -13,7 +13,7 @@ import Reports from './pages/Reports';
 import EWallets from './pages/EWallets';
 import WalletTransfer from './pages/WalletTransfer';
 
-const ProtectedRoute: React.FC<{ children: JSX.Element, allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
+const ProtectedRoute: React.FC<{ children: React.ReactElement, allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
   const { currentUser } = useStore();
   
   if (!currentUser) return <Navigate to="/login" replace />;
