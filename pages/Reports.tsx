@@ -1,10 +1,10 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { 
-  Download, Search, Eye, Trash2, Calendar, 
+  Search, Eye, Trash2, Calendar, 
   Banknote, ArrowUpCircle, ArrowDownCircle,
-  Wallet, FileMinus, XCircle, Loader2, Filter,
-  TrendingDown, TrendingUp, X
+  Wallet, FileMinus, X, Loader2, Filter
 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
@@ -12,36 +12,30 @@ import { Transaction } from '../types';
 const Reports: React.FC = () => {
   const { currentUser, users, fetchReportsData, companies, deleteTransaction } = useStore();
   
-  // Filters
+  // State
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Data
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Interactive Filter (Cards)
+  // Interactive Filter State
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'EGP' | 'SDG' | 'EXPENSE' | 'COMMISSION'>('ALL');
   
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
 
-  // Helper to get employee name
-  const getEmployeeName = (empId?: number) => {
-      if (!empId) return '-';
-      return users.find(u => u.id === empId)?.full_name || 'مستخدم محذوف';
-  };
-  
   const getCompany = (companyId: number) => companies.find(c => c.id === companyId);
   const getEmployee = (empId?: number) => users.find(u => u.id === empId);
+  const getEmployeeName = (empId?: number) => users.find(u => u.id === empId)?.full_name || '-';
 
   // Fetch Data
   useEffect(() => {
       const loadData = async () => {
           setIsLoading(true);
           try {
-              // Fetch 'all' types to calculate full stats, filter client-side for cards
+              // Fetch all transactions for the date range, then filter locally for speed and interaction
               const data = await fetchReportsData(startDate, endDate, selectedEmployeeId, 'all');
               setTransactions(data);
           } catch (e) {
@@ -68,11 +62,9 @@ const Reports: React.FC = () => {
 
           if (t.type === 'exchange') {
               if (t.from_currency === 'SDG') {
-                  // Client gives SDG (In), takes EGP (Out)
                   sdgIn += amount;
                   egpOut += toAmount;
               } else {
-                  // Client gives EGP (In), takes SDG (Out)
                   egpIn += amount;
                   sdgOut += toAmount;
               }
@@ -85,17 +77,11 @@ const Reports: React.FC = () => {
                   expenseSdg += amount;
               }
           } else if (t.type === 'wallet_deposit') {
-              // EGP Out from Treasury (to Wallet)
-              // But effectively it's Client Money In -> Wallet. 
-              // Wait, wallet_deposit implementation: update treasuries set egp_balance = egp_balance - p_amount.
-              // This represents money leaving the treasury to load a wallet.
-              // Usually the employee takes cash from client (In) then loads wallet? 
-              // No, 'wallet_deposit' usually means loading the wallet balance.
-              // Let's stick to Treasury Flow.
+              // Deposit into wallet means money leaving treasury
               egpOut += amount;
               if (t.commission) commissions += t.commission;
           } else if (t.type === 'wallet_withdrawal') {
-              // EGP In to Treasury (from Wallet)
+              // Withdraw from wallet means money entering treasury
               egpIn += toAmount; 
               if (t.commission) commissions += t.commission;
           } else if (t.type === 'wallet_feed') {
@@ -117,11 +103,11 @@ const Reports: React.FC = () => {
       };
   }, [transactions]);
 
-  // Filter Transactions for Display
+  // Filter Transactions for Display based on Active Card
   const displayTransactions = useMemo(() => {
       let filtered = transactions;
 
-      // Card Filter
+      // Card Filter Logic
       if (activeFilter === 'EGP') {
           filtered = filtered.filter(t => 
               t.from_currency === 'EGP' || t.to_currency === 'EGP' || 
@@ -166,45 +152,6 @@ const Reports: React.FC = () => {
 
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee');
 
-  const Card = ({ 
-      title, 
-      mainValue, 
-      subValue, 
-      icon: Icon, 
-      colorClass, 
-      filterKey 
-  }: { 
-      title: string, 
-      mainValue: React.ReactNode, 
-      subValue?: React.ReactNode, 
-      icon: any, 
-      colorClass: string,
-      filterKey: typeof activeFilter 
-  }) => {
-      const isActive = activeFilter === filterKey;
-      return (
-          <div 
-              onClick={() => setActiveFilter(isActive ? 'ALL' : filterKey)}
-              className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${isActive ? `border-${colorClass}-500 bg-${colorClass}-50 ring-2 ring-${colorClass}-200` : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-md'}`}
-          >
-              <div className="flex justify-between items-start mb-3">
-                  <span className={`text-xs font-bold ${isActive ? `text-${colorClass}-700` : 'text-gray-500'}`}>{title}</span>
-                  <div className={`p-2 rounded-full ${isActive ? `bg-white text-${colorClass}-600` : 'bg-gray-50 text-gray-400'}`}>
-                      <Icon size={20} />
-                  </div>
-              </div>
-              <div className="text-xl font-bold text-gray-800 mb-1">
-                  {mainValue}
-              </div>
-              {subValue && (
-                  <div className="text-xs text-gray-500 mt-2 border-t pt-2 border-dashed border-gray-200">
-                      {subValue}
-                  </div>
-              )}
-          </div>
-      );
-  };
-
   const getTxTypeLabel = (type: string) => {
       const map: Record<string, string> = {
           'exchange': 'صرف عملة',
@@ -219,15 +166,20 @@ const Reports: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-        {/* Top Controls */}
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+        {/* Controls Header */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-200 w-full md:w-auto">
-                <button onClick={setToday} className="px-3 py-2 bg-white rounded-lg shadow-sm text-xs font-bold hover:bg-gray-100 transition">اليوم</button>
+                <button onClick={setToday} className="px-3 py-2 bg-white rounded-lg shadow-sm text-xs font-bold hover:bg-gray-100 transition text-gray-700">اليوم</button>
                 <div className="h-4 w-px bg-gray-300 mx-1"></div>
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-sm font-bold w-32 focus:ring-0" />
-                <span className="text-gray-400">→</span>
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-sm font-bold w-32 focus:ring-0" />
+                <div className="flex items-center gap-1 px-2">
+                    <Calendar size={16} className="text-gray-400" />
+                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-sm font-bold w-full focus:ring-0 outline-none text-gray-700" />
+                </div>
+                <span className="text-gray-400">←</span>
+                <div className="flex items-center gap-1 px-2">
+                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-sm font-bold w-full focus:ring-0 outline-none text-gray-700" />
+                </div>
             </div>
 
             {currentUser?.role !== 'employee' && (
@@ -244,80 +196,124 @@ const Reports: React.FC = () => {
             )}
         </div>
 
-        {/* Summary Cards */}
+        {/* Summary Cards (Interactive Filters) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div onClick={() => setActiveFilter(activeFilter === 'EGP' ? 'ALL' : 'EGP')} 
-                 className={`cursor-pointer rounded-2xl p-5 border-2 transition-all ${activeFilter === 'EGP' ? 'border-blue-500 bg-blue-50' : 'border-white bg-white hover:border-blue-100 shadow-sm'}`}>
-                <div className="flex justify-between items-center mb-3">
-                    <span className="text-xs font-bold text-gray-500">حركة المصري (EGP)</span>
-                    <Banknote size={20} className={activeFilter === 'EGP' ? 'text-blue-600' : 'text-gray-300'} />
+            {/* EGP Card */}
+            <div 
+                onClick={() => setActiveFilter(activeFilter === 'EGP' ? 'ALL' : 'EGP')} 
+                className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
+                    activeFilter === 'EGP' 
+                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
+                    : 'border-white bg-white hover:border-blue-200 shadow-sm'
+                }`}
+            >
+                <div className="flex justify-between items-center mb-4">
+                    <span className={`text-xs font-bold ${activeFilter === 'EGP' ? 'text-blue-700' : 'text-gray-500'}`}>حركة المصري (EGP)</span>
+                    <div className={`p-2 rounded-full ${activeFilter === 'EGP' ? 'bg-white text-blue-600' : 'bg-gray-50 text-gray-400'}`}>
+                        <Banknote size={20} />
+                    </div>
                 </div>
                 <div className="text-2xl font-black text-gray-800" dir="ltr">{stats.egpNet.toLocaleString()}</div>
-                <div className="flex gap-3 mt-3 text-xs">
+                <div className="flex gap-4 mt-4 pt-3 border-t border-dashed border-gray-200 text-xs">
                     <span className="text-green-600 font-bold flex items-center gap-1"><ArrowDownCircle size={14}/> {stats.egpIn.toLocaleString()}</span>
                     <span className="text-red-500 font-bold flex items-center gap-1"><ArrowUpCircle size={14}/> {stats.egpOut.toLocaleString()}</span>
                 </div>
             </div>
 
-            <div onClick={() => setActiveFilter(activeFilter === 'SDG' ? 'ALL' : 'SDG')} 
-                 className={`cursor-pointer rounded-2xl p-5 border-2 transition-all ${activeFilter === 'SDG' ? 'border-emerald-500 bg-emerald-50' : 'border-white bg-white hover:border-emerald-100 shadow-sm'}`}>
-                <div className="flex justify-between items-center mb-3">
-                    <span className="text-xs font-bold text-gray-500">حركة السوداني (SDG)</span>
-                    <Banknote size={20} className={activeFilter === 'SDG' ? 'text-emerald-600' : 'text-gray-300'} />
+            {/* SDG Card */}
+            <div 
+                onClick={() => setActiveFilter(activeFilter === 'SDG' ? 'ALL' : 'SDG')} 
+                className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
+                    activeFilter === 'SDG' 
+                    ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' 
+                    : 'border-white bg-white hover:border-emerald-200 shadow-sm'
+                }`}
+            >
+                <div className="flex justify-between items-center mb-4">
+                    <span className={`text-xs font-bold ${activeFilter === 'SDG' ? 'text-emerald-700' : 'text-gray-500'}`}>حركة السوداني (SDG)</span>
+                    <div className={`p-2 rounded-full ${activeFilter === 'SDG' ? 'bg-white text-emerald-600' : 'bg-gray-50 text-gray-400'}`}>
+                        <Banknote size={20} />
+                    </div>
                 </div>
                 <div className="text-2xl font-black text-gray-800" dir="ltr">{stats.sdgNet.toLocaleString()}</div>
-                <div className="flex gap-3 mt-3 text-xs">
+                <div className="flex gap-4 mt-4 pt-3 border-t border-dashed border-gray-200 text-xs">
                     <span className="text-green-600 font-bold flex items-center gap-1"><ArrowDownCircle size={14}/> {stats.sdgIn.toLocaleString()}</span>
                     <span className="text-red-500 font-bold flex items-center gap-1"><ArrowUpCircle size={14}/> {stats.sdgOut.toLocaleString()}</span>
                 </div>
             </div>
 
-            <div onClick={() => setActiveFilter(activeFilter === 'EXPENSE' ? 'ALL' : 'EXPENSE')} 
-                 className={`cursor-pointer rounded-2xl p-5 border-2 transition-all ${activeFilter === 'EXPENSE' ? 'border-orange-500 bg-orange-50' : 'border-white bg-white hover:border-orange-100 shadow-sm'}`}>
-                <div className="flex justify-between items-center mb-3">
-                    <span className="text-xs font-bold text-gray-500">صافي المنصرفات</span>
-                    <FileMinus size={20} className={activeFilter === 'EXPENSE' ? 'text-orange-600' : 'text-gray-300'} />
-                </div>
-                <div className="space-y-1">
-                    <div className="flex justify-between items-end">
-                        <span className="text-lg font-bold text-gray-800" dir="ltr">{stats.expenseEgp.toLocaleString()}</span>
-                        <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">EGP</span>
+            {/* Expenses Card */}
+            <div 
+                onClick={() => setActiveFilter(activeFilter === 'EXPENSE' ? 'ALL' : 'EXPENSE')} 
+                className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
+                    activeFilter === 'EXPENSE' 
+                    ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200' 
+                    : 'border-white bg-white hover:border-orange-200 shadow-sm'
+                }`}
+            >
+                <div className="flex justify-between items-center mb-4">
+                    <span className={`text-xs font-bold ${activeFilter === 'EXPENSE' ? 'text-orange-700' : 'text-gray-500'}`}>المنصرفات</span>
+                    <div className={`p-2 rounded-full ${activeFilter === 'EXPENSE' ? 'bg-white text-orange-600' : 'bg-gray-50 text-gray-400'}`}>
+                        <FileMinus size={20} />
                     </div>
-                    <div className="flex justify-between items-end">
+                </div>
+                <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                        <span className="text-lg font-bold text-gray-800" dir="ltr">{stats.expenseEgp.toLocaleString()}</span>
+                        <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">EGP</span>
+                    </div>
+                    <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-gray-800" dir="ltr">{stats.expenseSdg.toLocaleString()}</span>
-                        <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">SDG</span>
+                        <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">SDG</span>
                     </div>
                 </div>
             </div>
 
-            <div onClick={() => setActiveFilter(activeFilter === 'COMMISSION' ? 'ALL' : 'COMMISSION')} 
-                 className={`cursor-pointer rounded-2xl p-5 border-2 transition-all ${activeFilter === 'COMMISSION' ? 'border-purple-500 bg-purple-50' : 'border-white bg-white hover:border-purple-100 shadow-sm'}`}>
-                <div className="flex justify-between items-center mb-3">
-                    <span className="text-xs font-bold text-gray-500">أرباح العمولات</span>
-                    <Wallet size={20} className={activeFilter === 'COMMISSION' ? 'text-purple-600' : 'text-gray-300'} />
+            {/* Commissions Card */}
+            <div 
+                onClick={() => setActiveFilter(activeFilter === 'COMMISSION' ? 'ALL' : 'COMMISSION')} 
+                className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
+                    activeFilter === 'COMMISSION' 
+                    ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200' 
+                    : 'border-white bg-white hover:border-purple-200 shadow-sm'
+                }`}
+            >
+                <div className="flex justify-between items-center mb-4">
+                    <span className={`text-xs font-bold ${activeFilter === 'COMMISSION' ? 'text-purple-700' : 'text-gray-500'}`}>أرباح العمولات</span>
+                    <div className={`p-2 rounded-full ${activeFilter === 'COMMISSION' ? 'bg-white text-purple-600' : 'bg-gray-50 text-gray-400'}`}>
+                        <Wallet size={20} />
+                    </div>
                 </div>
                 <div className="text-2xl font-black text-purple-700" dir="ltr">{stats.commissions.toLocaleString()}</div>
-                <div className="text-xs text-gray-400 mt-2">إجمالي عمولات التحويل</div>
+                <div className="text-xs text-gray-400 mt-4 pt-3 border-t border-dashed border-gray-200">
+                    إجمالي عمولات التحويلات
+                </div>
             </div>
         </div>
 
         {/* Active Filter Indicator */}
         {activeFilter !== 'ALL' && (
-            <div className="flex justify-center">
-                <button onClick={() => setActiveFilter('ALL')} className="bg-gray-800 text-white px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 hover:bg-black transition animate-in fade-in slide-in-from-top-2">
-                    <X size={14} /> إلغاء تصفية: {
-                        activeFilter === 'EGP' ? 'المصري' : 
-                        activeFilter === 'SDG' ? 'السوداني' : 
-                        activeFilter === 'EXPENSE' ? 'المنصرفات' : 'العمولات'
-                    }
+            <div className="flex justify-center animate-in fade-in slide-in-from-top-2">
+                <button 
+                    onClick={() => setActiveFilter('ALL')} 
+                    className="bg-gray-800 text-white px-5 py-2 rounded-full text-xs font-bold flex items-center gap-2 hover:bg-black transition shadow-lg"
+                >
+                    <X size={14} /> 
+                    <span>
+                        إلغاء تصفية: 
+                        {activeFilter === 'EGP' && ' المصري'}
+                        {activeFilter === 'SDG' && ' السوداني'}
+                        {activeFilter === 'EXPENSE' && ' المنصرفات'}
+                        {activeFilter === 'COMMISSION' && ' العمولات'}
+                    </span>
                 </button>
             </div>
         )}
 
-        {/* Transactions List */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* Transactions Table */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[300px] flex flex-col">
             <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                <div className="relative">
+                <div className="relative w-full md:w-auto">
                     <Search size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input 
                         type="text" 
@@ -327,19 +323,19 @@ const Reports: React.FC = () => {
                         className="pl-4 pr-10 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 w-full md:w-64 transition"
                     />
                 </div>
-                <div className="text-xs font-bold text-gray-500">
+                <div className="text-xs font-bold text-gray-500 bg-white px-3 py-1 rounded-lg border border-gray-200 shadow-sm">
                     {displayTransactions.length} عملية
                 </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto flex-1">
                 <table className="w-full text-right">
-                    <thead className="bg-gray-50 text-gray-500 text-xs font-bold uppercase">
+                    <thead className="bg-gray-50 text-gray-500 text-xs font-bold uppercase sticky top-0">
                         <tr>
-                            <th className="p-4 rounded-tr-xl">التفاصيل</th>
-                            <th className="p-4">النوع</th>
-                            <th className="p-4">المبلغ</th>
-                            <th className="p-4 rounded-tl-xl text-left">إجراءات</th>
+                            <th className="p-4 whitespace-nowrap">التفاصيل</th>
+                            <th className="p-4 whitespace-nowrap">النوع</th>
+                            <th className="p-4 whitespace-nowrap">المبلغ</th>
+                            <th className="p-4 whitespace-nowrap text-left">إجراءات</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -347,13 +343,19 @@ const Reports: React.FC = () => {
                             <tr key={t.id} className="hover:bg-gray-50 transition group">
                                 <td className="p-4">
                                     <div className="flex flex-col">
-                                        <span className="text-xs text-gray-400 mb-0.5">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})} • {new Date(t.created_at).toLocaleDateString('ar-EG')}</span>
+                                        <span className="text-xs text-gray-400 mb-0.5 flex gap-2">
+                                            <span>{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</span>
+                                            <span>•</span>
+                                            <span>{new Date(t.created_at).toLocaleDateString('ar-EG')}</span>
+                                        </span>
                                         <span className="font-bold text-gray-800 text-sm">{getEmployeeName(t.employee_id)}</span>
-                                        <span className="text-xs text-gray-500 mt-1">{t.description || '-'} {t.receipt_number ? `(#${t.receipt_number})` : ''}</span>
+                                        <span className="text-xs text-gray-500 mt-1 truncate max-w-[150px] md:max-w-none">
+                                            {t.description || '-'} {t.receipt_number ? `(#${t.receipt_number})` : ''}
+                                        </span>
                                     </div>
                                 </td>
                                 <td className="p-4 align-top">
-                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold
+                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap
                                         ${t.type === 'expense' ? 'bg-orange-100 text-orange-700' : 
                                           t.type === 'exchange' ? 'bg-blue-100 text-blue-700' : 
                                           t.type.includes('wallet') ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
@@ -374,12 +376,12 @@ const Reports: React.FC = () => {
                                     </div>
                                 </td>
                                 <td className="p-4 align-top text-left">
-                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => setViewTransaction(t)} className="p-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition">
+                                    <div className="flex items-center justify-end gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => setViewTransaction(t)} className="p-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition" title="عرض الإشعار">
                                             <Eye size={16} />
                                         </button>
                                         {currentUser?.role === 'admin' && (
-                                            <button onClick={() => handleDelete(t.id)} className="p-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition">
+                                            <button onClick={() => handleDelete(t.id)} className="p-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition" title="حذف">
                                                 <Trash2 size={16} />
                                             </button>
                                         )}
@@ -402,7 +404,7 @@ const Reports: React.FC = () => {
             </div>
             
             {isLoading && (
-                <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-sm z-10">
                     <Loader2 className="animate-spin text-blue-600" size={32} />
                 </div>
             )}
