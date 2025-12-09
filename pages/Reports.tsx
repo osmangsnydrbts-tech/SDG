@@ -1,473 +1,414 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { 
-  Search, Eye, Trash2, Calendar, 
-  Banknote, ArrowUpCircle, ArrowDownCircle,
-  Wallet, FileMinus, X, Loader2, Filter
-} from 'lucide-react';
+import { FileText, Download, Filter, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, Wallet } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
+type TabType = 'exchange' | 'treasury' | 'breakdown';
+
 const Reports: React.FC = () => {
-  const { currentUser, users, fetchReportsData, companies, deleteTransaction } = useStore();
+  const { transactions, currentUser, users, companies, deleteTransaction } = useStore();
+  const [activeTab, setActiveTab] = useState<TabType>('breakdown');
   
-  // State
+  // Filtering States
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  
-  // Interactive Filter State
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'EGP_IN' | 'SDG_IN' | 'EXPENSE' | 'COMMISSION'>('ALL');
-  
+  // Modal State
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
 
-  const getCompany = (companyId: number) => companies.find(c => c.id === companyId);
-  const getEmployee = (empId?: number) => users.find(u => u.id === empId);
-  const getEmployeeName = (empId?: number) => users.find(u => u.id === empId)?.full_name || '-';
+  // Helper to get employee name
+  const getEmployeeName = (empId?: number) => {
+      if (!empId) return '-';
+      return users.find(u => u.id === empId)?.full_name || 'Unknown';
+  };
 
-  // Fetch Data
-  useEffect(() => {
-      const loadData = async () => {
-          setIsLoading(true);
-          try {
-              // Fetch all transactions for the date range, then filter locally for speed and interaction
-              const data = await fetchReportsData(startDate, endDate, selectedEmployeeId, 'all');
-              setTransactions(data);
-          } catch (e) {
-              console.error("Error loading reports", e);
-          } finally {
-              setIsLoading(false);
-          }
-      };
-      
-      const timeout = setTimeout(loadData, 300);
-      return () => clearTimeout(timeout);
-  }, [startDate, endDate, selectedEmployeeId, fetchReportsData]);
+  const getCompany = (companyId: number) => {
+      return companies.find(c => c.id === companyId);
+  };
 
-  // Calculate Statistics
-  const stats = useMemo(() => {
-      let egpIn = 0; let egpOut = 0;
-      let sdgIn = 0; let sdgOut = 0;
-      let commissions = 0;
-      let expenseEgp = 0; let expenseSdg = 0;
-
-      transactions.forEach(t => {
-          const amount = Math.round(t.from_amount);
-          const toAmount = Math.round(t.to_amount || 0);
-
-          if (t.type === 'exchange') {
-              if (t.from_currency === 'SDG') {
-                  // User GIVES SDG (In), TAKES EGP (Out)
-                  sdgIn += amount;
-                  egpOut += toAmount;
-              } else {
-                  // User GIVES EGP (In), TAKES SDG (Out)
-                  egpIn += amount;
-                  sdgOut += toAmount;
-              }
-          } else if (t.type === 'expense') {
-              if (t.from_currency === 'EGP') {
-                  egpOut += amount;
-                  expenseEgp += amount;
-              } else {
-                  sdgOut += amount;
-                  expenseSdg += amount;
-              }
-          } else if (t.type === 'wallet_deposit') {
-              // Deposit into wallet: Money leaves Treasury (Out) to go to Wallet Provider
-              egpOut += amount;
-              if (t.commission) commissions += t.commission;
-          } else if (t.type === 'wallet_withdrawal') {
-              // Withdraw from wallet: Money comes to Treasury (In) from Wallet Provider
-              // Note: Usually withdrawal means Cash IN to Treasury.
-              egpIn += toAmount; 
-              if (t.commission) commissions += t.commission;
-          } else if (t.type === 'wallet_feed') {
-              egpOut += amount;
-          } else if (t.type === 'treasury_feed') {
-              // Exclude EGP Treasury Feed from Receipts report as per request
-              if (t.from_currency === 'SDG') {
-                  sdgIn += amount;
-              }
-          } else if (t.type === 'treasury_withdraw') {
-               if (t.from_currency === 'EGP') egpOut += amount; else sdgOut += amount;
-          }
-      });
-
-      return {
-          egpNet: egpIn - egpOut,
-          sdgNet: sdgIn - sdgOut,
-          expenseEgp,
-          expenseSdg,
-          commissions,
-          egpIn, egpOut, sdgIn, sdgOut
-      };
-  }, [transactions]);
-
-  // Filter Transactions for Display based on Active Card
-  const displayTransactions = useMemo(() => {
-      let filtered = transactions;
-
-      // Card Filter Logic
-      if (activeFilter === 'EGP_IN') {
-          // Show transactions where EGP came IN (Excluding Treasury Feed)
-          filtered = filtered.filter(t => 
-              (t.type === 'exchange' && t.from_currency === 'EGP') ||
-              t.type === 'wallet_withdrawal'
-          );
-      } else if (activeFilter === 'SDG_IN') {
-          // Show transactions where SDG came IN
-           filtered = filtered.filter(t => 
-              (t.type === 'exchange' && t.from_currency === 'SDG') ||
-              (t.type === 'treasury_feed' && t.from_currency === 'SDG')
-          );
-      } else if (activeFilter === 'EXPENSE') {
-          filtered = filtered.filter(t => t.type === 'expense');
-      } else if (activeFilter === 'COMMISSION') {
-          filtered = filtered.filter(t => (t.commission || 0) > 0);
-      }
-
-      // Search Filter
-      if (searchQuery) {
-          const q = searchQuery.toLowerCase();
-          filtered = filtered.filter(t => 
-              t.receipt_number?.toLowerCase().includes(q) || 
-              t.description?.toLowerCase().includes(q) ||
-              getEmployeeName(t.employee_id).toLowerCase().includes(q)
-          );
-      }
-
-      return filtered;
-  }, [transactions, activeFilter, searchQuery, users]);
+  const getEmployee = (empId?: number) => {
+      return users.find(u => u.id === empId);
+  };
 
   const handleDelete = async (id: number) => {
-      if (window.confirm('هل أنت متأكد من حذف هذه العملية؟')) {
+      if (window.confirm('هل أنت متأكد من حذف هذه العملية؟ سيتم استرداد المبلغ إلى خزينة الموظف.')) {
           await deleteTransaction(id);
-          const data = await fetchReportsData(startDate, endDate, selectedEmployeeId, 'all');
-          setTransactions(data);
       }
   };
 
-  const setToday = () => {
+  // Quick Filter Handlers
+  const setFilterToday = () => {
       const today = new Date().toISOString().split('T')[0];
       setStartDate(today);
       setEndDate(today);
   };
 
-  const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee');
+  const setFilterMonth = () => {
+      const date = new Date();
+      const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+      const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+      setStartDate(firstDay);
+      setEndDate(lastDay);
+  };
 
-  const getTxTypeLabel = (type: string) => {
-      const map: Record<string, string> = {
-          'exchange': 'صرف عملة',
-          'expense': 'منصرفات',
-          'wallet_deposit': 'إيداع محفظة',
-          'wallet_withdrawal': 'سحب محفظة',
-          'treasury_feed': 'تغذية نقدية',
-          'treasury_withdraw': 'سحب نقدي',
-          'wallet_feed': 'تغذية محفظة'
-      };
-      return map[type] || type;
+  const setFilterAll = () => {
+      setStartDate('2024-01-01'); // Arbitrary past date
+      setEndDate(new Date().toISOString().split('T')[0]);
+  };
+
+  // Base Filter Logic
+  const getFilteredTransactions = () => {
+      return transactions.filter(t => {
+        // 1. Role Check
+        let roleMatch = false;
+        if (currentUser?.role === 'super_admin') roleMatch = true;
+        else if (currentUser?.role === 'admin') roleMatch = t.company_id === currentUser.company_id;
+        else roleMatch = t.employee_id === currentUser?.id;
+
+        if (!roleMatch) return false;
+
+        // 2. Search Query Check (Receipt Number)
+        if (searchQuery) {
+            return t.receipt_number?.toLowerCase().includes(searchQuery.toLowerCase());
+        }
+
+        // 3. Date Range Check
+        const txDate = new Date(t.created_at).setHours(0,0,0,0);
+        const start = new Date(startDate).setHours(0,0,0,0);
+        const end = new Date(endDate).setHours(23,59,59,999); // End of the day
+
+        if (txDate < start || txDate > end) return false;
+
+        // 4. Type Check
+        if (selectedType !== 'all') {
+            if (selectedType === 'exchange' && t.type !== 'exchange') return false;
+            
+            if (selectedType === 'e_wallet') {
+                if (t.type !== 'e_wallet' && t.type !== 'wallet_deposit' && t.type !== 'wallet_withdrawal') return false;
+            }
+
+            if (selectedType === 'treasury' && !['treasury_feed', 'treasury_withdraw'].includes(t.type)) return false;
+            if (selectedType === 'expense' && t.type !== 'expense') return false;
+            if (selectedType === 'wallet_feed' && t.type !== 'wallet_feed') return false;
+        }
+
+        return true;
+      });
+  };
+
+  const filtered = getFilteredTransactions();
+  
+  // Derived lists based on filtered data
+  const exchangeTx = filtered.filter(t => t.type === 'exchange');
+  const treasuryTx = filtered.filter(t => ['treasury_feed', 'treasury_withdraw'].includes(t.type));
+  const walletTx = filtered.filter(t => ['e_wallet', 'wallet_deposit', 'wallet_withdrawal'].includes(t.type));
+  const expenseTx = filtered.filter(t => t.type === 'expense');
+
+  // --- STATS CALCULATION ---
+  const stats = {
+      exchangeCount: exchangeTx.length,
+      receivedSdg: exchangeTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
+      receivedEgp: exchangeTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
+      walletCommission: walletTx.reduce((sum, t) => sum + (t.commission || 0), 0),
+      totalExpensesEgp: expenseTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
+      totalExpensesSdg: expenseTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
+  };
+
+  const handleExport = () => {
+    const headers = ["ID", "التاريخ", "الموظف", "النوع", "من", "المبلغ", "إلى", "المبلغ", "السعر", "العمولة", "رقم الإشعار"];
+    
+    // Export based on active tab or all filtered
+    const dataToExport = activeTab === 'exchange' ? exchangeTx : activeTab === 'treasury' ? treasuryTx : filtered;
+
+    const rows = dataToExport.map(t => [
+        t.id,
+        new Date(t.created_at).toLocaleDateString('ar-EG') + ' ' + new Date(t.created_at).toLocaleTimeString('ar-EG'),
+        getEmployeeName(t.employee_id),
+        t.type,
+        t.from_currency || '-',
+        t.from_amount,
+        t.to_currency || '-',
+        t.to_amount || '-',
+        t.rate || '-',
+        t.commission || 0,
+        t.receipt_number || '-'
+    ]);
+
+    const csvContent = [
+        headers.join(","), 
+        ...rows.map(row => row.join(","))
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `report_${startDate}_to_${endDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20">
-        {/* Controls Header */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-4">
-            <div className="flex flex-col md:flex-row gap-4 items-center">
-                {/* Date Filter */}
-                <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-200 w-full md:w-auto flex-1">
-                    <button onClick={setToday} className="px-4 py-2 bg-white rounded-lg shadow-sm text-xs font-bold hover:bg-gray-100 transition text-blue-700 whitespace-nowrap">اليوم</button>
-                    <div className="h-4 w-px bg-gray-300 mx-1"></div>
-                    <div className="flex items-center gap-1 px-2 flex-1">
-                        <Calendar size={16} className="text-gray-400" />
-                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none text-sm font-bold w-full focus:ring-0 outline-none text-gray-700" />
-                    </div>
-                    <span className="text-gray-400">←</span>
-                    <div className="flex items-center gap-1 px-2 flex-1">
-                        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none text-sm font-bold w-full focus:ring-0 outline-none text-gray-700" />
-                    </div>
-                </div>
-
-                {/* Employee Select */}
-                {currentUser?.role !== 'employee' && (
-                    <div className="w-full md:w-48">
-                        <select 
-                            value={selectedEmployeeId} 
-                            onChange={e => setSelectedEmployeeId(e.target.value)}
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                        >
-                            <option value="all">كل الموظفين</option>
-                            {companyEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-                        </select>
-                    </div>
-                )}
+    <div className="space-y-6">
+        {/* Controls Section */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+            <div className="flex justify-between items-center">
+                <h2 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
+                    <Filter size={20} className="text-blue-600" /> فلترة التقارير
+                </h2>
+                <button 
+                    onClick={handleExport}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-green-700 transition shadow-sm font-bold"
+                >
+                    <Download size={16} /> Excel تصدير
+                </button>
             </div>
-
-            {/* Search Bar */}
+            
+            {/* Search Box */}
             <div className="relative">
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <span className="absolute inset-y-0 right-0 flex items-center pr-3">
+                    <Search size={18} className="text-gray-400" />
+                </span>
                 <input 
                     type="text" 
-                    placeholder="بحث برقم الإشعار، اسم الموظف، أو التفاصيل..." 
+                    inputMode="numeric"
+                    placeholder="بحث برقم الإشعار..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    className="w-full pr-10 pl-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition"
                 />
             </div>
-        </div>
 
-        {/* 4 Cards Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            {/* Card 1: Receipts in SDG (المقبوضات بالسوداني) */}
-            <div 
-                onClick={() => setActiveFilter(activeFilter === 'SDG_IN' ? 'ALL' : 'SDG_IN')} 
-                className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
-                    activeFilter === 'SDG_IN' 
-                    ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' 
-                    : 'border-white bg-white hover:border-emerald-200 shadow-sm'
-                }`}
-            >
-                <div className="flex justify-between items-center mb-4">
-                    <span className={`text-sm font-bold ${activeFilter === 'SDG_IN' ? 'text-emerald-700' : 'text-gray-600'}`}>المقبوضات بالسوداني</span>
-                    <div className={`p-2 rounded-full ${activeFilter === 'SDG_IN' ? 'bg-white text-emerald-600' : 'bg-green-50 text-green-600'}`}>
-                        <Banknote size={20} />
+            {/* Filters Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                
+                {/* Date Range */}
+                <div className="md:col-span-2 space-y-2">
+                    <label className="text-xs text-gray-500 font-bold flex items-center gap-1"><Calendar size={14}/> الفترة الزمنية</label>
+                    <div className="flex gap-2 items-center">
+                        <div className="flex-1">
+                            <input 
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="w-full p-2 border rounded-lg bg-gray-50 text-sm font-bold text-gray-700"
+                            />
+                        </div>
+                        <span className="text-gray-400 font-bold">إلى</span>
+                        <div className="flex-1">
+                            <input 
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="w-full p-2 border rounded-lg bg-gray-50 text-sm font-bold text-gray-700"
+                            />
+                        </div>
+                    </div>
+                    {/* Quick Date Buttons */}
+                    <div className="flex gap-2 text-xs">
+                        <button onClick={setFilterToday} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 font-bold">اليوم</button>
+                        <button onClick={setFilterMonth} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 font-bold">هذا الشهر</button>
+                        <button onClick={setFilterAll} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 font-bold">الكل</button>
                     </div>
                 </div>
-                <div className="text-2xl font-black text-gray-800" dir="ltr">{stats.sdgIn.toLocaleString()}</div>
-                <div className="text-xs text-gray-400 mt-2">إجمالي الداخل (SDG)</div>
-            </div>
 
-            {/* Card 2: Receipts in EGP (المقبوضات بالمصري) */}
-            <div 
-                onClick={() => setActiveFilter(activeFilter === 'EGP_IN' ? 'ALL' : 'EGP_IN')} 
-                className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
-                    activeFilter === 'EGP_IN' 
-                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
-                    : 'border-white bg-white hover:border-blue-200 shadow-sm'
-                }`}
-            >
-                <div className="flex justify-between items-center mb-4">
-                    <span className={`text-sm font-bold ${activeFilter === 'EGP_IN' ? 'text-blue-700' : 'text-gray-600'}`}>المقبوضات بالمصري</span>
-                    <div className={`p-2 rounded-full ${activeFilter === 'EGP_IN' ? 'bg-white text-blue-600' : 'bg-blue-50 text-blue-600'}`}>
-                        <Banknote size={20} />
-                    </div>
+                {/* Transaction Type */}
+                <div className="space-y-2">
+                    <label className="text-xs text-gray-500 font-bold flex items-center gap-1"><ListFilter size={14}/> نوع العملية</label>
+                    <select 
+                        value={selectedType} 
+                        onChange={(e) => setSelectedType(e.target.value)}
+                        className="w-full p-2 border rounded-lg bg-gray-50 text-sm h-[42px] font-bold text-gray-700"
+                    >
+                        <option value="all">كل العمليات</option>
+                        <option value="exchange">صرف عملة</option>
+                        <option value="expense">منصرفات</option>
+                        <option value="e_wallet">محفظة إلكترونية</option>
+                        <option value="treasury">حركة خزينة</option>
+                    </select>
                 </div>
-                <div className="text-2xl font-black text-gray-800" dir="ltr">{stats.egpIn.toLocaleString()}</div>
-                <div className="text-xs text-gray-400 mt-2">إجمالي الداخل (EGP)</div>
-            </div>
-
-            {/* Card 3: Expenses (اجمالي المنصرفات) */}
-            <div 
-                onClick={() => setActiveFilter(activeFilter === 'EXPENSE' ? 'ALL' : 'EXPENSE')} 
-                className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
-                    activeFilter === 'EXPENSE' 
-                    ? 'border-red-500 bg-red-50 ring-2 ring-red-200' 
-                    : 'border-white bg-white hover:border-red-200 shadow-sm'
-                }`}
-            >
-                <div className="flex justify-between items-center mb-4">
-                    <span className={`text-sm font-bold ${activeFilter === 'EXPENSE' ? 'text-red-700' : 'text-gray-600'}`}>اجمالي المنصرفات</span>
-                    <div className={`p-2 rounded-full ${activeFilter === 'EXPENSE' ? 'bg-white text-red-600' : 'bg-red-50 text-red-600'}`}>
-                        <FileMinus size={20} />
-                    </div>
-                </div>
-                <div className="space-y-1">
-                    <div className="flex justify-between items-center">
-                        <span className="text-lg font-bold text-gray-800" dir="ltr">{stats.expenseEgp.toLocaleString()}</span>
-                        <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">EGP</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-lg font-bold text-gray-800" dir="ltr">{stats.expenseSdg.toLocaleString()}</span>
-                        <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">SDG</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Card 4: Commissions (اجمالي العمولات) */}
-            <div 
-                onClick={() => setActiveFilter(activeFilter === 'COMMISSION' ? 'ALL' : 'COMMISSION')} 
-                className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 relative overflow-hidden ${
-                    activeFilter === 'COMMISSION' 
-                    ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200' 
-                    : 'border-white bg-white hover:border-purple-200 shadow-sm'
-                }`}
-            >
-                <div className="flex justify-between items-center mb-4">
-                    <span className={`text-sm font-bold ${activeFilter === 'COMMISSION' ? 'text-purple-700' : 'text-gray-600'}`}>اجمالي العمولات</span>
-                    <div className={`p-2 rounded-full ${activeFilter === 'COMMISSION' ? 'bg-white text-purple-600' : 'bg-purple-50 text-purple-600'}`}>
-                        <Wallet size={20} />
-                    </div>
-                </div>
-                <div className="text-2xl font-black text-purple-700" dir="ltr">{stats.commissions.toLocaleString()}</div>
-                <div className="text-xs text-gray-400 mt-2">أرباح التحويلات</div>
             </div>
         </div>
 
-        {/* Active Filter Indicator */}
-        {activeFilter !== 'ALL' && (
-            <div className="flex justify-center animate-in fade-in slide-in-from-top-2">
-                <button 
-                    onClick={() => setActiveFilter('ALL')} 
-                    className="bg-gray-800 text-white px-5 py-2 rounded-full text-xs font-bold flex items-center gap-2 hover:bg-black transition shadow-lg"
-                >
-                    <X size={14} /> 
-                    <span>
-                        إلغاء تصفية: 
-                        {activeFilter === 'EGP_IN' && ' مقبوضات المصري'}
-                        {activeFilter === 'SDG_IN' && ' مقبوضات السوداني'}
-                        {activeFilter === 'EXPENSE' && ' المنصرفات'}
-                        {activeFilter === 'COMMISSION' && ' العمولات'}
-                    </span>
-                </button>
+        {/* Tabs */}
+        <div className="flex bg-white p-1 rounded-xl border border-gray-200 overflow-x-auto shadow-sm">
+            <button onClick={() => setActiveTab('breakdown')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition ${activeTab === 'breakdown' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>ملخص عام</button>
+            <button onClick={() => setActiveTab('exchange')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition ${activeTab === 'exchange' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>سجل الصرف</button>
+            <button onClick={() => setActiveTab('treasury')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition ${activeTab === 'treasury' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>سجل الخزينة</button>
+        </div>
+
+        {/* Detailed Breakdown Tab */}
+        {activeTab === 'breakdown' && (
+             <div className="space-y-4 animate-in fade-in duration-300">
+                 
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     {/* SDG Income */}
+                     <div className="bg-white p-5 rounded-xl shadow-sm border-r-4 border-r-orange-500">
+                         <h4 className="text-xs text-gray-500 mb-1 font-bold">مقبوضات سوداني (SDG)</h4>
+                         <p className="text-2xl font-bold text-gray-800">{stats.receivedSdg.toLocaleString()}</p>
+                     </div>
+
+                     {/* EGP Income */}
+                     <div className="bg-white p-5 rounded-xl shadow-sm border-r-4 border-r-blue-500">
+                         <h4 className="text-xs text-gray-500 mb-1 font-bold">مقبوضات مصري (EGP)</h4>
+                         <p className="text-2xl font-bold text-gray-800">{stats.receivedEgp.toLocaleString()}</p>
+                     </div>
+
+                     {/* Commissions */}
+                     <div className="bg-white p-5 rounded-xl shadow-sm border-r-4 border-r-green-500">
+                         <h4 className="text-xs text-gray-500 mb-1 font-bold">أرباح العمولات (EGP)</h4>
+                         <p className="text-2xl font-bold text-green-700">{stats.walletCommission.toLocaleString()}</p>
+                     </div>
+
+                     {/* Expenses */}
+                     <div className="bg-white p-5 rounded-xl shadow-sm border-r-4 border-r-red-500">
+                         <h4 className="text-xs text-gray-500 mb-1 font-bold">إجمالي المنصرفات</h4>
+                         <div className="flex gap-4">
+                            <span className="text-red-600 font-bold">{stats.totalExpensesEgp.toLocaleString()} EGP</span>
+                            <span className="text-gray-300">|</span>
+                            <span className="text-red-600 font-bold">{stats.totalExpensesSdg.toLocaleString()} SDG</span>
+                         </div>
+                     </div>
+                 </div>
+
+                 {/* Recent Expenses List */}
+                 {expenseTx.length > 0 && (
+                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                         <div className="p-4 bg-red-50 border-b border-red-100 flex items-center gap-2">
+                             <TrendingDown size={18} className="text-red-600"/>
+                             <h3 className="font-bold text-red-800">تفاصيل المنصرفات</h3>
+                         </div>
+                         <div className="overflow-x-auto">
+                            <table className="w-full text-right text-sm">
+                                <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                                    <tr>
+                                        <th className="p-3">التاريخ</th>
+                                        <th className="p-3">الموظف</th>
+                                        <th className="p-3">المبلغ</th>
+                                        <th className="p-3">البيان</th>
+                                        <th className="p-3"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {expenseTx.slice(0, 10).map(t => (
+                                        <tr key={t.id} className="hover:bg-gray-50">
+                                            <td className="p-3">{new Date(t.created_at).toLocaleDateString('ar-EG')}</td>
+                                            <td className="p-3">{getEmployeeName(t.employee_id)}</td>
+                                            <td className="p-3 font-bold text-red-600">{t.from_amount.toLocaleString()} {t.from_currency}</td>
+                                            <td className="p-3 text-gray-600">{t.description}</td>
+                                            <td className="p-3">
+                                                {currentUser?.role === 'admin' && (
+                                                    <button onClick={() => handleDelete(t.id)} className="text-red-400 hover:text-red-600 p-1">
+                                                        <Trash2 size={16}/>
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                         </div>
+                     </div>
+                 )}
+
+             </div>
+        )}
+
+        {/* Exchange Log */}
+        {activeTab === 'exchange' && (
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-in fade-in duration-300">
+                <div className="p-4 bg-gray-50 font-bold border-b text-sm text-gray-700 flex justify-between">
+                    <span>سجل عمليات الصرف</span>
+                    <span className="text-xs font-normal text-gray-500 bg-white px-2 py-1 rounded border">العدد: {exchangeTx.length}</span>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-right text-sm">
+                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                            <tr>
+                                <th className="p-3">الوقت</th>
+                                <th className="p-3">الموظف</th>
+                                <th className="p-3">من (استلام)</th>
+                                <th className="p-3">إلى (تسليم)</th>
+                                <th className="p-3">الإشعار</th>
+                                <th className="p-3">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {exchangeTx.map(t => (
+                                <tr key={t.id} className="hover:bg-gray-50">
+                                    <td className="p-3 text-gray-600">
+                                        <div className="font-bold">{new Date(t.created_at).toLocaleDateString('ar-EG')}</div>
+                                        <div className="text-xs">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
+                                    </td>
+                                    <td className="p-3 font-medium">{getEmployeeName(t.employee_id)}</td>
+                                    <td className="p-3 font-bold text-green-700" dir="ltr">{t.from_amount.toLocaleString()} {t.from_currency}</td>
+                                    <td className="p-3 text-red-600" dir="ltr">{t.to_amount?.toLocaleString()} {t.to_currency}</td>
+                                    <td className="p-3 text-xs text-gray-500 font-mono">{t.receipt_number || '-'}</td>
+                                    <td className="p-3 flex items-center gap-2">
+                                        <button onClick={() => setViewTransaction(t)} className="text-blue-600 hover:bg-blue-50 p-2 rounded-full">
+                                            <Eye size={18} />
+                                        </button>
+                                        {currentUser?.role === 'admin' && (
+                                            <button onClick={() => handleDelete(t.id)} className="text-red-600 hover:bg-red-50 p-2 rounded-full" title="حذف واسترداد">
+                                                <Trash2 size={18} />
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                            {exchangeTx.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-gray-400">لا توجد عمليات مطابقة للفلتر</td></tr>}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         )}
 
-        {/* Transactions Table & Mobile List */}
-        <div className="flex-1 overflow-y-auto bg-gray-50/50 p-4 md:p-0 rounded-2xl">
-            {/* Desktop Table */}
-            <div className="hidden md:block overflow-x-auto bg-white rounded-2xl border border-gray-100">
-                <table className="w-full text-right">
-                    <thead className="bg-gray-50 text-gray-500 text-xs font-bold uppercase sticky top-0">
-                        <tr>
-                            <th className="p-4 whitespace-nowrap">التفاصيل</th>
-                            <th className="p-4 whitespace-nowrap">النوع</th>
-                            <th className="p-4 whitespace-nowrap">المبلغ</th>
-                            <th className="p-4 whitespace-nowrap text-left">إجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        {displayTransactions.map(t => (
-                            <tr key={t.id} className="hover:bg-gray-50 transition group">
-                                <td className="p-4">
-                                    <div className="flex flex-col">
-                                        <span className="text-xs text-gray-400 mb-0.5 flex gap-2">
-                                            <span>{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</span>
-                                            <span>•</span>
-                                            <span>{new Date(t.created_at).toLocaleDateString('ar-EG')}</span>
-                                        </span>
-                                        <span className="font-bold text-gray-800 text-sm">{getEmployeeName(t.employee_id)}</span>
-                                        <span className="text-xs text-gray-500 mt-1 truncate max-w-[150px] md:max-w-none">
-                                            {t.description || '-'} {t.receipt_number ? `(#${t.receipt_number})` : ''}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td className="p-4 align-top">
-                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap
-                                        ${t.type === 'expense' ? 'bg-red-100 text-red-700' : 
-                                          t.type === 'exchange' ? 'bg-blue-100 text-blue-700' : 
-                                          t.type.includes('wallet') ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
-                                        }`}>
-                                        {getTxTypeLabel(t.type)}
-                                    </span>
-                                </td>
-                                <td className="p-4 align-top">
-                                    <div className="flex flex-col">
-                                        <span className="font-bold text-gray-900" dir="ltr">
-                                            {Math.round(t.from_amount).toLocaleString()} {t.from_currency}
-                                        </span>
-                                        {t.to_amount && (
-                                            <span className="text-xs text-gray-400 mt-1" dir="ltr">
-                                                → {Math.round(t.to_amount).toLocaleString()} {t.to_currency}
-                                            </span>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="p-4 align-top text-left">
-                                    <div className="flex items-center justify-end gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => setViewTransaction(t)} className="p-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition" title="عرض الإشعار">
-                                            <Eye size={16} />
-                                        </button>
-                                        {currentUser?.role === 'admin' && (
-                                            <button onClick={() => handleDelete(t.id)} className="p-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition" title="حذف">
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                        {displayTransactions.length === 0 && (
-                            <tr>
-                                <td colSpan={4} className="p-12 text-center">
-                                    <div className="flex flex-col items-center text-gray-300">
-                                        <FileMinus size={48} className="mb-3 opacity-20" />
-                                        <p className="text-sm">لا توجد عمليات مطابقة</p>
-                                    </div>
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+        {/* Treasury Log */}
+        {activeTab === 'treasury' && (
+             <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-in fade-in duration-300">
+             <div className="p-4 bg-gray-50 font-bold border-b text-sm text-gray-700 flex justify-between">
+                <span>سجل حركة الخزينة</span>
+                <span className="text-xs font-normal text-gray-500 bg-white px-2 py-1 rounded border">العدد: {treasuryTx.length}</span>
+             </div>
+             <div className="overflow-x-auto">
+                 <table className="w-full text-right text-sm">
+                     <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                         <tr>
+                             <th className="p-3">الوقت</th>
+                             <th className="p-3">النوع</th>
+                             <th className="p-3">المبلغ</th>
+                             <th className="p-3">الوصف</th>
+                         </tr>
+                     </thead>
+                     <tbody className="divide-y">
+                         {treasuryTx.map(t => (
+                             <tr key={t.id} className="hover:bg-gray-50">
+                                 <td className="p-3 text-gray-600">
+                                     <div className="font-bold">{new Date(t.created_at).toLocaleDateString('ar-EG')}</div>
+                                     <div className="text-xs">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
+                                 </td>
+                                 <td className="p-3">
+                                     <span className={`px-2 py-1 rounded-full text-xs font-bold ${t.type === 'treasury_feed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                         {t.type === 'treasury_feed' ? 'إيداع/تغذية' : 'سحب/استرداد'}
+                                     </span>
+                                 </td>
+                                 <td className="p-3 font-bold" dir="ltr">{t.from_amount.toLocaleString()} {t.from_currency}</td>
+                                 <td className="p-3 text-xs text-gray-500">{t.description}</td>
+                             </tr>
+                         ))}
+                         {treasuryTx.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-gray-400">لا توجد حركات مطابقة للفلتر</td></tr>}
+                     </tbody>
+                 </table>
+             </div>
+         </div>
+        )}
 
-            {/* Mobile Cards List */}
-            <div className="md:hidden space-y-3">
-                {displayTransactions.map(t => (
-                    <div key={t.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3">
-                        <div className="flex justify-between items-start">
-                            <div className="flex flex-col">
-                                <span className={`text-xs font-bold px-2 py-1 rounded-md w-fit
-                                    ${t.type === 'expense' ? 'bg-red-100 text-red-700' : 
-                                      t.type === 'exchange' ? 'bg-blue-100 text-blue-700' : 
-                                      t.type.includes('wallet') ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
-                                    }`}>
-                                    {getTxTypeLabel(t.type)}
-                                </span>
-                                <span className="text-xs text-gray-400 mt-1">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</span>
-                            </div>
-                            <div className="text-left">
-                                 <span className="text-xs text-gray-400 block">الموظف</span>
-                                 <span className="text-sm font-bold text-gray-700">{getEmployeeName(t.employee_id)}</span>
-                            </div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                            <div>
-                                 <span className="block text-xs text-gray-400">من</span>
-                                 <span className="font-bold text-gray-900" dir="ltr">{Math.round(t.from_amount).toLocaleString()} {t.from_currency}</span>
-                            </div>
-                            {t.to_amount && (
-                                <div className="text-left">
-                                     <span className="block text-xs text-gray-400">إلى</span>
-                                     <span className="font-bold text-blue-600" dir="ltr">{Math.round(t.to_amount).toLocaleString()} {t.to_currency}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="flex justify-between items-center border-t border-gray-100 pt-2">
-                             <span className="text-xs text-gray-500 truncate max-w-[150px]">{t.description || 'بدون وصف'} {t.receipt_number ? `(${t.receipt_number})` : ''}</span>
-                             <div className="flex gap-2">
-                                 <button onClick={() => setViewTransaction(t)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><Eye size={16}/></button>
-                                 {currentUser?.role === 'admin' && (
-                                     <button onClick={() => handleDelete(t.id)} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"><Trash2 size={16}/></button>
-                                 )}
-                             </div>
-                        </div>
-                    </div>
-                ))}
-                {displayTransactions.length === 0 && (
-                    <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-200">
-                        <div className="flex flex-col items-center text-gray-300">
-                            <FileMinus size={48} className="mb-3 opacity-20" />
-                            <p className="text-sm">لا توجد عمليات مطابقة</p>
-                        </div>
-                    </div>
-                )}
-            </div>
-            
-            {isLoading && (
-                <div className="absolute inset-0 bg-white/50 flex items-center justify-center backdrop-blur-sm z-10 rounded-2xl">
-                    <Loader2 className="animate-spin text-blue-600" size={32} />
-                </div>
-            )}
-        </div>
-
+        {/* Receipt Viewer */}
         {viewTransaction && (
             <ReceiptModal 
                 transaction={viewTransaction} 
