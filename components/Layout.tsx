@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useStore } from '../context/StoreContext';
-import { useHistory, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, Home, ArrowRightLeft, Landmark, BarChart3, Building, Smartphone } from 'lucide-react';
 import Toast from './Toast';
 
@@ -12,12 +12,12 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children, title }) => {
   const { currentUser, logout, companies, toast, hideToast } = useStore();
-  const history = useHistory();
+  const navigate = useNavigate();
   const location = useLocation();
 
   const handleLogout = () => {
     logout();
-    history.push('/login');
+    navigate('/login');
   };
 
   const currentCompany = currentUser?.company_id 
@@ -28,7 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
     const isActive = location.pathname === to;
     return (
       <button 
-        onClick={() => history.push(to)}
+        onClick={() => navigate(to)}
         className={`flex flex-col items-center justify-center w-full py-2 ${isActive ? 'text-blue-600' : 'text-gray-500'}`}
       >
         <Icon size={24} />
