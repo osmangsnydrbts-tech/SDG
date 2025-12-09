@@ -383,6 +383,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return { success: false, message: 'خطأ في الوصول للخزينة' };
     }
 
+    // --- CHECK BALANCE BEFORE TRANSACTION ---
+    if (fromCurrency === 'EGP') {
+        // Customer GIVES EGP, TAKES SDG.
+        // We must have enough SDG in treasury to give to customer.
+        if (empTreasury.sdg_balance < toAmount) {
+             return { success: false, message: `رصيد السوادني غير كافي في الخزينة. المطلوب: ${toAmount.toLocaleString()}، المتوفر: ${empTreasury.sdg_balance.toLocaleString()}` };
+        }
+    } else {
+        // Customer GIVES SDG, TAKES EGP.
+        // We must have enough EGP in treasury to give to customer.
+        if (empTreasury.egp_balance < toAmount) {
+             return { success: false, message: `رصيد المصري غير كافي في الخزينة. المطلوب: ${toAmount.toLocaleString()}، المتوفر: ${empTreasury.egp_balance.toLocaleString()}` };
+        }
+    }
+
     // Prepare Update
     const updates: any = {};
     if (fromCurrency === 'EGP') {
