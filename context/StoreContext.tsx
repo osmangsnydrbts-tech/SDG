@@ -697,10 +697,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             balance: wallet.balance + totalToAdd
           }).eq('id', walletId);
 
-          // 2. Update Employee Treasury (Add funds to treasury because employee received cash)
-          await supabase.from('treasuries').update({
-            egp_balance: empTreasury.egp_balance + totalToAdd
-          }).eq('id', empTreasury.id);
+          // 2. DO NOT Update Employee Treasury for Deposits (User Request)
+          // Previously: Added to Treasury
       }
 
       const { data: newTx, error } = await supabase.from('transactions').insert({
@@ -830,3 +828,4 @@ export const useStore = () => {
   if (!context) throw new Error('useStore must be used within StoreProvider');
   return context;
 };
+    
