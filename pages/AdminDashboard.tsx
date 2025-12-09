@@ -1,14 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { withRouter, RouteComponentProps } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, ChevronDown, ChevronUp, Banknote, ArrowRightLeft, Smartphone, ArrowUpCircle } from 'lucide-react';
 import { User } from '../types';
 
-const AdminDashboard: React.FC<RouteComponentProps> = ({ history }) => {
+const AdminDashboard: React.FC = () => {
   const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies, treasuries } = useStore();
   const rateData = exchangeRates.find(r => r.company_id === currentUser?.company_id);
   const company = companies.find(c => c.id === currentUser?.company_id);
+  const navigate = useNavigate();
 
   const [showRateModal, setShowRateModal] = useState(false);
   const [showEmpModal, setShowEmpModal] = useState(false);
@@ -237,19 +237,19 @@ const AdminDashboard: React.FC<RouteComponentProps> = ({ history }) => {
         <QuickAction 
             icon={Landmark} 
             label="إدارة الخزينة" 
-            onClick={() => history.push('/admin/treasury')} 
+            onClick={() => navigate('/admin/treasury')} 
             color="bg-teal-600" 
         />
         <QuickAction 
             icon={Users} 
             label="إدارة التجار" 
-            onClick={() => history.push('/admin/merchants')} 
+            onClick={() => navigate('/admin/merchants')} 
             color="bg-indigo-600" 
         />
         <QuickAction 
             icon={Wallet} 
             label="المحافظ الإلكترونية" 
-            onClick={() => history.push('/admin/ewallets')} 
+            onClick={() => navigate('/admin/ewallets')} 
             color="bg-pink-600" 
         />
       </div>
@@ -547,4 +547,4 @@ const CheckIcon = ({ size }: { size: number }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
 );
 
-export default withRouter(AdminDashboard);
+export default AdminDashboard;
