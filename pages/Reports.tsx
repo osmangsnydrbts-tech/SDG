@@ -90,7 +90,10 @@ const Reports: React.FC = () => {
           } else if (t.type === 'wallet_feed') {
               egpOut += amount;
           } else if (t.type === 'treasury_feed') {
-              if (t.from_currency === 'EGP') egpIn += amount; else sdgIn += amount;
+              // Exclude EGP Treasury Feed from Receipts report as per request
+              if (t.from_currency === 'SDG') {
+                  sdgIn += amount;
+              }
           } else if (t.type === 'treasury_withdraw') {
                if (t.from_currency === 'EGP') egpOut += amount; else sdgOut += amount;
           }
@@ -112,10 +115,9 @@ const Reports: React.FC = () => {
 
       // Card Filter Logic
       if (activeFilter === 'EGP_IN') {
-          // Show transactions where EGP came IN
+          // Show transactions where EGP came IN (Excluding Treasury Feed)
           filtered = filtered.filter(t => 
               (t.type === 'exchange' && t.from_currency === 'EGP') ||
-              (t.type === 'treasury_feed' && t.from_currency === 'EGP') ||
               t.type === 'wallet_withdrawal'
           );
       } else if (activeFilter === 'SDG_IN') {
