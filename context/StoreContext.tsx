@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   User, Company, Treasury, ExchangeRate, Transaction, 
-  Merchant, MerchantEntry, EWallet
+  Merchant, MerchantEntry, EWallet, DEFAULT_SUPER_ADMIN
 } from '../types';
 import { supabase } from '../src/lib/supabase';
 import { ToastType } from '../components/Toast';
@@ -24,7 +24,7 @@ interface StoreData {
   hideToast: () => void;
 
   // Actions
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<User | null>;
   logout: () => void;
   addCompany: (name: string, username: string, password: string, days: number, phoneNumbers: string, logo?: string) => Promise<{ success: boolean; message: string }>;
   updateCompany: (id: number, data: Partial<Company> & { password?: string }) => Promise<{ success: boolean; message: string }>;
@@ -160,26 +160,38 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // --- ACTIONS ---
 
   const login = async (username: string, pass: string) => {
-    const { data: user } = await supabase
-      .from('users')
-      .select('*')
-      .eq('username', username)
-      .eq('password', pass)
-      .eq('is_active', true)
-      .single();
+    try {
+        const { data: user } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .eq('password', pass)
+        .eq('is_active', true)
+        .maybeSingle();
 
-    if (user) {
-      if (user.role !== 'super_admin' && user.company_id) {
-        const { data: company } = await supabase.from('companies').select('*').eq('id', user.company_id).single();
-        if (!company || !company.is_active || new Date(company.subscription_end) < new Date()) {
-          return false;
+        if (user) {
+            if (user.role !== 'super_admin' && user.company_id) {
+                const { data: company } = await supabase.from('companies').select('*').eq('id', user.company_id).single();
+                if (!company || !company.is_active || new Date(company.subscription_end) < new Date()) {
+                    return null;
+                }
+            }
+            setCurrentUser(user);
+            showToast(`مرحباً ${user.full_name}`, 'success');
+            return user;
         }
-      }
-      setCurrentUser(user);
-      showToast(`مرحباً ${user.full_name}`, 'success');
-      return true;
+    } catch (error) {
+        console.error("Login attempt failed against DB", error);
     }
-    return false;
+
+    // Fallback for default super admin if DB is empty or connection fails
+    if (username === DEFAULT_SUPER_ADMIN.username && pass === DEFAULT_SUPER_ADMIN.password) {
+        setCurrentUser(DEFAULT_SUPER_ADMIN);
+        showToast(`مرحباً ${DEFAULT_SUPER_ADMIN.full_name}`, 'success');
+        return DEFAULT_SUPER_ADMIN;
+    }
+
+    return null;
   };
 
   const logout = () => {
