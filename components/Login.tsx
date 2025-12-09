@@ -1,18 +1,17 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { withRouter, RouteComponentProps } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { Lock, User as UserIcon, Info, Phone, MessageCircle, X, Loader2 } from 'lucide-react';
 import Toast from './Toast';
 
-const Login: React.FC = () => {
+const Login: React.FC<RouteComponentProps> = ({ history }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showAbout, setShowAbout] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
   const { login, toast, hideToast, showToast } = useStore();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,10 +21,9 @@ const Login: React.FC = () => {
       
       if (result.success && result.role) {
         // Navigate based on the returned role immediately
-        // Do NOT set isLoading(false) here. Keep spinner until page unmounts.
-        if (result.role === 'super_admin') navigate('/super-admin');
-        else if (result.role === 'admin') navigate('/admin');
-        else navigate('/employee');
+        if (result.role === 'super_admin') history.push('/super-admin');
+        else if (result.role === 'admin') history.push('/admin');
+        else history.push('/employee');
       } else {
         // Only stop loading if login failed
         showToast('بيانات الدخول غير صحيحة أو الاشتراك منتهي', 'error');
@@ -178,4 +176,4 @@ const Login: React.FC = () => {
   );
 };
 
-export default Login;
+export default withRouter(Login);
