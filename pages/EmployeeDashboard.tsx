@@ -1,16 +1,16 @@
-
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { withRouter, RouteComponentProps } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ArrowRightLeft, Wallet, ArrowUpRight, ArrowDownLeft, Smartphone, FileMinus, Loader2, CheckCircle } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 import FormattedInput from '../components/FormattedInput';
 
-const EmployeeDashboard: React.FC<RouteComponentProps> = ({ history }) => {
+const EmployeeDashboard: React.FC = () => {
   const { currentUser, treasuries, fetchRecentTransactions, companies, users, eWallets, addExpense } = useStore();
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const navigate = useNavigate();
   
   // Expense Modal State
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -113,13 +113,13 @@ const EmployeeDashboard: React.FC<RouteComponentProps> = ({ history }) => {
                     <p className="text-xs text-pink-400 mb-1 flex items-center gap-1"><Smartphone size={12}/> رصيد المحافظ</p>
                     <p className="text-xl font-bold text-pink-700">{myWalletsBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</p>
                 </div>
-                <button onClick={() => history.push('/wallet-transfer')} className="text-xs bg-white text-pink-600 px-3 py-1 rounded-lg shadow-sm font-bold">تحويل</button>
+                <button onClick={() => navigate('/wallet-transfer')} className="text-xs bg-white text-pink-600 px-3 py-1 rounded-lg shadow-sm font-bold">تحويل</button>
             </div>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-          <button onClick={() => history.push('/exchange')} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 transition transform active:scale-95">
+          <button onClick={() => navigate('/exchange')} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 transition transform active:scale-95">
             <ArrowRightLeft size={24}/><span className="font-bold">صرف عملة</span>
           </button>
           
@@ -188,4 +188,4 @@ const EmployeeDashboard: React.FC<RouteComponentProps> = ({ history }) => {
   );
 };
 
-export default withRouter(EmployeeDashboard);
+export default EmployeeDashboard;
