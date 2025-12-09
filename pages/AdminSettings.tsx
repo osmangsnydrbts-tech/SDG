@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Building, UploadCloud, Save, Loader2, Info, Share2 } from 'lucide-react';
+import { Building, UploadCloud, Save, Loader2, Info, Share2, CheckCircle, AlertCircle } from 'lucide-react';
 
 const AdminSettings: React.FC = () => {
   const { currentUser, companies, updateCompany } = useStore();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [msg, setMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   
   const currentCompany = companies.find(c => c.id === currentUser?.company_id);
 
@@ -38,13 +39,27 @@ const AdminSettings: React.FC = () => {
       e.preventDefault();
       if (!currentCompany) return;
       setIsProcessing(true);
-      await updateCompany(currentCompany.id, {
-          name,
-          logo,
-          phone_numbers: phoneNumbers,
-          footer_message: footerMsg
-      });
-      setIsProcessing(false);
+      setMsg(null);
+      
+      try {
+        const res = await updateCompany(currentCompany.id, {
+            name,
+            logo,
+            phone_numbers: phoneNumbers,
+            footer_message: footerMsg
+        });
+
+        if (res.success) {
+            setMsg({ type: 'success', text: 'تم حفظ إعدادات الشركة بنجاح' });
+            setTimeout(() => setMsg(null), 3000);
+        } else {
+            setMsg({ type: 'error', text: res.message || 'حدث خطأ أثناء الحفظ' });
+        }
+      } catch (err) {
+        setMsg({ type: 'error', text: 'حدث خطأ غير متوقع' });
+      } finally {
+        setIsProcessing(false);
+      }
   };
 
   return (
@@ -122,7 +137,14 @@ const AdminSettings: React.FC = () => {
                     ></textarea>
                 </div>
 
-                <div className="pt-4">
+                {msg && (
+                    <div className={`p-4 rounded-xl flex items-center gap-3 font-bold ${msg.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {msg.type === 'success' ? <CheckCircle size={20}/> : <AlertCircle size={20}/>}
+                        {msg.text}
+                    </div>
+                )}
+
+                <div className="pt-2">
                     <button 
                         type="submit" 
                         disabled={isProcessing} 
