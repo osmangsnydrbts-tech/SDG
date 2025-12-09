@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { StoreProvider, useStore } from './context/StoreContext';
@@ -14,7 +13,7 @@ import Reports from './pages/Reports';
 import EWallets from './pages/EWallets';
 import WalletTransfer from './pages/WalletTransfer';
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode, allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
+const ProtectedRoute: React.FC<{ children: JSX.Element, allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
   const { currentUser } = useStore();
   
   if (!currentUser) return <Navigate to="/login" replace />;
@@ -26,7 +25,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode, allowedRoles?: strin
     return <Navigate to="/employee" replace />;
   }
 
-  return <>{children}</>;
+  return children;
 };
 
 const AppRoutes = () => {
