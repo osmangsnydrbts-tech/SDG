@@ -5,7 +5,7 @@ import {
   Download, Filter, Search, Eye, Trash2, Calendar, 
   ArrowRightLeft, ArrowUpRight, ArrowDownLeft,
   Banknote, ArrowUpCircle, ArrowDownCircle,
-  Users, Wallet
+  Users, Wallet, FileMinus, XCircle
 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
@@ -19,6 +19,9 @@ const Reports: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
+  
+  // Card Filter State
+  const [activeCardFilter, setActiveCardFilter] = useState<'ALL' | 'EGP' | 'SDG' | 'EXPENSE' | 'COMMISSION'>('ALL');
   
   // Modals
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
@@ -44,8 +47,8 @@ const Reports: React.FC = () => {
       setEndDate(today);
   };
 
-  // --- Filtering Logic ---
-  const filteredTransactions = useMemo(() => {
+  // --- Base Filtering Logic (Date, Search, Employee) ---
+  const baseFilteredTransactions = useMemo(() => {
     return transactions.filter(t => {
         // 1. Permission / Scope Check
         let roleMatch = false;
@@ -66,7 +69,7 @@ const Reports: React.FC = () => {
             if (t.employee_id !== parseInt(selectedEmployeeId)) return false;
         }
 
-        // 4. Transaction Type Filter
+        // 4. Transaction Type Filter (Dropdown)
         if (selectedType !== 'all') {
             if (selectedType === 'exchange' && t.type !== 'exchange') return false;
             if (selectedType === 'wallet' && !['wallet_deposit', 'wallet_withdrawal', 'wallet_feed'].includes(t.type)) return false;
@@ -88,15 +91,17 @@ const Reports: React.FC = () => {
     }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [transactions, currentUser, startDate, endDate, selectedEmployeeId, selectedType, searchQuery, users]);
 
-  // --- Stats Calculation ---
+  // --- Stats Calculation (Based on Base Filter) ---
   const stats = useMemo(() => {
       let egpIn = 0;
       let egpOut = 0;
       let sdgIn = 0;
       let sdgOut = 0;
       let commissions = 0;
+      let expenseEgp = 0;
+      let expenseSdg = 0;
 
-      filteredTransactions.forEach(t => {
+      baseFilteredTransactions.forEach(t => {
           const amount = Math.round(t.from_amount);
           
           if (t.type === 'exchange') {
@@ -109,8 +114,13 @@ const Reports: React.FC = () => {
               }
           }
           else if (t.type === 'expense') {
-              if (t.from_currency === 'EGP') egpOut += amount;
-              else sdgOut += amount;
+              if (t.from_currency === 'EGP') {
+                  egpOut += amount;
+                  expenseEgp += amount;
+              } else {
+                  sdgOut += amount;
+                  expenseSdg += amount;
+              }
           }
           else if (t.type === 'wallet_deposit') { 
               egpOut += amount; 
@@ -136,16 +146,39 @@ const Reports: React.FC = () => {
       return {
           egpIn, egpOut, egpNet: egpIn - egpOut,
           sdgIn, sdgOut, sdgNet: sdgIn - sdgOut,
-          commissions
+          commissions,
+          expenseEgp, expenseSdg
       };
-  }, [filteredTransactions]);
+  }, [baseFilteredTransactions]);
+
+  // --- Final List Filter (Based on Clicked Card) ---
+  const displayTransactions = useMemo(() => {
+      if (activeCardFilter === 'ALL') return baseFilteredTransactions;
+
+      return baseFilteredTransactions.filter(t => {
+          if (activeCardFilter === 'EXPENSE') return t.type === 'expense';
+          if (activeCardFilter === 'COMMISSION') return (t.commission || 0) > 0;
+          
+          // Currency Filters
+          if (activeCardFilter === 'EGP') {
+              // Show transaction if it affects EGP
+              return t.from_currency === 'EGP' || t.to_currency === 'EGP' || 
+                     ['wallet_deposit', 'wallet_withdrawal', 'wallet_feed'].includes(t.type);
+          }
+          if (activeCardFilter === 'SDG') {
+              // Show transaction if it affects SDG
+              return t.from_currency === 'SDG' || t.to_currency === 'SDG';
+          }
+          return true;
+      });
+  }, [baseFilteredTransactions, activeCardFilter]);
 
 
   // --- Export Function ---
   const handleExport = () => {
     const headers = ["التاريخ", "الموظف", "نوع العملية", "المبلغ", "العملة", "التفاصيل", "الإشعار"];
     
-    const rows = filteredTransactions.map(t => [
+    const rows = displayTransactions.map(t => [
         new Date(t.created_at).toLocaleDateString('ar-EG'),
         getEmployeeName(t.employee_id),
         getTxTypeLabel(t.type),
@@ -192,6 +225,12 @@ const Reports: React.FC = () => {
   };
 
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee');
+
+  // Helper for Card Selection Style
+  const getCardStyle = (filterType: typeof activeCardFilter, baseColorClass: string, activeColorClass: string) => {
+      const isActive = activeCardFilter === filterType;
+      return `relative cursor-pointer transition-all duration-300 rounded-xl shadow-sm p-5 border-2 ${isActive ? `${activeColorClass} scale-[1.02] shadow-md` : `${baseColorClass} hover:bg-gray-50`}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -244,46 +283,87 @@ const Reports: React.FC = () => {
             </div>
         </div>
 
-        {/* === Summary Cards (The "Simple" View) === */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* === Interactive Summary Cards === */}
+        {activeCardFilter !== 'ALL' && (
+            <div className="flex justify-center -mb-2">
+                 <button 
+                    onClick={() => setActiveCardFilter('ALL')}
+                    className="flex items-center gap-1 text-xs bg-gray-800 text-white px-3 py-1 rounded-full hover:bg-black transition animate-in fade-in"
+                 >
+                    <XCircle size={14}/> إلغاء التصفية (عرض الكل)
+                 </button>
+            </div>
+        )}
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {/* EGP Card */}
-            <div className="bg-white p-5 rounded-xl shadow-sm border-r-4 border-blue-500">
+            <div 
+                onClick={() => setActiveCardFilter('EGP')}
+                className={`bg-white ${getCardStyle('EGP', 'border-transparent border-r-4 border-r-blue-500', 'border-blue-500 bg-blue-50')}`}
+            >
                 <div className="flex justify-between items-start mb-2">
-                    <span className="text-gray-500 text-xs font-bold">صافي المصري (EGP)</span>
+                    <span className="text-gray-500 text-xs font-bold">صافي المصري</span>
                     <Banknote size={18} className="text-blue-500"/>
                 </div>
-                <div className="text-2xl font-black text-gray-800 mb-2" dir="ltr">
+                <div className="text-xl lg:text-2xl font-black text-gray-800 mb-2" dir="ltr">
                     {stats.egpNet.toLocaleString()}
                 </div>
-                <div className="flex gap-4 text-xs">
+                <div className="flex gap-4 text-[10px] lg:text-xs">
                     <span className="text-green-600 flex items-center gap-1"><ArrowDownCircle size={12}/> {stats.egpIn.toLocaleString()}</span>
                     <span className="text-red-500 flex items-center gap-1"><ArrowUpCircle size={12}/> {stats.egpOut.toLocaleString()}</span>
                 </div>
             </div>
 
             {/* SDG Card */}
-            <div className="bg-white p-5 rounded-xl shadow-sm border-r-4 border-emerald-500">
+            <div 
+                onClick={() => setActiveCardFilter('SDG')}
+                className={`bg-white ${getCardStyle('SDG', 'border-transparent border-r-4 border-r-emerald-500', 'border-emerald-500 bg-emerald-50')}`}
+            >
                 <div className="flex justify-between items-start mb-2">
-                    <span className="text-gray-500 text-xs font-bold">صافي السوداني (SDG)</span>
+                    <span className="text-gray-500 text-xs font-bold">صافي السوداني</span>
                     <Banknote size={18} className="text-emerald-500"/>
                 </div>
-                <div className="text-2xl font-black text-gray-800 mb-2" dir="ltr">
+                <div className="text-xl lg:text-2xl font-black text-gray-800 mb-2" dir="ltr">
                     {stats.sdgNet.toLocaleString()}
                 </div>
-                <div className="flex gap-4 text-xs">
+                <div className="flex gap-4 text-[10px] lg:text-xs">
                     <span className="text-green-600 flex items-center gap-1"><ArrowDownCircle size={12}/> {stats.sdgIn.toLocaleString()}</span>
                     <span className="text-red-500 flex items-center gap-1"><ArrowUpCircle size={12}/> {stats.sdgOut.toLocaleString()}</span>
                 </div>
             </div>
 
+            {/* Expenses Card */}
+            <div 
+                onClick={() => setActiveCardFilter('EXPENSE')}
+                className={`bg-white ${getCardStyle('EXPENSE', 'border-transparent border-r-4 border-r-orange-500', 'border-orange-500 bg-orange-50')}`}
+            >
+                 <div className="flex justify-between items-center mb-1">
+                    <span className="text-gray-500 text-xs font-bold">المنصرفات</span>
+                    <FileMinus size={18} className="text-orange-500"/>
+                 </div>
+                 <div className="space-y-1 mt-2">
+                     <div className="flex justify-between items-end">
+                         <span className="text-sm font-bold text-gray-700">{stats.expenseEgp.toLocaleString()}</span>
+                         <span className="text-[10px] text-gray-400">EGP</span>
+                     </div>
+                     <div className="flex justify-between items-end border-t border-dashed border-gray-200 pt-1">
+                         <span className="text-sm font-bold text-gray-700">{stats.expenseSdg.toLocaleString()}</span>
+                         <span className="text-[10px] text-gray-400">SDG</span>
+                     </div>
+                 </div>
+            </div>
+
             {/* Commissions Card */}
-            <div className="bg-white p-5 rounded-xl shadow-sm border-r-4 border-purple-500 flex flex-col justify-center">
+            <div 
+                onClick={() => setActiveCardFilter('COMMISSION')}
+                className={`bg-white ${getCardStyle('COMMISSION', 'border-transparent border-r-4 border-r-purple-500', 'border-purple-500 bg-purple-50')}`}
+            >
                  <div className="flex justify-between items-center mb-1">
                     <span className="text-gray-500 text-xs font-bold">أرباح العمولات</span>
                     <Wallet size={18} className="text-purple-500"/>
                  </div>
-                 <div className="text-2xl font-black text-purple-700" dir="ltr">
-                    {stats.commissions.toLocaleString()} <span className="text-sm font-medium text-gray-400">EGP</span>
+                 <div className="text-xl lg:text-2xl font-black text-purple-700 mt-2" dir="ltr">
+                    {stats.commissions.toLocaleString()} <span className="text-xs font-medium text-gray-400">EGP</span>
                  </div>
             </div>
         </div>
@@ -301,13 +381,18 @@ const Reports: React.FC = () => {
                         className="bg-transparent border-none text-sm focus:ring-0 w-32 md:w-48 placeholder-gray-400"
                     />
                 </div>
-                <button 
-                    onClick={handleExport}
-                    className="text-gray-600 hover:text-blue-600 transition"
-                    title="تصدير Excel"
-                >
-                    <Download size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                    <div className="text-xs text-gray-400 hidden md:block">
+                        عدد العمليات: <span className="font-bold text-gray-700">{displayTransactions.length}</span>
+                    </div>
+                    <button 
+                        onClick={handleExport}
+                        className="text-gray-600 hover:text-blue-600 transition"
+                        title="تصدير Excel"
+                    >
+                        <Download size={20} />
+                    </button>
+                </div>
             </div>
             
             <div className="overflow-x-auto">
@@ -322,7 +407,7 @@ const Reports: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                        {filteredTransactions.map(t => (
+                        {displayTransactions.map(t => (
                             <tr key={t.id} className="hover:bg-gray-50/80 transition">
                                 <td className="p-3 text-gray-600 whitespace-nowrap">
                                     {new Date(t.created_at).toLocaleDateString('ar-EG')}
@@ -359,10 +444,10 @@ const Reports: React.FC = () => {
                                 </td>
                             </tr>
                         ))}
-                        {filteredTransactions.length === 0 && (
+                        {displayTransactions.length === 0 && (
                             <tr>
                                 <td colSpan={5} className="p-8 text-center text-gray-400 text-xs">
-                                    لا توجد عمليات
+                                    لا توجد عمليات {activeCardFilter !== 'ALL' ? 'لهذا التصنيف' : ''}
                                 </td>
                             </tr>
                         )}
