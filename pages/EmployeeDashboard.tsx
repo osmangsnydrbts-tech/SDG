@@ -1,14 +1,14 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ArrowRightLeft, Wallet, ArrowUpRight, ArrowDownLeft, Smartphone } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
 const EmployeeDashboard: React.FC = () => {
   const { currentUser, treasuries, transactions, companies, users, eWallets } = useStore();
-  const history = useHistory();
+  const navigate = useNavigate();
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
 
   const myTreasury = treasuries.find(t => t.employee_id === currentUser?.id);
@@ -72,7 +72,7 @@ const EmployeeDashboard: React.FC = () => {
                     <p className="text-xl font-bold text-pink-700">{myWalletsBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} EGP</p>
                 </div>
                 <button 
-                    onClick={() => history.push('/wallet-transfer')}
+                    onClick={() => navigate('/wallet-transfer')}
                     className="text-xs bg-white text-pink-600 px-3 py-1 rounded-lg shadow-sm font-bold"
                 >
                     تحويل
@@ -82,7 +82,7 @@ const EmployeeDashboard: React.FC = () => {
       </div>
 
       <button 
-        onClick={() => history.push('/exchange')}
+        onClick={() => navigate('/exchange')}
         className="w-full bg-blue-600 text-white p-5 rounded-2xl shadow-lg flex items-center justify-between transition transform active:scale-95"
       >
         <div className="flex items-center gap-3">
