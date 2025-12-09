@@ -20,7 +20,6 @@ const AdminDashboard: React.FC = () => {
   const [editPassId, setEditPassId] = useState<number | null>(null);
   const [editInfoId, setEditInfoId] = useState<User | null>(null);
 
-  // New States for Employee Report & Secure Delete
   const [selectedEmpReport, setSelectedEmpReport] = useState<User | null>(null);
   const [empToDelete, setEmpToDelete] = useState<number | null>(null);
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -64,7 +63,6 @@ const AdminDashboard: React.FC = () => {
   const handleShareRates = async () => {
     if (!rateData || !company) return;
 
-    // Use footer_message if available, otherwise fall back to phone_numbers
     const footer = company.footer_message ? `\n\n${company.footer_message}` : (company.phone_numbers ? `\n📞 ${company.phone_numbers}` : '');
 
     const text = `
@@ -155,7 +153,6 @@ ${footer}
       e.preventDefault();
       if (!empToDelete || !currentUser) return;
       
-      // Simple security check (Checking current user password vs input)
       if (confirmPassword === currentUser.password) {
         setIsProcessing(true);
         await deleteEmployee(empToDelete);
@@ -174,7 +171,6 @@ ${footer}
     </button>
   );
 
-  // Helper for Employee Report
   const getEmpStats = (empId: number) => {
       const treasury = treasuries.find(t => t.employee_id === empId);
       const txs = transactions.filter(t => t.employee_id === empId).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -207,7 +203,6 @@ ${footer}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        {/* Updated Buttons */}
         <QuickAction 
             icon={RefreshCw} 
             label="تحديث الأسعار" 
@@ -282,7 +277,7 @@ ${footer}
                         </div>
                         
                         {company?.footer_message && (
-                            <div className="bg-gray-50 p-3 rounded-lg text-xs text-gray-600 text-center whitespace-pre-wrap">
+                            <div className="bg-gray-50 p-3 rounded-lg text-xs text-gray-600 text-center whitespace-pre-wrap border border-gray-100">
                                 {company.footer_message}
                             </div>
                         )}
