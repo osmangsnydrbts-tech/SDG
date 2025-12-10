@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Building, UploadCloud, Save, Loader2, Info, Share2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Building, UploadCloud, Save, Loader2, Share2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const AdminSettings: React.FC = () => {
