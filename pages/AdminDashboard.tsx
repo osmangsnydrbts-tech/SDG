@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock, RefreshCw, ChevronRight } from 'lucide-react';
+import { Landmark, UserPlus, Users, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock, RefreshCw, ChevronRight, Settings, Store } from 'lucide-react';
 import { User } from '../types';
 
 const AdminDashboard: React.FC = () => {
@@ -164,21 +164,6 @@ ${footer}
       }
   };
 
-  const QuickAction = ({ icon: Icon, label, onClick, color, subLabel }: any) => (
-    <button onClick={onClick} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between group hover:border-blue-200 transition active:scale-95">
-      <div className="flex items-center gap-3">
-          <div className={`p-3 rounded-full text-white ${color}`}>
-            <Icon size={24} />
-          </div>
-          <div className="text-right">
-            <span className="font-bold text-gray-800 block">{label}</span>
-            {subLabel && <span className="text-xs text-gray-400">{subLabel}</span>}
-          </div>
-      </div>
-      <ChevronRight size={18} className="text-gray-300 group-hover:text-blue-500 transition"/>
-    </button>
-  );
-
   const getEmpStats = (empId: number) => {
       const treasury = treasuries.find(t => t.employee_id === empId);
       const txs = transactions.filter(t => t.employee_id === empId).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -186,88 +171,101 @@ ${footer}
       return { treasury, recentTxs, totalTxs: txs.length };
   };
 
+  // Dashboard Button Component
+  const DashboardBtn = ({ title, icon: Icon, color, onClick }: any) => (
+    <button 
+      onClick={onClick} 
+      className={`${color} text-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-3 active:scale-95 transition min-h-[140px]`}
+    >
+      <div className="bg-white/20 p-3 rounded-full">
+        <Icon size={32} />
+      </div>
+      <span className="font-bold text-lg">{title}</span>
+    </button>
+  );
+
   return (
     <div className="space-y-6">
       
-      {/* Header Card */}
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+      {/* Header Card - Exchange Rates */}
+      <div className="bg-blue-600 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden mb-8">
         <div className="relative z-10">
-          <div className="flex justify-between items-start mb-4">
-             <div>
-                <h2 className="text-xl font-bold">{company?.name}</h2>
-                <p className="text-slate-400 text-xs">لوحة التحكم الإدارية</p>
-             </div>
-          </div>
-          
-          <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-              <div className="flex justify-between items-center mb-2">
-                 <p className="text-slate-300 text-xs flex items-center gap-1"><RefreshCw size={12}/> أسعار الصرف الحالية</p>
-                 <button onClick={() => setShowShareModal(true)} className="text-xs bg-blue-600 px-3 py-1 rounded-full flex items-center gap-1 hover:bg-blue-500 transition">
-                     <Share2 size={12} /> مشاركة
-                 </button>
+           <div className="flex justify-between items-start mb-6">
+               <h2 className="text-xl font-bold opacity-90">أسعار الصرف الحالية</h2>
+               <button onClick={() => setShowShareModal(true)} className="bg-white/20 hover:bg-white/30 p-2 rounded-full transition">
+                   <Share2 size={20} />
+               </button>
+           </div>
+           
+           <div className="flex justify-between items-center text-center">
+              <div onClick={() => setShowRateModal(true)} className="flex-1 cursor-pointer active:scale-95 transition">
+                 <span className="text-5xl font-bold block mb-1">{rateData?.sd_to_eg_rate}</span>
+                 <span className="text-blue-200 text-sm font-medium">مصري {'->'} سوداني</span>
               </div>
-              <div className="flex justify-between items-end">
-                <div onClick={() => setShowRateModal(true)} className="cursor-pointer hover:opacity-80">
-                  <span className="text-2xl font-bold block text-green-400">{rateData?.sd_to_eg_rate}</span>
-                  <span className="text-[10px] opacity-75">سوداني {'->'} مصري</span>
-                </div>
-                <div className="h-8 w-px bg-white/10"></div>
-                <div onClick={() => setShowRateModal(true)} className="cursor-pointer hover:opacity-80 text-right">
-                  <span className="text-2xl font-bold block text-blue-400">{rateData?.eg_to_sd_rate}</span>
-                  <span className="text-[10px] opacity-75">مصري {'->'} سوداني</span>
-                </div>
+              <div className="h-12 w-px bg-blue-400/50 mx-4"></div>
+              <div onClick={() => setShowRateModal(true)} className="flex-1 cursor-pointer active:scale-95 transition">
+                 <span className="text-5xl font-bold block mb-1">{rateData?.eg_to_sd_rate}</span>
+                 <span className="text-blue-200 text-sm font-medium">سوداني {'->'} مصري</span>
               </div>
-          </div>
+           </div>
         </div>
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-600/20 rounded-full blur-3xl"></div>
+        
+        {/* Decorative Background */}
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-blue-800/30 to-transparent"></div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* Operations */}
-        <p className="col-span-full text-xs font-bold text-gray-400 mt-2">العمليات والموظفين</p>
+      {/* Main Grid Actions */}
+      <div className="grid grid-cols-2 gap-4">
         
-        <QuickAction 
-            icon={RefreshCw} 
-            label="تحديث الأسعار" 
-            subLabel="تعديل سعر الصرف والعمولات"
-            onClick={() => setShowRateModal(true)} 
-            color="bg-slate-700" 
-        />
-        
-        <QuickAction 
-            icon={Users} 
-            label="إدارة الموظفين" 
-            subLabel={`${companyEmployees.length} موظف نشط`}
-            onClick={() => setShowManageEmpModal(true)} 
-            color="bg-purple-600" 
-        />
-        
-        <QuickAction 
+        {/* Add Employee (Orange) */}
+        <DashboardBtn 
+            title="إضافة موظف" 
             icon={UserPlus} 
-            label="إضافة موظف" 
-            subLabel="تسجيل مستخدم جديد"
-            onClick={() => setShowEmpModal(true)} 
             color="bg-orange-500" 
+            onClick={() => setShowEmpModal(true)} 
         />
 
-        {/* Finance */}
-        <p className="col-span-full text-xs font-bold text-gray-400 mt-2">المالية والخزينة</p>
+        {/* Update Rates (Dark Slate) */}
+        <DashboardBtn 
+            title="تحديث الأسعار" 
+            icon={Settings} 
+            color="bg-slate-700" 
+            onClick={() => setShowRateModal(true)} 
+        />
 
-        <QuickAction 
+        {/* Manage Treasury (Teal) */}
+        <DashboardBtn 
+            title="إدارة الخزينة" 
             icon={Landmark} 
-            label="إدارة الخزينة" 
-            subLabel="إيداع، سحب، جرد"
-            onClick={() => navigate('/admin/treasury')} 
             color="bg-teal-600" 
+            onClick={() => navigate('/admin/treasury')} 
         />
-        
-        <QuickAction 
+
+        {/* Employees List (Purple) */}
+        <DashboardBtn 
+            title="قائمة الموظفين" 
+            icon={Users} 
+            color="bg-purple-600" 
+            onClick={() => setShowManageEmpModal(true)} 
+        />
+
+        {/* Electronic Wallets (Pink) */}
+        <DashboardBtn 
+            title="المحافظ الإلكترونية" 
             icon={Wallet} 
-            label="المحافظ الإلكترونية" 
-            subLabel="فودافون، انستا، بنكك"
-            onClick={() => navigate('/admin/ewallets')} 
             color="bg-pink-600" 
+            onClick={() => navigate('/admin/ewallets')} 
         />
+
+        {/* Merchants (Indigo) */}
+        <DashboardBtn 
+            title="إدارة التجار" 
+            icon={Store} 
+            color="bg-indigo-600" 
+            onClick={() => navigate('/admin/merchants')} 
+        />
+
       </div>
 
       {/* Share Modal */}
@@ -334,38 +332,40 @@ ${footer}
       {/* Rate Update Modal */}
       {showRateModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-sm p-6">
-                <h3 className="text-lg font-bold mb-4 text-gray-800">تحديث الأسعار والإعدادات</h3>
-                <form onSubmit={handleUpdateRates} className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <label className="text-xs text-gray-500">سوداني {'->'} مصري</label>
-                            <input type="number" step="0.1" inputMode="decimal" value={sdRate} onChange={e => setSdRate(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95">
+                <div className="flex justify-between items-center mb-4">
+                     <h3 className="text-lg font-bold text-gray-800">تحديث الأسعار والإعدادات</h3>
+                     <button onClick={() => setShowRateModal(false)} className="bg-gray-100 p-1 rounded-full"><X size={20} className="text-gray-500"/></button>
+                </div>
+                <form onSubmit={handleUpdateRates} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-blue-50 p-3 rounded-xl">
+                            <label className="text-xs text-blue-600 font-bold mb-1 block">سوداني {'->'} مصري</label>
+                            <input type="number" step="0.1" inputMode="decimal" value={sdRate} onChange={e => setSdRate(parseFloat(e.target.value))} className="w-full p-2 border border-blue-200 rounded-lg font-bold text-lg text-center bg-white" />
                         </div>
-                        <div>
-                            <label className="text-xs text-gray-500">مصري {'->'} سوداني</label>
-                            <input type="number" step="0.1" inputMode="decimal" value={egRate} onChange={e => setEgRate(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
+                        <div className="bg-blue-50 p-3 rounded-xl">
+                            <label className="text-xs text-blue-600 font-bold mb-1 block">مصري {'->'} سوداني</label>
+                            <input type="number" step="0.1" inputMode="decimal" value={egRate} onChange={e => setEgRate(parseFloat(e.target.value))} className="w-full p-2 border border-blue-200 rounded-lg font-bold text-lg text-center bg-white" />
                         </div>
                     </div>
                     
                     <div className="pt-2 border-t">
-                        <label className="text-xs text-blue-600 font-bold">سعر الجملة</label>
-                        <input type="number" step="0.1" inputMode="decimal" value={wholesale} onChange={e => setWholesale(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
+                        <label className="text-xs text-gray-500 font-bold mb-1 block">سعر الجملة</label>
+                        <input type="number" step="0.1" inputMode="decimal" value={wholesale} onChange={e => setWholesale(parseFloat(e.target.value))} className="w-full p-3 border rounded-lg font-bold" />
                     </div>
                     <div>
-                        <label className="text-xs text-blue-600 font-bold">حد الجملة (EGP)</label>
-                        <input type="number" inputMode="decimal" value={threshold} onChange={e => setThreshold(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" />
+                        <label className="text-xs text-gray-500 font-bold mb-1 block">حد الجملة (EGP)</label>
+                        <input type="number" inputMode="decimal" value={threshold} onChange={e => setThreshold(parseFloat(e.target.value))} className="w-full p-3 border rounded-lg font-bold" />
                     </div>
 
                     <div className="pt-2 border-t">
-                        <label className="text-xs text-pink-600 font-bold flex items-center gap-1"><Percent size={12}/> عمولة المحفظة (%)</label>
-                        <input type="number" step="0.1" inputMode="decimal" value={commission} onChange={e => setCommission(parseFloat(e.target.value))} className="w-full p-2 border rounded-lg font-bold" placeholder="مثال: 1.0" />
+                        <label className="text-xs text-pink-600 font-bold flex items-center gap-1 mb-1"><Percent size={12}/> عمولة المحفظة (%)</label>
+                        <input type="number" step="0.1" inputMode="decimal" value={commission} onChange={e => setCommission(parseFloat(e.target.value))} className="w-full p-3 border rounded-lg font-bold" placeholder="مثال: 1.0" />
                     </div>
 
-                    <button disabled={isProcessing} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center">
+                    <button disabled={isProcessing} className="w-full bg-slate-800 text-white py-4 rounded-xl font-bold mt-2 flex items-center justify-center shadow-lg hover:bg-slate-900 transition">
                         {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'حفظ التغييرات'}
                     </button>
-                    <button type="button" onClick={() => setShowRateModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                 </form>
             </div>
         </div>
@@ -374,17 +374,28 @@ ${footer}
       {/* Add Employee Modal */}
       {showEmpModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-sm p-6">
-                <h3 className="text-lg font-bold mb-4 text-gray-800">إضافة موظف جديد</h3>
-                <form onSubmit={handleAddEmployee} className="space-y-3">
-                    <input type="text" placeholder="الاسم الكامل" value={empName} onChange={e => setEmpName(e.target.value)} className="w-full p-3 border rounded-lg" required />
-                    <input type="text" placeholder="اسم المستخدم" value={empUser} onChange={e => setEmpUser(e.target.value)} className="w-full p-3 border rounded-lg" required />
-                    <input type="password" inputMode="numeric" placeholder="كلمة المرور (أرقام)" value={empPass} onChange={e => setEmpPass(e.target.value)} className="w-full p-3 border rounded-lg" required />
-                    {error && <p className="text-red-500 text-xs">{error}</p>}
-                    <button disabled={isProcessing} className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center">
-                         {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'إضافة'}
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95">
+                <div className="flex justify-between items-center mb-4">
+                     <h3 className="text-lg font-bold text-gray-800">إضافة موظف جديد</h3>
+                     <button onClick={() => setShowEmpModal(false)} className="bg-gray-100 p-1 rounded-full"><X size={20} className="text-gray-500"/></button>
+                </div>
+                <form onSubmit={handleAddEmployee} className="space-y-4">
+                    <div>
+                         <label className="text-xs font-bold text-gray-500 mb-1 block">الاسم الكامل</label>
+                         <input type="text" placeholder="مثال: أحمد محمد" value={empName} onChange={e => setEmpName(e.target.value)} className="w-full p-3 border rounded-lg" required />
+                    </div>
+                    <div>
+                         <label className="text-xs font-bold text-gray-500 mb-1 block">اسم المستخدم</label>
+                         <input type="text" placeholder="username" value={empUser} onChange={e => setEmpUser(e.target.value)} className="w-full p-3 border rounded-lg" required />
+                    </div>
+                    <div>
+                         <label className="text-xs font-bold text-gray-500 mb-1 block">كلمة المرور</label>
+                         <input type="password" inputMode="numeric" placeholder="****" value={empPass} onChange={e => setEmpPass(e.target.value)} className="w-full p-3 border rounded-lg" required />
+                    </div>
+                    {error && <p className="text-red-500 text-xs font-bold text-center bg-red-50 p-2 rounded">{error}</p>}
+                    <button disabled={isProcessing} className="w-full bg-orange-500 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-orange-600 transition flex items-center justify-center">
+                         {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'إضافة الموظف'}
                     </button>
-                    <button type="button" onClick={() => setShowEmpModal(false)} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                 </form>
             </div>
         </div>
@@ -393,25 +404,31 @@ ${footer}
       {/* Manage Employees Modal */}
       {showManageEmpModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
-                <div className="flex justify-between items-center mb-4">
+            <div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto animate-in fade-in zoom-in-95">
+                <div className="flex justify-between items-center mb-4 border-b pb-2">
                     <h3 className="text-lg font-bold text-gray-800">إدارة الموظفين</h3>
-                    <button onClick={() => setShowManageEmpModal(false)} className="text-gray-500">إغلاق</button>
+                    <button onClick={() => setShowManageEmpModal(false)} className="bg-gray-100 p-2 rounded-full"><X size={20} className="text-gray-500"/></button>
                 </div>
                 
                 <div className="space-y-4">
                     {companyEmployees.map(emp => (
-                        <div key={emp.id} className="border p-3 rounded-xl bg-gray-50 transition hover:border-blue-300">
+                        <div key={emp.id} className="border p-4 rounded-xl bg-gray-50 transition hover:border-blue-300">
                             {editInfoId?.id === emp.id ? (
-                                <div className="space-y-2 mb-2">
-                                    <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded" placeholder="الاسم" />
-                                    <input value={editUser} onChange={e => setEditUser(e.target.value)} className="w-full p-2 border rounded" placeholder="اسم المستخدم" />
+                                <div className="space-y-3 mb-2">
+                                    <div>
+                                       <label className="text-xs text-gray-400 block mb-1">الاسم</label>
+                                       <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded" />
+                                    </div>
+                                    <div>
+                                       <label className="text-xs text-gray-400 block mb-1">اسم المستخدم</label>
+                                       <input value={editUser} onChange={e => setEditUser(e.target.value)} className="w-full p-2 border rounded" />
+                                    </div>
                                     {error && <p className="text-red-500 text-xs">{error}</p>}
-                                    <div className="flex gap-2">
-                                        <button onClick={handleUpdateInfo} disabled={isProcessing} className="bg-green-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1 min-w-[60px] justify-center">
-                                            {isProcessing ? <Loader2 className="animate-spin" size={12}/> : 'حفظ'}
+                                    <div className="flex gap-2 pt-2">
+                                        <button onClick={handleUpdateInfo} disabled={isProcessing} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1 flex-1 justify-center font-bold">
+                                            {isProcessing ? <Loader2 className="animate-spin" size={16}/> : 'حفظ'}
                                         </button>
-                                        <button onClick={() => setEditInfoId(null)} className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm">إلغاء</button>
+                                        <button onClick={() => setEditInfoId(null)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg text-sm flex-1 font-bold">إلغاء</button>
                                     </div>
                                 </div>
                             ) : (
@@ -421,35 +438,42 @@ ${footer}
                                         onClick={() => setSelectedEmpReport(emp)}
                                         title="اضغط لعرض التقرير"
                                     >
-                                        <p className="font-bold text-blue-700 hover:underline">{emp.full_name}</p>
-                                        <p className="text-xs text-gray-500">user: {emp.username}</p>
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-blue-100 p-2 rounded-full text-blue-600 font-bold w-10 h-10 flex items-center justify-center">
+                                                {emp.full_name.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-800">{emp.full_name}</p>
+                                                <p className="text-xs text-gray-500">@{emp.username}</p>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => openEditInfo(emp)} className="p-2 bg-indigo-100 text-indigo-600 rounded-lg" title="تعديل البيانات">
-                                            <Pencil size={16} />
+                                        <button onClick={() => openEditInfo(emp)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100" title="تعديل البيانات">
+                                            <Pencil size={18} />
                                         </button>
-                                        <button onClick={() => setEditPassId(editPassId === emp.id ? null : emp.id)} className="p-2 bg-blue-100 text-blue-600 rounded-lg" title="تغيير كلمة المرور">
-                                            <Key size={16} />
+                                        <button onClick={() => setEditPassId(editPassId === emp.id ? null : emp.id)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100" title="تغيير كلمة المرور">
+                                            <Key size={18} />
                                         </button>
-                                        <button onClick={() => initiateDeleteEmployee(emp.id)} className="p-2 bg-red-100 text-red-600 rounded-lg" title="حذف الموظف">
-                                            <Trash2 size={16} />
+                                        <button onClick={() => initiateDeleteEmployee(emp.id)} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="حذف الموظف">
+                                            <Trash2 size={18} />
                                         </button>
                                     </div>
                                 </div>
                             )}
 
                             {editPassId === emp.id && (
-                                <div className="mt-3 flex gap-2 border-t pt-2">
+                                <div className="mt-4 flex gap-2 border-t pt-3 bg-white p-2 rounded-lg border">
                                     <input 
                                         type="text" 
                                         inputMode="numeric"
-                                        placeholder="كلمة المرور الجديدة (أرقام)" 
+                                        placeholder="كلمة المرور الجديدة" 
                                         className="flex-1 p-2 border rounded-lg text-sm"
                                         value={newPass}
                                         onChange={e => setNewPass(e.target.value)}
                                     />
-                                    <button onClick={() => handleChangePassword(emp.id)} disabled={isProcessing} className="bg-green-600 text-white px-3 rounded-lg text-sm flex items-center min-w-[60px] justify-center">
-                                         {isProcessing ? <Loader2 className="animate-spin" size={14}/> : 'تغيير'}
+                                    <button onClick={() => handleChangePassword(emp.id)} disabled={isProcessing} className="bg-blue-600 text-white px-3 rounded-lg text-sm flex items-center min-w-[60px] justify-center font-bold">
+                                         {isProcessing ? <Loader2 className="animate-spin" size={16}/> : 'تغيير'}
                                     </button>
                                 </div>
                             )}
@@ -564,7 +588,7 @@ ${footer}
       )}
 
       {/* Subscription Info Footer */}
-      <div className="text-center text-xs text-gray-400 pt-4">
+      <div className="text-center text-xs text-gray-400 pt-4 pb-2">
           ينتهي الاشتراك في: {company ? new Date(company.subscription_end).toLocaleDateString('ar-EG') : '-'}
       </div>
     </div>
