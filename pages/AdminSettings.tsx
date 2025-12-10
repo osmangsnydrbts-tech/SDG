@@ -109,7 +109,12 @@ const AdminSettings: React.FC = () => {
             setTimeout(() => setMsg(null), 3000);
         } else {
             console.error('Update failed:', res.message);
-            setMsg({ type: 'error', text: `فشل الحفظ: ${res.message}` });
+            // Check specifically for the missing column error
+            if (res.message.includes('footer_message') || res.message.includes('schema cache')) {
+                setMsg({ type: 'error', text: 'تنبيه: قاعدة البيانات غير محدثة. يرجى تشغيل كود SQL الذي تم توفيره لإضافة الأعمدة الجديدة.' });
+            } else {
+                setMsg({ type: 'error', text: `فشل الحفظ: ${res.message}` });
+            }
         }
       } catch (err) {
         console.error('Unexpected error:', err);
