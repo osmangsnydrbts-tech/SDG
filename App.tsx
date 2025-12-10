@@ -13,7 +13,6 @@ import Merchants from './pages/Merchants';
 import Reports from './pages/Reports';
 import EWallets from './pages/EWallets';
 import WalletTransfer from './pages/WalletTransfer';
-import AdminSettings from './pages/AdminSettings';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode, allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
   const { currentUser } = useStore();
@@ -49,14 +48,6 @@ const AppRoutes = () => {
         <ProtectedRoute allowedRoles={['admin']}>
           <Layout title="لوحة التحكم">
             <AdminDashboard />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/admin/settings" element={
-        <ProtectedRoute allowedRoles={['admin']}>
-          <Layout title="إعدادات الشركة">
-            <AdminSettings />
           </Layout>
         </ProtectedRoute>
       } />
