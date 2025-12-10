@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Download, Filter, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, Wallet, ArrowRightLeft, Landmark, Clock, User, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { FileText, Download, Filter, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, ArrowRightLeft, Landmark, Clock, User, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
