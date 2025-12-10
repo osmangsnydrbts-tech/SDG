@@ -87,7 +87,6 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
               <NavItem to="/admin" icon={Home} label="الرئيسية" />
               <NavItem to="/admin/treasury" icon={Landmark} label="الخزينة" />
               <NavItem to="/reports" icon={BarChart3} label="التقارير" />
-              <NavItem to="/admin/settings" icon={Settings} label="الإعدادات" />
             </>
           )}
 
