@@ -257,34 +257,41 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateCompany = async (id: number, data: Partial<Company> & { password?: string }) => {
-      // Handle Username change collision check
-      if (data.username) {
-        const currentCompany = companies.find(c => c.id === id);
-        if (currentCompany && currentCompany.username !== data.username) {
-             if (isUsernameTaken(data.username)) return { success: false, message: 'اسم المستخدم الجديد مسجل مسبقاً' };
+      try {
+        // Handle Username change collision check
+        if (data.username) {
+            const currentCompany = companies.find(c => c.id === id);
+            if (currentCompany && currentCompany.username !== data.username) {
+                if (isUsernameTaken(data.username)) return { success: false, message: 'اسم المستخدم الجديد مسجل مسبقاً' };
+            }
         }
+
+        const { password, ...companyData } = data;
+
+        const { error } = await supabase.from('companies').update(companyData).eq('id', id);
+        if (error) {
+            console.error("Update Company DB Error:", error);
+            return { success: false, message: error.message };
+        }
+        
+        // Update Admin User details
+        const updateData: any = {};
+        if (data.username) updateData.username = data.username;
+        if (password) updateData.password = password;
+
+        if (Object.keys(updateData).length > 0) {
+            await supabase.from('users')
+                .update(updateData)
+                .eq('company_id', id)
+                .eq('role', 'admin');
+        }
+        
+        await fetchData();
+        return { success: true, message: 'تم التحديث بنجاح' };
+      } catch (err: any) {
+        console.error("Update Company Exception:", err);
+        return { success: false, message: err.message || 'Unknown error' };
       }
-
-      const { password, ...companyData } = data;
-
-      const { error } = await supabase.from('companies').update(companyData).eq('id', id);
-      if (error) return { success: false, message: error.message };
-      
-      // Update Admin User details
-      const updateData: any = {};
-      if (data.username) updateData.username = data.username;
-      if (password) updateData.password = password;
-
-      if (Object.keys(updateData).length > 0) {
-          await supabase.from('users')
-            .update(updateData)
-            .eq('company_id', id)
-            .eq('role', 'admin');
-      }
-      
-      await fetchData();
-      showToast('تم تحديث بيانات الشركة', 'success');
-      return { success: true, message: 'تم التحديث بنجاح' };
   };
 
   const renewSubscription = async (companyId: number, days: number) => {
