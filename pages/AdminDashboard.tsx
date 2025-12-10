@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock, RefreshCw } from 'lucide-react';
+import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock, RefreshCw, ChevronRight } from 'lucide-react';
 import { User } from '../types';
 
 const AdminDashboard: React.FC = () => {
@@ -164,10 +164,18 @@ ${footer}
       }
   };
 
-  const QuickAction = ({ icon: Icon, label, onClick, color }: any) => (
-    <button onClick={onClick} className={`${color} text-white p-4 rounded-xl shadow-md flex flex-col items-center justify-center gap-2 active:scale-95 transition`}>
-      <Icon size={28} />
-      <span className="font-bold text-sm">{label}</span>
+  const QuickAction = ({ icon: Icon, label, onClick, color, subLabel }: any) => (
+    <button onClick={onClick} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between group hover:border-blue-200 transition active:scale-95">
+      <div className="flex items-center gap-3">
+          <div className={`p-3 rounded-full text-white ${color}`}>
+            <Icon size={24} />
+          </div>
+          <div className="text-right">
+            <span className="font-bold text-gray-800 block">{label}</span>
+            {subLabel && <span className="text-xs text-gray-400">{subLabel}</span>}
+          </div>
+      </div>
+      <ChevronRight size={18} className="text-gray-300 group-hover:text-blue-500 transition"/>
     </button>
   );
 
@@ -180,63 +188,92 @@ ${footer}
 
   return (
     <div className="space-y-6">
-      <div className="bg-blue-600 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+      
+      {/* Header Card with Rate & Settings Link */}
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
         <div className="relative z-10">
-          <div className="flex justify-between items-start mb-2">
-             <p className="text-blue-200">أسعار الصرف الحالية</p>
-             <button onClick={() => setShowShareModal(true)} className="bg-white/20 p-2 rounded-full hover:bg-white/30 transition">
-                 <Share2 size={20} />
+          <div className="flex justify-between items-start mb-4">
+             <div>
+                <h2 className="text-xl font-bold">{company?.name}</h2>
+                <p className="text-slate-400 text-xs">لوحة التحكم الإدارية</p>
+             </div>
+             
+             {/* Settings Button - Moved Here */}
+             <button 
+                onClick={() => navigate('/admin/settings')} 
+                className="bg-white/10 hover:bg-white/20 p-2 rounded-xl backdrop-blur-sm transition flex flex-col items-center gap-1 min-w-[60px]"
+             >
+                 <Settings size={20} className="text-blue-300" />
+                 <span className="text-[10px] font-medium">الإعدادات</span>
              </button>
           </div>
-          <div className="flex justify-between items-end">
-            <div>
-              <span className="text-3xl font-bold block">{rateData?.sd_to_eg_rate}</span>
-              <span className="text-xs opacity-75">سوداني {'->'} مصري</span>
-            </div>
-            <div className="text-right">
-              <span className="text-3xl font-bold block">{rateData?.eg_to_sd_rate}</span>
-              <span className="text-xs opacity-75">مصري {'->'} سوداني</span>
-            </div>
+          
+          <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+              <div className="flex justify-between items-center mb-2">
+                 <p className="text-slate-300 text-xs flex items-center gap-1"><RefreshCw size={12}/> أسعار الصرف الحالية</p>
+                 <button onClick={() => setShowShareModal(true)} className="text-xs bg-blue-600 px-3 py-1 rounded-full flex items-center gap-1 hover:bg-blue-500 transition">
+                     <Share2 size={12} /> مشاركة
+                 </button>
+              </div>
+              <div className="flex justify-between items-end">
+                <div onClick={() => setShowRateModal(true)} className="cursor-pointer hover:opacity-80">
+                  <span className="text-2xl font-bold block text-green-400">{rateData?.sd_to_eg_rate}</span>
+                  <span className="text-[10px] opacity-75">سوداني {'->'} مصري</span>
+                </div>
+                <div className="h-8 w-px bg-white/10"></div>
+                <div onClick={() => setShowRateModal(true)} className="cursor-pointer hover:opacity-80 text-right">
+                  <span className="text-2xl font-bold block text-blue-400">{rateData?.eg_to_sd_rate}</span>
+                  <span className="text-[10px] opacity-75">مصري {'->'} سوداني</span>
+                </div>
+              </div>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-600/20 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Operations */}
+        <p className="col-span-full text-xs font-bold text-gray-400 mt-2">العمليات والموظفين</p>
+        
         <QuickAction 
             icon={RefreshCw} 
             label="تحديث الأسعار" 
+            subLabel="تعديل سعر الصرف والعمولات"
             onClick={() => setShowRateModal(true)} 
             color="bg-slate-700" 
         />
+        
         <QuickAction 
-            icon={Settings} 
-            label="إعدادات الشركة" 
-            onClick={() => navigate('/admin/settings')} 
-            color="bg-gray-800" 
+            icon={Users} 
+            label="إدارة الموظفين" 
+            subLabel={`${companyEmployees.length} موظف نشط`}
+            onClick={() => setShowManageEmpModal(true)} 
+            color="bg-purple-600" 
         />
         
         <QuickAction 
             icon={UserPlus} 
             label="إضافة موظف" 
+            subLabel="تسجيل مستخدم جديد"
             onClick={() => setShowEmpModal(true)} 
             color="bg-orange-500" 
         />
-         <QuickAction 
-            icon={Users} 
-            label="قائمة الموظفين" 
-            onClick={() => setShowManageEmpModal(true)} 
-            color="bg-purple-600" 
-        />
+
+        {/* Finance */}
+        <p className="col-span-full text-xs font-bold text-gray-400 mt-2">المالية والخزينة</p>
+
         <QuickAction 
             icon={Landmark} 
             label="إدارة الخزينة" 
+            subLabel="إيداع، سحب، جرد"
             onClick={() => navigate('/admin/treasury')} 
             color="bg-teal-600" 
         />
+        
         <QuickAction 
             icon={Wallet} 
             label="المحافظ الإلكترونية" 
+            subLabel="فودافون، انستا، بنكك"
             onClick={() => navigate('/admin/ewallets')} 
             color="bg-pink-600" 
         />
