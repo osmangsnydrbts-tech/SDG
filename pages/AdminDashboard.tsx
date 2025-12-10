@@ -189,7 +189,7 @@ ${footer}
   return (
     <div className="space-y-6">
       
-      {/* Header Card with Rate & Settings Link */}
+      {/* Header Card */}
       <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
         <div className="relative z-10">
           <div className="flex justify-between items-start mb-4">
