@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Plus, Power, Calendar, Building, UploadCloud, Activity, Trash2, Pencil, Database, Download, Loader2 } from 'lucide-react';
+import { Plus, Power, Calendar, Building, UploadCloud, Activity, Trash2, Pencil, Database, Download, Loader2, Copy, AlertTriangle } from 'lucide-react';
 import { Company } from '../types';
 
 const SuperAdminDashboard: React.FC = () => {
@@ -126,8 +126,45 @@ const SuperAdminDashboard: React.FC = () => {
       reader.readAsText(file);
   };
 
+  const SQL_FIX = `
+-- FIX MISSING COLUMNS ERROR
+ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS logo text;
+ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS phone_numbers text;
+ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS footer_message text;
+
+-- FORCE REFRESH CACHE
+NOTIFY pgrst, 'reload schema';
+  `.trim();
+
+  const copySql = () => {
+    navigator.clipboard.writeText(SQL_FIX);
+    alert('تم نسخ كود الإصلاح. يرجى تشغيله في Supabase SQL Editor.');
+  };
+
   return (
     <div className="space-y-6">
+      
+      {/* Database Repair Helper */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 shadow-sm">
+        <div className="flex justify-between items-start">
+             <div>
+                <h3 className="flex items-center gap-2 font-bold text-yellow-800 text-sm mb-1">
+                    <AlertTriangle size={16}/> هل تواجه مشكلة "Could not find column"?
+                </h3>
+                <p className="text-xs text-yellow-700 leading-relaxed mb-2">
+                    إذا ظهرت رسالة خطأ عند إنشاء أو تعديل شركة، فهذا يعني أن قاعدة البيانات تحتاج إلى تحديث.
+                    انسخ الكود التالي وشغله في Supabase SQL Editor.
+                </p>
+             </div>
+             <button onClick={copySql} className="text-yellow-700 bg-yellow-100 hover:bg-yellow-200 p-2 rounded-lg text-xs font-bold flex items-center gap-1">
+                 <Copy size={14} /> نسخ الكود
+             </button>
+        </div>
+        <pre className="bg-slate-800 text-slate-100 p-3 rounded-lg text-[10px] overflow-x-auto font-mono text-left" dir="ltr">
+            {SQL_FIX}
+        </pre>
+      </div>
+
       {/* Active Companies Report */}
       <div className="grid grid-cols-2 gap-4">
           <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-blue-500">
