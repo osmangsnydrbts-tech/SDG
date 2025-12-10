@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Download, Filter, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, Wallet, ArrowRightLeft, Landmark } from 'lucide-react';
+import { FileText, Download, Filter, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, Wallet, ArrowRightLeft, Landmark, Clock, User, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -104,7 +104,6 @@ const Reports: React.FC = () => {
   // Derived lists based on filtered data
   const exchangeTx = filtered.filter(t => t.type === 'exchange');
   const treasuryTx = filtered.filter(t => ['treasury_feed', 'treasury_withdraw'].includes(t.type));
-  const walletTx = filtered.filter(t => ['e_wallet', 'wallet_deposit', 'wallet_withdrawal'].includes(t.type));
   const expenseTx = filtered.filter(t => t.type === 'expense');
 
   // --- STATS CALCULATION ---
@@ -112,7 +111,8 @@ const Reports: React.FC = () => {
       exchangeCount: exchangeTx.length,
       receivedSdg: exchangeTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
       receivedEgp: exchangeTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
-      walletCommission: walletTx.reduce((sum, t) => sum + (t.commission || 0), 0),
+      // Fix wallet logic: calculate commission from deposits/withdrawals
+      walletCommission: filtered.filter(t => t.commission).reduce((sum, t) => sum + (t.commission || 0), 0),
       totalExpensesEgp: expenseTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
       totalExpensesSdg: expenseTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
   };
@@ -155,20 +155,109 @@ const Reports: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const CardRow = ({ t, type }: { t: Transaction, type: 'exchange' | 'expense' | 'treasury' }) => {
+    const isExchange = type === 'exchange';
+    const isExpense = type === 'expense';
+    
+    return (
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3 relative overflow-hidden group">
+            {/* Header: Date & User */}
+            <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2 text-gray-500 text-xs">
+                    <Clock size={12} />
+                    <span>{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</span>
+                    <span className="bg-gray-100 px-2 py-0.5 rounded-full">{new Date(t.created_at).toLocaleDateString('ar-EG')}</span>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded-lg">
+                    <User size={12} />
+                    <span>{getEmployeeName(t.employee_id)}</span>
+                </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="flex justify-between items-center">
+                {/* Right Side: Amount IN or Expense */}
+                <div>
+                     {isExpense ? (
+                        <div className="text-red-600">
+                             <span className="text-xs font-bold block mb-1 flex items-center gap-1"><TrendingDown size={14}/> منصرف</span>
+                             <span className="text-xl font-bold">{t.from_amount.toLocaleString()} {t.from_currency}</span>
+                        </div>
+                     ) : isExchange ? (
+                         <div className="text-green-600">
+                             <span className="text-xs font-bold block mb-1 flex items-center gap-1"><ArrowDownLeft size={14}/> استلام</span>
+                             <span className="text-xl font-bold">{t.from_amount.toLocaleString()} {t.from_currency}</span>
+                         </div>
+                     ) : (
+                         <div className={t.type === 'treasury_feed' ? 'text-green-600' : 'text-red-600'}>
+                             <span className="text-xs font-bold block mb-1">{t.type === 'treasury_feed' ? 'إيداع خزينة' : 'سحب خزينة'}</span>
+                             <span className="text-xl font-bold">{t.from_amount.toLocaleString()} {t.from_currency}</span>
+                         </div>
+                     )}
+                </div>
+
+                {/* Left Side: Amount OUT or Description */}
+                <div className="text-right">
+                    {isExchange && t.to_amount && (
+                        <div className="text-red-500">
+                            <span className="text-xs font-bold block mb-1 flex items-center justify-end gap-1">تسليم <ArrowUpRight size={14}/></span>
+                            <span className="text-xl font-bold">{t.to_amount.toLocaleString()} {t.to_currency}</span>
+                        </div>
+                    )}
+                    {isExpense && (
+                         <div className="text-gray-500 text-sm max-w-[150px] truncate text-left">
+                            {t.description}
+                         </div>
+                    )}
+                    {type === 'treasury' && (
+                        <div className="text-gray-400 text-xs max-w-[150px] truncate">
+                            {t.description || '-'}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Footer: Receipt & Actions */}
+            <div className="flex justify-between items-center border-t border-gray-50 pt-3 mt-1">
+                 <div className="text-xs font-mono text-gray-400 bg-gray-50 px-2 py-1 rounded">
+                     #{t.receipt_number || t.id}
+                 </div>
+                 <div className="flex gap-2">
+                     {isExchange && (
+                         <button onClick={() => setViewTransaction(t)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition" title="عرض الإيصال">
+                             <Eye size={16} />
+                         </button>
+                     )}
+                     {currentUser?.role === 'admin' && (
+                         <button onClick={() => handleDelete(t.id)} className="p-2 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition" title="حذف">
+                             <Trash2 size={16} />
+                         </button>
+                     )}
+                 </div>
+            </div>
+            
+            {/* Side Indicator Stripe */}
+            <div className={`absolute right-0 top-0 bottom-0 w-1 ${isExpense ? 'bg-red-500' : isExchange ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
+        </div>
+    );
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-10">
         {/* Controls Section */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h2 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
                     <Filter size={20} className="text-blue-600" /> فلترة التقارير
                 </h2>
-                <button 
-                    onClick={handleExport}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-green-700 transition shadow-sm font-bold"
-                >
-                    <Download size={16} /> Excel تصدير
-                </button>
+                <div className="flex gap-2 w-full sm:w-auto">
+                     <button 
+                        onClick={handleExport}
+                        className="flex-1 sm:flex-none bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-green-700 transition shadow-sm font-bold"
+                    >
+                        <Download size={16} /> تصدير
+                    </button>
+                </div>
             </div>
             
             {/* Search Box */}
@@ -188,7 +277,6 @@ const Reports: React.FC = () => {
 
             {/* Filters Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                
                 {/* Date Range */}
                 <div className="md:col-span-2 space-y-2">
                     <label className="text-xs text-gray-500 font-bold flex items-center gap-1"><Calendar size={14}/> الفترة الزمنية</label>
@@ -212,10 +300,10 @@ const Reports: React.FC = () => {
                         </div>
                     </div>
                     {/* Quick Date Buttons */}
-                    <div className="flex gap-2 text-xs">
-                        <button onClick={setFilterToday} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 font-bold">اليوم</button>
-                        <button onClick={setFilterMonth} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 font-bold">هذا الشهر</button>
-                        <button onClick={setFilterAll} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 font-bold">الكل</button>
+                    <div className="flex gap-2 text-xs overflow-x-auto pb-1 no-scrollbar">
+                        <button onClick={setFilterToday} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 font-bold whitespace-nowrap">اليوم</button>
+                        <button onClick={setFilterMonth} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 font-bold whitespace-nowrap">هذا الشهر</button>
+                        <button onClick={setFilterAll} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 font-bold whitespace-nowrap">الكل</button>
                     </div>
                 </div>
 
@@ -238,17 +326,17 @@ const Reports: React.FC = () => {
         </div>
 
         {/* Tabs */}
-        <div className="flex bg-white p-1 rounded-xl border border-gray-200 overflow-x-auto shadow-sm">
-            <button onClick={() => setActiveTab('breakdown')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'breakdown' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
-                <FileText size={16}/> ملخص عام
+        <div className="flex bg-white p-1 rounded-xl border border-gray-200 overflow-x-auto shadow-sm no-scrollbar">
+            <button onClick={() => setActiveTab('breakdown')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'breakdown' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
+                <FileText size={16}/> الملخص
             </button>
-            <button onClick={() => setActiveTab('exchange')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'exchange' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
-                <ArrowRightLeft size={16}/> سجل الصرف
+            <button onClick={() => setActiveTab('exchange')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'exchange' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
+                <ArrowRightLeft size={16}/> الصرف
             </button>
-            <button onClick={() => setActiveTab('treasury')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'treasury' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
-                <Landmark size={16}/> سجل الخزينة
+            <button onClick={() => setActiveTab('treasury')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'treasury' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
+                <Landmark size={16}/> الخزينة
             </button>
-            <button onClick={() => setActiveTab('expenses')} className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'expenses' ? 'bg-red-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
+            <button onClick={() => setActiveTab('expenses')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'expenses' ? 'bg-red-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
                 <TrendingDown size={16}/> المنصرفات
             </button>
         </div>
@@ -292,141 +380,43 @@ const Reports: React.FC = () => {
              </div>
         )}
 
-        {/* Expenses Log */}
+        {/* Expenses Log - Card View */}
         {activeTab === 'expenses' && (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-in fade-in duration-300">
-                <div className="p-4 bg-red-50 font-bold border-b border-red-100 text-sm text-red-800 flex justify-between items-center">
-                    <span className="flex items-center gap-2"><TrendingDown size={18}/> سجل المنصرفات</span>
-                    <span className="text-xs font-normal text-white bg-red-500 px-2 py-1 rounded-full">{expenseTx.length} عملية</span>
+            <div className="space-y-3 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between text-sm text-gray-500 px-1">
+                    <span>عدد العمليات: {expenseTx.length}</span>
                 </div>
-                <div className="overflow-x-auto">
-                <table className="w-full text-right text-sm">
-                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-bold">
-                        <tr>
-                            <th className="p-3">التاريخ</th>
-                            <th className="p-3">الموظف</th>
-                            <th className="p-3">المبلغ</th>
-                            <th className="p-3">البيان / السبب</th>
-                            <th className="p-3">إجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {expenseTx.map(t => (
-                            <tr key={t.id} className="hover:bg-gray-50 transition">
-                                <td className="p-3 text-gray-600 whitespace-nowrap">
-                                    <div className="font-bold">{new Date(t.created_at).toLocaleDateString('ar-EG')}</div>
-                                    <div className="text-xs">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</div>
-                                </td>
-                                <td className="p-3 font-medium">{getEmployeeName(t.employee_id)}</td>
-                                <td className="p-3">
-                                    <span className="bg-red-50 text-red-700 px-2 py-1 rounded-lg font-bold border border-red-100">
-                                        {t.from_amount.toLocaleString()} {t.from_currency}
-                                    </span>
-                                </td>
-                                <td className="p-3 text-gray-700 font-medium">{t.description}</td>
-                                <td className="p-3">
-                                    {currentUser?.role === 'admin' && (
-                                        <button onClick={() => handleDelete(t.id)} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition" title="حذف">
-                                            <Trash2 size={16}/>
-                                        </button>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                        {expenseTx.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-gray-400">لا توجد منصرفات مسجلة في هذه الفترة</td></tr>}
-                    </tbody>
-                </table>
-                </div>
+                {expenseTx.map((t) => (
+                    <CardRow key={t.id} t={t} type="expense" />
+                ))}
+                {expenseTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد بيانات</div>}
             </div>
         )}
 
-        {/* Exchange Log */}
+        {/* Exchange Log - Card View */}
         {activeTab === 'exchange' && (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-in fade-in duration-300">
-                <div className="p-4 bg-blue-50 font-bold border-b border-blue-100 text-sm text-blue-800 flex justify-between items-center">
-                    <span className="flex items-center gap-2"><ArrowRightLeft size={18}/> سجل عمليات الصرف</span>
-                    <span className="text-xs font-normal text-white bg-blue-600 px-2 py-1 rounded-full">{exchangeTx.length} عملية</span>
+            <div className="space-y-3 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between text-sm text-gray-500 px-1">
+                     <span>عدد العمليات: {exchangeTx.length}</span>
                 </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-right text-sm">
-                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-bold">
-                            <tr>
-                                <th className="p-3">الوقت</th>
-                                <th className="p-3">الموظف</th>
-                                <th className="p-3">من (استلام)</th>
-                                <th className="p-3">إلى (تسليم)</th>
-                                <th className="p-3">الإشعار</th>
-                                <th className="p-3">إجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {exchangeTx.map(t => (
-                                <tr key={t.id} className="hover:bg-gray-50 transition">
-                                    <td className="p-3 text-gray-600 whitespace-nowrap">
-                                        <div className="font-bold">{new Date(t.created_at).toLocaleDateString('ar-EG')}</div>
-                                        <div className="text-xs">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
-                                    </td>
-                                    <td className="p-3 font-medium">{getEmployeeName(t.employee_id)}</td>
-                                    <td className="p-3 font-bold text-green-700" dir="ltr">{t.from_amount.toLocaleString()} {t.from_currency}</td>
-                                    <td className="p-3 text-red-600" dir="ltr">{t.to_amount?.toLocaleString()} {t.to_currency}</td>
-                                    <td className="p-3 text-xs text-gray-500 font-mono">{t.receipt_number || '-'}</td>
-                                    <td className="p-3 flex items-center gap-2">
-                                        <button onClick={() => setViewTransaction(t)} className="text-blue-600 hover:bg-blue-50 p-2 rounded-full transition">
-                                            <Eye size={18} />
-                                        </button>
-                                        {currentUser?.role === 'admin' && (
-                                            <button onClick={() => handleDelete(t.id)} className="text-red-600 hover:bg-red-50 p-2 rounded-full transition" title="حذف واسترداد">
-                                                <Trash2 size={18} />
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                            {exchangeTx.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-gray-400">لا توجد عمليات مطابقة للفلتر</td></tr>}
-                        </tbody>
-                    </table>
-                </div>
+                {exchangeTx.map((t) => (
+                    <CardRow key={t.id} t={t} type="exchange" />
+                ))}
+                {exchangeTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد بيانات</div>}
             </div>
         )}
 
-        {/* Treasury Log */}
+        {/* Treasury Log - Card View */}
         {activeTab === 'treasury' && (
-             <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-in fade-in duration-300">
-             <div className="p-4 bg-emerald-50 font-bold border-b border-emerald-100 text-sm text-emerald-800 flex justify-between items-center">
-                <span className="flex items-center gap-2"><Landmark size={18}/> سجل حركة الخزينة</span>
-                <span className="text-xs font-normal text-white bg-emerald-600 px-2 py-1 rounded-full">{treasuryTx.length} عملية</span>
+             <div className="space-y-3 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between text-sm text-gray-500 px-1">
+                     <span>عدد العمليات: {treasuryTx.length}</span>
+                </div>
+                 {treasuryTx.map((t) => (
+                    <CardRow key={t.id} t={t} type="treasury" />
+                 ))}
+                 {treasuryTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد بيانات</div>}
              </div>
-             <div className="overflow-x-auto">
-                 <table className="w-full text-right text-sm">
-                     <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-bold">
-                         <tr>
-                             <th className="p-3">الوقت</th>
-                             <th className="p-3">النوع</th>
-                             <th className="p-3">المبلغ</th>
-                             <th className="p-3">الوصف</th>
-                         </tr>
-                     </thead>
-                     <tbody className="divide-y divide-gray-100">
-                         {treasuryTx.map(t => (
-                             <tr key={t.id} className="hover:bg-gray-50 transition">
-                                 <td className="p-3 text-gray-600 whitespace-nowrap">
-                                     <div className="font-bold">{new Date(t.created_at).toLocaleDateString('ar-EG')}</div>
-                                     <div className="text-xs">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
-                                 </td>
-                                 <td className="p-3">
-                                     <span className={`px-2 py-1 rounded-lg text-xs font-bold border ${t.type === 'treasury_feed' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
-                                         {t.type === 'treasury_feed' ? 'إيداع/تغذية' : 'سحب/استرداد'}
-                                     </span>
-                                 </td>
-                                 <td className="p-3 font-bold text-gray-800" dir="ltr">{t.from_amount.toLocaleString()} {t.from_currency}</td>
-                                 <td className="p-3 text-xs text-gray-500 max-w-[200px] truncate">{t.description}</td>
-                             </tr>
-                         ))}
-                         {treasuryTx.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-gray-400">لا توجد حركات مطابقة للفلتر</td></tr>}
-                     </tbody>
-                 </table>
-             </div>
-         </div>
         )}
 
         {/* Receipt Viewer */}
