@@ -1,10 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Building, UploadCloud, Save, Loader2, Info, Share2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Building, UploadCloud, Save, Loader2, Info, Share2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const AdminSettings: React.FC = () => {
   const { currentUser, companies, updateCompany } = useStore();
+  const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   
@@ -38,8 +40,8 @@ const AdminSettings: React.FC = () => {
           let height = img.height;
           
           // Max dimensions
-          const MAX_WIDTH = 500;
-          const MAX_HEIGHT = 500;
+          const MAX_WIDTH = 400; // Reduced for safety
+          const MAX_HEIGHT = 400;
 
           if (width > height) {
             if (width > MAX_WIDTH) {
@@ -59,8 +61,8 @@ const AdminSettings: React.FC = () => {
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
           
-          // Compress to JPEG with 0.8 quality
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          // Compress to JPEG with 0.7 quality to keep size small
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
           resolve(dataUrl);
         };
         img.onerror = (e) => reject(e);
@@ -73,9 +75,14 @@ const AdminSettings: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
         try {
-            // Compress before setting state
+            // Check file size (limit to 2MB before compression)
+            if (file.size > 2 * 1024 * 1024) {
+               setMsg({ type: 'error', text: 'حجم الصورة كبير جداً. يرجى اختيار صورة أقل من 2MB.' });
+               return;
+            }
             const compressedLogo = await compressImage(file);
             setLogo(compressedLogo);
+            setMsg(null);
         } catch (error) {
             setMsg({ type: 'error', text: 'فشل في معالجة الصورة. يرجى اختيار صورة أخرى.' });
         }
@@ -98,14 +105,15 @@ const AdminSettings: React.FC = () => {
 
         if (res.success) {
             setMsg({ type: 'success', text: 'تم حفظ إعدادات الشركة بنجاح' });
-            // Scroll to top to see message
             window.scrollTo({ top: 0, behavior: 'smooth' });
             setTimeout(() => setMsg(null), 3000);
         } else {
-            setMsg({ type: 'error', text: res.message || 'حدث خطأ أثناء الحفظ' });
+            console.error('Update failed:', res.message);
+            setMsg({ type: 'error', text: `فشل الحفظ: ${res.message}` });
         }
       } catch (err) {
-        setMsg({ type: 'error', text: 'حدث خطأ غير متوقع' });
+        console.error('Unexpected error:', err);
+        setMsg({ type: 'error', text: 'حدث خطأ غير متوقع أثناء الحفظ' });
       } finally {
         setIsProcessing(false);
       }
@@ -113,8 +121,14 @@ const AdminSettings: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+        
+        <div className="flex items-center gap-2 text-gray-500 cursor-pointer hover:text-blue-600 transition w-fit" onClick={() => navigate('/admin')}>
+            <ArrowLeft size={18} />
+            <span className="text-sm font-bold">العودة للرئيسية</span>
+        </div>
+
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2 border-b pb-4">
                 <Building size={24} className="text-blue-600" />
                 إعدادات الشركة
             </h2>
@@ -122,38 +136,37 @@ const AdminSettings: React.FC = () => {
             {msg && (
                 <div className={`p-4 rounded-xl flex items-center gap-3 font-bold mb-6 ${msg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
                     {msg.type === 'success' ? <CheckCircle size={24}/> : <AlertCircle size={24}/>}
-                    {msg.text}
+                    <span>{msg.text}</span>
                 </div>
             )}
 
             <form onSubmit={handleSave} className="space-y-8">
                 
-                {/* Logo Section */}
-                <div className="flex flex-col items-center justify-center">
-                    <label className="block text-sm font-bold text-gray-700 mb-2">شعار الشركة (اللوجو)</label>
-                    <div className="relative w-32 h-32 border-2 border-dashed border-gray-300 rounded-full overflow-hidden hover:bg-gray-50 transition cursor-pointer group bg-white shadow-sm">
-                        <input 
-                            type="file" 
-                            accept="image/*" 
-                            onChange={handleImageUpload} 
-                            className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                        />
-                        {logo ? (
-                            <img src={logo} alt="Logo" className="w-full h-full object-contain p-1" />
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                                <UploadCloud size={32} />
-                                <span className="text-xs mt-1">رفع الشعار</span>
+                {/* Section 1: Branding */}
+                <div className="space-y-4">
+                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">الهوية والشعار</h3>
+                    <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                        <div className="relative w-32 h-32 rounded-full overflow-hidden bg-white shadow-sm group">
+                            <input 
+                                type="file" 
+                                accept="image/*" 
+                                onChange={handleImageUpload} 
+                                className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
+                            />
+                            {logo ? (
+                                <img src={logo} alt="Logo" className="w-full h-full object-contain p-1" />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                                    <UploadCloud size={32} />
+                                </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white text-xs font-bold z-20 pointer-events-none">
+                                تغيير
                             </div>
-                        )}
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white text-xs font-bold z-20">
-                            تغيير الشعار
                         </div>
+                        <p className="text-xs text-gray-500 mt-2">اضغط على الصورة لتغيير الشعار (يفضل صورة مربعة)</p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">اضغط على الدائرة لرفع صورة جديدة</p>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">اسم الشركة</label>
                         <input 
@@ -165,9 +178,16 @@ const AdminSettings: React.FC = () => {
                             required 
                         />
                     </div>
+                </div>
 
+                <hr className="border-gray-100" />
+
+                {/* Section 2: Contact Info */}
+                <div className="space-y-4">
+                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">بيانات التواصل (الفوتر)</h3>
+                    
                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">أرقام الهواتف (الرئيسية)</label>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">أرقام الهواتف الرئيسية</label>
                         <input 
                             type="text" 
                             value={phoneNumbers} 
@@ -176,24 +196,24 @@ const AdminSettings: React.FC = () => {
                             placeholder="مثال: 09123... / 0123..."
                         />
                     </div>
-                </div>
 
-                <div className="bg-blue-50 p-5 rounded-xl border border-blue-100">
-                    <label className="block text-sm font-bold text-blue-800 mb-2 flex items-center gap-2">
-                        <Share2 size={18}/> بيانات التواصل في الإيصال (الفوتر)
-                    </label>
-                    <p className="text-xs text-blue-600 mb-3 leading-relaxed">
-                        هذه البيانات ستظهر أسفل "نشرة أسعار الصرف" وعند مشاركة الإيصالات.
-                        <br/>
-                        يمكنك كتابة العنوان، أرقام التواصل الإضافية، الإيميل، أو أي ملاحظات.
-                    </p>
-                    <textarea 
-                        value={footerMsg}
-                        onChange={e => setFooterMsg(e.target.value)}
-                        rows={5}
-                        className="w-full p-3 border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-white"
-                        placeholder="مثال: &#10;الخرطوم - السوق العربي - عمارة الذهب&#10;تلفون: 0912345678&#10;إيميل: info@exchange.com"
-                    ></textarea>
+                    <div className="bg-blue-50 p-5 rounded-xl border border-blue-100">
+                        <label className="block text-sm font-bold text-blue-800 mb-2 flex items-center gap-2">
+                            <Share2 size={18}/> رسالة الفوتر (عند المشاركة)
+                        </label>
+                        <p className="text-xs text-blue-600 mb-3 leading-relaxed">
+                            هذه البيانات ستظهر أسفل "نشرة أسعار الصرف" وعند مشاركة الإيصالات.
+                            <br/>
+                            يمكنك كتابة العنوان، أرقام التواصل الإضافية، الإيميل، أو أي ملاحظات.
+                        </p>
+                        <textarea 
+                            value={footerMsg}
+                            onChange={e => setFooterMsg(e.target.value)}
+                            rows={5}
+                            className="w-full p-3 border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-white"
+                            placeholder="مثال: &#10;الخرطوم - السوق العربي - عمارة الذهب&#10;تلفون: 0912345678&#10;إيميل: info@exchange.com"
+                        ></textarea>
+                    </div>
                 </div>
 
                 <div className="pt-2">
@@ -202,7 +222,7 @@ const AdminSettings: React.FC = () => {
                         disabled={isProcessing} 
                         className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition active:scale-95"
                     >
-                        {isProcessing ? <Loader2 className="animate-spin" size={24} /> : <><Save size={20} /> حفظ التغييرات</>}
+                        {isProcessing ? <Loader2 className="animate-spin" size={24} /> : <><Save size={20} /> حفظ الإعدادات</>}
                     </button>
                 </div>
 
