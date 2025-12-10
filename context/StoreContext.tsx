@@ -26,7 +26,7 @@ interface StoreData {
   // Actions
   login: (username: string, password: string) => Promise<User | null>;
   logout: () => void;
-  addCompany: (name: string, username: string, password: string, days: number, phoneNumbers: string, logo?: string) => Promise<{ success: boolean; message: string }>;
+  addCompany: (name: string, username: string, password: string, days: number, phoneNumbers: string, logo?: string, footerMessage?: string) => Promise<{ success: boolean; message: string }>;
   updateCompany: (id: number, data: Partial<Company> & { password?: string }) => Promise<{ success: boolean; message: string }>;
   renewSubscription: (companyId: number, days: number) => Promise<void>;
   deleteCompany: (companyId: number) => Promise<void>;
@@ -207,7 +207,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       showToast('تم تسجيل الخروج', 'info');
   };
 
-  const addCompany = async (name: string, username: string, pass: string, days: number, phoneNumbers: string, logo?: string) => {
+  const addCompany = async (name: string, username: string, pass: string, days: number, phoneNumbers: string, logo?: string, footerMessage?: string) => {
     if (isUsernameTaken(username)) {
       return { success: false, message: 'اسم المستخدم مسجل مسبقاً' };
     }
@@ -221,7 +221,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       subscription_end: subEnd.toISOString(),
       is_active: true,
       phone_numbers: phoneNumbers,
-      logo
+      logo,
+      footer_message: footerMessage
     }).select().single();
 
     if (compError || !company) return { success: false, message: 'فشل إنشاء الشركة' };
