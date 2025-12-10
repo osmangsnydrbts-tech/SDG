@@ -2,7 +2,7 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Home, ArrowRightLeft, Landmark, BarChart3, Building, Smartphone, Settings } from 'lucide-react';
+import { LogOut, Home, ArrowRightLeft, Landmark, BarChart3, Building, Smartphone } from 'lucide-react';
 import Toast from './Toast';
 
 interface LayoutProps {
