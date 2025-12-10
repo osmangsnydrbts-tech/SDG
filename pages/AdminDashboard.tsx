@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Settings, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock, RefreshCw, ChevronRight } from 'lucide-react';
+import { Landmark, UserPlus, Users, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock, RefreshCw, ChevronRight } from 'lucide-react';
 import { User } from '../types';
 
 const AdminDashboard: React.FC = () => {
@@ -197,15 +197,6 @@ ${footer}
                 <h2 className="text-xl font-bold">{company?.name}</h2>
                 <p className="text-slate-400 text-xs">لوحة التحكم الإدارية</p>
              </div>
-             
-             {/* Settings Button - Moved Here */}
-             <button 
-                onClick={() => navigate('/admin/settings')} 
-                className="bg-white/10 hover:bg-white/20 p-2 rounded-xl backdrop-blur-sm transition flex flex-col items-center gap-1 min-w-[60px]"
-             >
-                 <Settings size={20} className="text-blue-300" />
-                 <span className="text-[10px] font-medium">الإعدادات</span>
-             </button>
           </div>
           
           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
