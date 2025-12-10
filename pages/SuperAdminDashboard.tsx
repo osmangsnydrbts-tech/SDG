@@ -279,7 +279,17 @@ const SuperAdminDashboard: React.FC = () => {
               </div>
               
               <input type="text" placeholder="أرقام الهواتف (اختياري)" className="w-full p-2 border rounded-lg" value={phoneNumbers} onChange={e => setPhoneNumbers(e.target.value)} />
-              <textarea placeholder="رسالة تذييل الإيصال (الفوتر)" className="w-full p-2 border rounded-lg" rows={3} value={footerMessage} onChange={e => setFooterMessage(e.target.value)} />
+              
+              <div>
+                 <label className="text-xs text-gray-500 font-bold mb-1 block">رسالة تذييل الإيصال (الفوتر)</label>
+                 <textarea 
+                    placeholder="مثال: العنوان، أرقام إضافية، ملاحظات..." 
+                    className="w-full p-2 border rounded-lg" 
+                    rows={3} 
+                    value={footerMessage} 
+                    onChange={e => setFooterMessage(e.target.value)} 
+                 />
+              </div>
 
               <input type="text" placeholder="اسم مستخدم المدير" className="w-full p-2 border rounded-lg" value={username} onChange={e => setUsername(e.target.value)} required />
               <input type="password" inputMode="numeric" placeholder="كلمة المرور" className="w-full p-2 border rounded-lg" value={password} onChange={e => setPassword(e.target.value)} required />
