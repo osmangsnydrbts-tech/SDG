@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Transaction, Company, User } from '../types';
 import { X, Share2, Loader2 } from 'lucide-react';
@@ -86,6 +85,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     if (t.type === 'treasury_feed') return 'إيداع نقدي';
     if (t.type === 'treasury_withdraw') return 'سحب نقدي';
     if (t.type === 'wallet_feed') return 'تغذية محفظة';
+    if (t.type === 'expense') return 'منصرفات';
     return 'عملية مالية';
   };
 
@@ -139,12 +139,18 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             <div className="space-y-3 text-sm">
               <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span className="text-gray-600 font-medium">
-                    {transaction.type === 'wallet_withdrawal' ? 'المبلغ المسحوب من المحفظة' : 'المبلغ'}
+                    {transaction.type === 'wallet_withdrawal' || transaction.type === 'expense' ? 'المبلغ المخصوم' : 'المبلغ'}
                 </span>
                 <span className="font-bold text-gray-900 text-lg" dir="ltr">
                   {formatAmount(transaction.from_amount)} {transaction.from_currency}
                 </span>
               </div>
+
+              {transaction.type === 'expense' && transaction.description && (
+                  <div className="bg-red-50 p-3 rounded-lg text-center text-red-700 font-bold text-sm">
+                      {transaction.description}
+                  </div>
+              )}
 
               {transaction.type === 'exchange' && transaction.rate && (
                 <div className="flex justify-between items-center px-2">
@@ -156,9 +162,9 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
               {transaction.to_amount && (
                 <div className="flex justify-between items-center p-4 bg-blue-600 rounded-lg shadow-sm text-white">
                   <span className="text-blue-100 font-bold">
-                    {transaction.type === 'wallet_withdrawal' ? 'المبلغ المضاف للخزينة (مع الربح)' : 
-                     transaction.type === 'wallet_deposit' ? 'المبلغ المضاف للمحفظة (مع الربح)' :
-                     'المبلغ المسلم للعميل'}
+                    {transaction.type === 'wallet_withdrawal' ? 'المبلغ المضاف للخزينة' : 
+                     transaction.type === 'wallet_deposit' ? 'المبلغ المضاف للمحفظة' :
+                     'المبلغ المستلم'}
                   </span>
                   <span className="font-extrabold text-2xl" dir="ltr">
                     {formatAmount(transaction.to_amount)} {transaction.to_currency}
@@ -180,7 +186,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
                 <span className="font-bold text-gray-700">{employee?.full_name}</span>
               </div>
               <div className="text-center text-xs text-gray-400 font-light">
-                 شكراً لتعاملكم معنا
+                 {company.footer_message || 'شكراً لتعاملكم معنا'}
               </div>
             </div>
           </div>
