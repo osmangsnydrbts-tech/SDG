@@ -166,7 +166,7 @@ const WalletTransfer: React.FC = () => {
                     {currency === 'SDG' && transferType === 'withdraw' && (
                         <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-sm text-blue-800">
                             <div className="flex justify-between items-center mb-1">
-                                <span>سعر الصرف (SDG -> EGP):</span>
+                                <span>سعر الصرف (SDG {'->'} EGP):</span>
                                 <span className="font-bold">{rates?.sd_to_eg_rate}</span>
                             </div>
                             <p className="text-xs opacity-75">سيتم خصم القيمة المعادلة بالمصري من رصيد المحفظة.</p>
