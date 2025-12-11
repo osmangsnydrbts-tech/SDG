@@ -68,7 +68,8 @@ interface StoreData {
       type: 'deposit' | 'withdraw',
       amount: number, 
       recipientPhone: string, 
-      receipt: string
+      receipt: string,
+      currency?: 'EGP' | 'SDG'
   ) => Promise<{ success: boolean; message: string; transaction?: Transaction }>;
   
   manageTreasury: (
@@ -598,16 +599,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await supabase.from('e_wallets').update({ balance: wallet.balance - totalAdded }).eq('id', wallet.id);
 
     } else if (transaction.type === 'wallet_withdrawal') {
-        // Reverse Withdrawal: Add Amount to Wallet, Deduct (Amount + Commission) from Employee Treasury
-        // Logic: Wallet was deducted by Amount. Employee Treasury was credited by (Amount + Commission).
+        // Reverse Withdrawal: Add Amount to Wallet, Deduct from Employee Treasury
+        // Note: Logic depends on currency used in withdrawal
         if (!wallet || !empTreasury) return { success: false, message: 'بيانات المحفظة أو الموظف غير متوفرة' };
-        const amountDeductedFromWallet = transaction.from_amount;
-        const amountAddedToTreasury = transaction.to_amount || transaction.from_amount;
-
-        if (empTreasury.egp_balance < amountAddedToTreasury) return { success: false, message: 'رصيد الموظف لا يسمح بإلغاء السحب' };
-
-        await supabase.from('e_wallets').update({ balance: wallet.balance + amountDeductedFromWallet }).eq('id', wallet.id);
-        await supabase.from('treasuries').update({ egp_balance: empTreasury.egp_balance - amountAddedToTreasury }).eq('id', empTreasury.id);
+        
+        const deductedFromWallet = transaction.to_amount || 0; // The EGP amount deducted from wallet
+        const addedToTreasury = transaction.from_amount; // The amount added to treasury (could be EGP or SDG)
+        
+        // Restore Wallet Balance (EGP)
+        await supabase.from('e_wallets').update({ balance: wallet.balance + deductedFromWallet }).eq('id', wallet.id);
+        
+        // Deduct from Treasury
+        if (transaction.from_currency === 'SDG') {
+             if (empTreasury.sdg_balance < addedToTreasury) return { success: false, message: 'رصيد السوداني لا يسمح بإلغاء السحب' };
+             await supabase.from('treasuries').update({ sdg_balance: empTreasury.sdg_balance - addedToTreasury }).eq('id', empTreasury.id);
+        } else {
+             // Default EGP
+             const totalEgpAdded = transaction.to_amount ? (transaction.to_amount + (transaction.commission || 0)) : transaction.from_amount;
+             // Logic check: in standard withdraw, we add Amount + Commission to Treasury? 
+             // Let's re-read performEWalletTransfer logic. 
+             // Standard EGP Withdraw: Treasury += (amount + commission). Wallet -= amount.
+             // SDG Withdraw: Treasury(SDG) += amount. Wallet(EGP) -= calculatedEgp.
+             
+             if (transaction.from_currency === 'EGP' || !transaction.from_currency) {
+                 if (empTreasury.egp_balance < addedToTreasury) return { success: false, message: 'رصيد المصري لا يسمح بإلغاء السحب' };
+                 await supabase.from('treasuries').update({ egp_balance: empTreasury.egp_balance - addedToTreasury }).eq('id', empTreasury.id);
+             }
+        }
     } else {
         // Handle other types if necessary or block
         return { success: false, message: 'لا يمكن حذف هذا النوع من العمليات حالياً' };
@@ -719,7 +737,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     type: 'deposit' | 'withdraw',
     amount: number, 
     recipientPhone: string, 
-    receipt: string
+    receipt: string,
+    currency: 'EGP' | 'SDG' = 'EGP'
   ) => {
       const wallet = eWallets.find(w => w.id === walletId);
       if (!wallet) return { success: false, message: 'Wallet not found' };
@@ -745,52 +764,104 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const rates = exchangeRates.find(r => r.company_id === wallet.company_id);
       const commissionRate = rates?.ewallet_commission || 1; 
-      const commission = amount * (commissionRate / 100);
 
       const transactionType = type === 'withdraw' ? 'wallet_withdrawal' : 'wallet_deposit';
+      let calculatedCommission = 0;
+      let toAmount = 0; // Amount recorded in 'to_amount' field of transaction
+      let fromCurrency = currency;
+      let toCurrency = 'EGP';
 
       if (type === 'withdraw') {
-          // Withdrawal: Deduct from Wallet, Add to Employee Treasury
-          if (wallet.balance < amount) {
-              return { success: false, message: `رصيد المحفظة غير كافي للسحب` };
-          }
+          // WITHDRAW: Shop sends money from Wallet to Customer. Customer pays Cash.
           
-          // Deduct Amount from Wallet
-          await supabase.from('e_wallets').update({
-            balance: wallet.balance - amount
-          }).eq('id', walletId);
+          if (currency === 'SDG') {
+               // New Feature: SDG -> Wallet
+               // 1. Calculate EGP equivalent
+               if (!rates) return { success: false, message: 'أسعار الصرف غير محددة' };
+               const rate = rates.sd_to_eg_rate;
+               const egpAmount = amount / rate; // The Base EGP amount
+               
+               // 2. Check Wallet Balance
+               if (wallet.balance < egpAmount) {
+                   return { success: false, message: `رصيد المحفظة غير كافي (${wallet.balance.toFixed(0)} < ${egpAmount.toFixed(0)})` };
+               }
+               
+               // 3. Calculate Commission (on the EGP amount)
+               calculatedCommission = egpAmount * (commissionRate / 100);
 
-          // Add Amount + Commission to Employee Cash
-          const totalToAdd = amount + commission;
-          await supabase.from('treasuries').update({
-            egp_balance: empTreasury.egp_balance + totalToAdd
-          }).eq('id', empTreasury.id);
+               // 4. Update Balances
+               // Deduct EGP from Wallet
+               await supabase.from('e_wallets').update({
+                   balance: wallet.balance - egpAmount
+               }).eq('id', walletId);
+
+               // Add SDG to Treasury
+               await supabase.from('treasuries').update({
+                   sdg_balance: empTreasury.sdg_balance + amount
+               }).eq('id', empTreasury.id);
+               
+               toAmount = egpAmount; // The amount sent to wallet
+
+          } else {
+               // Standard EGP -> Wallet (Customer pays EGP Cash)
+               calculatedCommission = amount * (commissionRate / 100);
+               
+               if (wallet.balance < amount) {
+                  return { success: false, message: `رصيد المحفظة غير كافي للسحب` };
+               }
+
+               // Deduct Amount from Wallet
+               await supabase.from('e_wallets').update({
+                  balance: wallet.balance - amount
+               }).eq('id', walletId);
+
+               // Add Amount + Commission to Employee Cash (Treasury)
+               const totalToAdd = amount + calculatedCommission;
+               await supabase.from('treasuries').update({
+                  egp_balance: empTreasury.egp_balance + totalToAdd
+               }).eq('id', empTreasury.id);
+
+               toAmount = amount; // The EGP amount deducted
+               toCurrency = 'EGP'; // Explicitly set
+          }
 
       } else {
+          // DEPOSIT: Shop receives money in Wallet from Customer. Customer gets Cash.
+          // Currently only supports EGP Cash out?
+          if (currency === 'SDG') {
+              return { success: false, message: 'الإيداع بالسوداني غير مدعوم حالياً' };
+          }
+
+          calculatedCommission = amount * (commissionRate / 100);
+          
           // Deposit: Add Amount + Commission to Wallet
-          const totalToAdd = amount + commission;
+          const totalToAdd = amount + calculatedCommission;
 
           // 1. Update Wallet (Add funds to wallet)
           await supabase.from('e_wallets').update({
             balance: wallet.balance + totalToAdd
           }).eq('id', walletId);
 
-          // 2. DO NOT Update Employee Treasury for Deposits (User Request)
+          // 2. DO NOT Update Employee Treasury for Deposits (User Request - Cash provided by Shop?)
+          // Usually implies Shop pays Cash to customer. But previously requested not to touch treasury.
+          
+          toAmount = amount + calculatedCommission;
       }
 
       const { data: newTx, error } = await supabase.from('transactions').insert({
           company_id: user.company_id!,
           employee_id: wallet.employee_id,
           type: transactionType,
-          from_currency: 'EGP',
-          to_currency: 'EGP',
-          from_amount: amount,
-          to_amount: amount + commission, 
-          commission: commission,
+          from_currency: fromCurrency,
+          to_currency: toCurrency,
+          from_amount: amount, // Input Amount (Could be SDG or EGP)
+          to_amount: toAmount, // Converted/Processed Amount
+          commission: calculatedCommission,
           receipt_number: receipt,
           description: `${type === 'withdraw' ? 'سحب' : 'إيداع'} - ${recipientPhone} via ${wallet.provider}`,
           created_at: new Date().toISOString(),
-          e_wallet_id: walletId
+          e_wallet_id: walletId,
+          rate: currency === 'SDG' ? rates?.sd_to_eg_rate : undefined
       }).select().single();
 
       if (error) return { success: false, message: error.message };
