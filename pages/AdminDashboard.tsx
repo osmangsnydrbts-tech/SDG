@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock, RefreshCw, ChevronRight, Settings, Store } from 'lucide-react';
+import { Landmark, UserPlus, Users, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock, Store, TrendingDown, ArrowDownCircle, ArrowUpCircle, Settings } from 'lucide-react';
 import { User } from '../types';
 
 const AdminDashboard: React.FC = () => {
@@ -162,13 +162,6 @@ ${footer}
       } else {
           setError('كلمة المرور غير صحيحة');
       }
-  };
-
-  const getEmpStats = (empId: number) => {
-      const treasury = treasuries.find(t => t.employee_id === empId);
-      const txs = transactions.filter(t => t.employee_id === empId).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      const recentTxs = txs.slice(0, 5);
-      return { treasury, recentTxs, totalTxs: txs.length };
   };
 
   // Dashboard Button Component
@@ -507,32 +500,68 @@ ${footer}
                       </div>
 
                       {(() => {
-                          const stats = getEmpStats(selectedEmpReport.id);
+                          const empTreasury = treasuries.find(t => t.employee_id === selectedEmpReport.id);
+                          
+                          // Filter Today's Transactions
+                          const today = new Date().toISOString().split('T')[0];
+                          const todayTxs = transactions.filter(t => 
+                              t.employee_id === selectedEmpReport.id && 
+                              t.created_at.startsWith(today)
+                          );
+
+                          // Calculate Daily Totals
+                          const expenseEGP = todayTxs.filter(t => t.type === 'expense' && t.from_currency === 'EGP').reduce((a, b) => a + b.from_amount, 0);
+                          const expenseSDG = todayTxs.filter(t => t.type === 'expense' && t.from_currency === 'SDG').reduce((a, b) => a + b.from_amount, 0);
+                          const walletIncome = todayTxs.filter(t => t.type === 'wallet_deposit').reduce((a, b) => a + b.from_amount, 0);
+                          const walletWithdraw = todayTxs.filter(t => t.type === 'wallet_withdrawal').reduce((a, b) => a + b.from_amount, 0);
+
                           return (
                               <div className="space-y-4">
+                                  {/* Current Balance */}
                                   <div className="grid grid-cols-2 gap-3">
                                       <div className="bg-gray-50 p-3 rounded-xl border text-center">
                                           <span className="text-xs text-gray-500 block">رصيد (EGP)</span>
-                                          <span className="font-bold text-lg">{stats.treasury?.egp_balance.toLocaleString()}</span>
+                                          <span className="font-bold text-lg">{empTreasury?.egp_balance.toLocaleString()}</span>
                                       </div>
                                       <div className="bg-gray-50 p-3 rounded-xl border text-center">
                                           <span className="text-xs text-gray-500 block">رصيد (SDG)</span>
-                                          <span className="font-bold text-lg">{stats.treasury?.sdg_balance.toLocaleString()}</span>
+                                          <span className="font-bold text-lg">{empTreasury?.sdg_balance.toLocaleString()}</span>
                                       </div>
                                   </div>
 
                                   <div className="border-t pt-3">
-                                      <p className="text-xs font-bold text-gray-500 mb-2">آخر العمليات ({stats.totalTxs})</p>
-                                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                                          {stats.recentTxs.map(tx => (
-                                              <div key={tx.id} className="flex justify-between text-xs bg-gray-50 p-2 rounded border border-gray-100">
-                                                  <span className={tx.from_currency === 'SDG' ? 'text-orange-600' : 'text-blue-600'}>
-                                                      {tx.type === 'exchange' ? 'صرف' : 'حركة'} {tx.from_amount.toLocaleString()} {tx.from_currency}
-                                                  </span>
-                                                  <span className="text-gray-400">{new Date(tx.created_at).toLocaleDateString()}</span>
+                                      <p className="text-xs font-bold text-gray-500 mb-2 text-center">حركة اليوم ({new Date().toLocaleDateString('ar-EG')})</p>
+                                      
+                                      <div className="space-y-2">
+                                          {/* Expenses */}
+                                          <div className="bg-red-50 p-3 rounded-xl flex items-center justify-between border border-red-100">
+                                              <div className="flex items-center gap-2 text-red-700 font-bold text-sm">
+                                                  <TrendingDown size={16} />
+                                                  <span>المنصرفات</span>
                                               </div>
-                                          ))}
-                                          {stats.recentTxs.length === 0 && <p className="text-center text-gray-400 text-xs py-2">لا توجد عمليات</p>}
+                                              <div className="text-left text-xs font-bold text-red-800">
+                                                  <div>{expenseEGP.toLocaleString()} EGP</div>
+                                                  {expenseSDG > 0 && <div>{expenseSDG.toLocaleString()} SDG</div>}
+                                              </div>
+                                          </div>
+
+                                          {/* Wallet Income (Deposit) */}
+                                          <div className="bg-green-50 p-3 rounded-xl flex items-center justify-between border border-green-100">
+                                              <div className="flex items-center gap-2 text-green-700 font-bold text-sm">
+                                                  <ArrowDownCircle size={16} />
+                                                  <span>إيداع محافظ</span>
+                                              </div>
+                                              <span className="text-green-800 font-bold">{walletIncome.toLocaleString()} EGP</span>
+                                          </div>
+
+                                          {/* Wallet Withdraw */}
+                                          <div className="bg-orange-50 p-3 rounded-xl flex items-center justify-between border border-orange-100">
+                                              <div className="flex items-center gap-2 text-orange-700 font-bold text-sm">
+                                                  <ArrowUpCircle size={16} />
+                                                  <span>سحب محافظ</span>
+                                              </div>
+                                              <span className="text-orange-800 font-bold">{walletWithdraw.toLocaleString()} EGP</span>
+                                          </div>
                                       </div>
                                   </div>
                               </div>
