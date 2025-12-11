@@ -1,15 +1,15 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Send, Smartphone, CheckCircle, Loader2, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Send, Smartphone, CheckCircle, Loader2, ArrowUpCircle, ArrowDownCircle, Coins } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
-import FormattedInput from '../components/FormattedInput';
 
 const WalletTransfer: React.FC = () => {
   const { currentUser, eWallets, performEWalletTransfer, exchangeRates, companies } = useStore();
   const [selectedWalletId, setSelectedWalletId] = useState<string>('');
   const [transferType, setTransferType] = useState<'withdraw' | 'deposit'>('withdraw');
+  const [currency, setCurrency] = useState<'EGP' | 'SDG'>('EGP');
   const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
   const [receipt, setReceipt] = useState('');
@@ -48,9 +48,10 @@ const WalletTransfer: React.FC = () => {
         const res = await performEWalletTransfer(
             parseInt(selectedWalletId),
             transferType,
-            parseFloat(amount), // Store will round this
+            parseFloat(amount),
             phone,
-            receipt
+            receipt,
+            currency
         );
 
         if (res.success) {
@@ -71,19 +72,26 @@ const WalletTransfer: React.FC = () => {
     }
   };
 
-  const calculateCommission = () => {
+  // Helper Calculations
+  const getCalculatedValues = () => {
       const val = parseFloat(amount);
-      if (isNaN(val)) return 0;
-      // Round amount first then calculate commission
-      return Math.round(Math.round(val) * (commissionRate / 100));
+      if (isNaN(val)) return { commission: 0, total: 0, egpEquivalent: 0 };
+
+      if (currency === 'SDG' && transferType === 'withdraw') {
+          // SDG -> Wallet (EGP)
+          const rate = rates?.sd_to_eg_rate || 1;
+          const egpEquivalent = val / rate;
+          const commission = egpEquivalent * (commissionRate / 100);
+          return { commission, total: 0, egpEquivalent }; 
+      }
+
+      // EGP -> Wallet
+      const commission = val * (commissionRate / 100);
+      const total = val + commission;
+      return { commission, total, egpEquivalent: val };
   };
 
-  const calculateTotal = () => {
-      const val = parseFloat(amount);
-      if (isNaN(val)) return 0;
-      // Round amount first then add rounded commission
-      return Math.round(val) + calculateCommission();
-  };
+  const calc = getCalculatedValues();
 
   return (
     <div className="space-y-6">
@@ -110,7 +118,7 @@ const WalletTransfer: React.FC = () => {
                             <option value="">-- اختر المحفظة --</option>
                             {myWallets.map(w => (
                                 <option key={w.id} value={w.id}>
-                                    {w.phone_number} ({w.provider}) - الرصيد: {w.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                    {w.phone_number} ({w.provider}) - الرصيد: {w.balance.toLocaleString()}
                                 </option>
                             ))}
                         </select>
@@ -119,7 +127,7 @@ const WalletTransfer: React.FC = () => {
                     <div className="grid grid-cols-2 gap-3">
                         <button
                             type="button"
-                            onClick={() => setTransferType('withdraw')}
+                            onClick={() => { setTransferType('withdraw'); setCurrency('EGP'); }}
                             className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition ${transferType === 'withdraw' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}
                         >
                             <ArrowUpCircle size={24} />
@@ -127,13 +135,43 @@ const WalletTransfer: React.FC = () => {
                         </button>
                         <button
                             type="button"
-                            onClick={() => setTransferType('deposit')}
+                            onClick={() => { setTransferType('deposit'); setCurrency('EGP'); }}
                             className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition ${transferType === 'deposit' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}`}
                         >
                             <ArrowDownCircle size={24} />
                             <span className="font-bold">إيداع (في المحفظة)</span>
                         </button>
                     </div>
+
+                    {/* Currency Toggle (Only for Withdraw/Send to Customer) */}
+                    {transferType === 'withdraw' && (
+                        <div className="bg-gray-100 p-1 rounded-xl flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setCurrency('EGP')}
+                                className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition ${currency === 'EGP' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+                            >
+                                <Coins size={16}/> مصري (EGP)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setCurrency('SDG')}
+                                className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition ${currency === 'SDG' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+                            >
+                                <Coins size={16}/> سوداني (SDG)
+                            </button>
+                        </div>
+                    )}
+
+                    {currency === 'SDG' && transferType === 'withdraw' && (
+                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-sm text-blue-800">
+                            <div className="flex justify-between items-center mb-1">
+                                <span>سعر الصرف (SDG -> EGP):</span>
+                                <span className="font-bold">{rates?.sd_to_eg_rate}</span>
+                            </div>
+                            <p className="text-xs opacity-75">سيتم خصم القيمة المعادلة بالمصري من رصيد المحفظة.</p>
+                        </div>
+                    )}
 
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">رقم العميل / المرسل إليه</label>
@@ -148,51 +186,78 @@ const WalletTransfer: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">المبلغ</label>
-                        <FormattedInput 
+                        <label className="block text-sm font-bold text-gray-700 mb-1">
+                            {currency === 'SDG' ? 'المبلغ المستلم (SDG)' : 'المبلغ'}
+                        </label>
+                        <input 
+                            type="number" 
+                            inputMode="decimal"
                             value={amount}
-                            onChange={setAmount}
+                            onChange={e => setAmount(e.target.value)}
                             className="w-full p-3 border rounded-xl text-lg font-bold"
-                            placeholder="0"
+                            placeholder="0.00"
                             required
                         />
                     </div>
 
                     <div className="bg-gray-50 p-4 rounded-xl space-y-2">
-                        <div className="flex justify-between text-sm">
-                            <span className="text-gray-500">المبلغ:</span>
-                            <span className="font-bold">{amount ? Math.round(parseFloat(amount)).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '0'} EGP</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-gray-500">العمولة ({commissionRate}%):</span>
-                            <span className="font-bold text-green-600">
-                                {calculateCommission().toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP
-                            </span>
-                        </div>
-                        
-                        <div className="border-t pt-2 mt-2">
-                            {transferType === 'withdraw' ? (
-                                <>
-                                    <div className="flex justify-between items-center text-sm text-red-600 mb-1">
+                        {currency === 'SDG' ? (
+                            <>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">القيمة المعادلة:</span>
+                                    <span className="font-bold">{calc.egpEquivalent.toLocaleString(undefined, {maximumFractionDigits: 0})} EGP</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">العمولة ({commissionRate}%):</span>
+                                    <span className="font-bold text-green-600">{calc.commission.toLocaleString(undefined, {maximumFractionDigits: 1})} EGP</span>
+                                </div>
+                                <div className="border-t pt-2 mt-2">
+                                    <div className="flex justify-between items-center text-sm text-red-600">
                                         <span>يخصم من المحفظة:</span>
-                                        <span className="font-bold">{amount ? Math.round(parseFloat(amount)).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '0'} EGP</span>
+                                        <span className="font-bold">{calc.egpEquivalent.toLocaleString(undefined, {maximumFractionDigits: 0})} EGP</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-lg text-green-700">
-                                        <span className="font-bold">يضاف إلى خزينتك:</span>
-                                        <span className="font-extrabold">{calculateTotal().toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
+                                    <div className="flex justify-between items-center text-lg text-green-700 mt-1">
+                                        <span className="font-bold">يضاف للخزينة (SDG):</span>
+                                        <span className="font-extrabold">{amount || 0} SDG</span>
                                     </div>
-                                    <p className="text-xs text-gray-400 mt-1">يتم سحب المبلغ من المحفظة وإضافته مع العمولة إلى عهدتك</p>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="flex justify-between items-center text-lg text-green-700">
-                                        <span className="font-bold">يضاف إلى المحفظة:</span>
-                                        <span className="font-extrabold">{calculateTotal().toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
-                                    </div>
-                                    <p className="text-xs text-gray-400 mt-1">يتم إضافة المبلغ مع العمولة إلى رصيد المحفظة</p>
-                                </>
-                            )}
-                        </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">المبلغ:</span>
+                                    <span className="font-bold">{amount || 0} EGP</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">الربح ({commissionRate}%):</span>
+                                    <span className="font-bold text-green-600">
+                                        {calc.commission.toFixed(2)} EGP
+                                    </span>
+                                </div>
+                                
+                                <div className="border-t pt-2 mt-2">
+                                    {transferType === 'withdraw' ? (
+                                        <>
+                                            <div className="flex justify-between items-center text-sm text-red-600 mb-1">
+                                                <span>يخصم من المحفظة:</span>
+                                                <span className="font-bold">{amount || 0} EGP</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-lg text-green-700">
+                                                <span className="font-bold">يضاف إلى خزينتك:</span>
+                                                <span className="font-extrabold">{calc.total.toFixed(2)} EGP</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="flex justify-between items-center text-lg text-green-700">
+                                                <span className="font-bold">يضاف إلى المحفظة:</span>
+                                                <span className="font-extrabold">{calc.total.toFixed(2)} EGP</span>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     <div>
