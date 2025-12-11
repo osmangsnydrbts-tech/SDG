@@ -550,9 +550,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!transaction) return { success: false, message: 'العملية غير موجودة' };
 
     const empTreasury = treasuries.find(t => t.employee_id === transaction.employee_id);
-    if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+    const mainTreasury = treasuries.find(t => t.company_id === transaction.company_id && !t.employee_id);
+    const wallet = transaction.e_wallet_id ? eWallets.find(w => w.id === transaction.e_wallet_id) : null;
 
     if (transaction.type === 'exchange') {
+        if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
         const fromAmount = transaction.from_amount;
         const toAmount = transaction.to_amount || 0;
 
@@ -568,6 +570,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }).eq('id', empTreasury.id);
         }
     } else if (transaction.type === 'expense') {
+        if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
         const currency = transaction.from_currency as 'EGP' | 'SDG';
         const amount = transaction.from_amount;
         const balanceKey = currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
@@ -575,6 +578,36 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await supabase.from('treasuries').update({
             [balanceKey]: empTreasury[balanceKey] + amount
         }).eq('id', empTreasury.id);
+    } else if (transaction.type === 'wallet_feed') {
+        // Reverse Feed: Deduct from Wallet, Add to Main Treasury
+        if (!wallet || !mainTreasury) return { success: false, message: 'بيانات المحفظة أو الخزينة غير متوفرة' };
+        if (wallet.balance < transaction.from_amount) return { success: false, message: 'رصيد المحفظة الحالي لا يسمح بإلغاء التغذية' };
+
+        await supabase.from('e_wallets').update({ balance: wallet.balance - transaction.from_amount }).eq('id', wallet.id);
+        await supabase.from('treasuries').update({ egp_balance: mainTreasury.egp_balance + transaction.from_amount }).eq('id', mainTreasury.id);
+
+    } else if (transaction.type === 'wallet_deposit') {
+        // Reverse Deposit: Deduct (Amount + Commission) from Wallet
+        // Logic: Wallet was credited with (Amount + Commission). We reverse that.
+        // Employee treasury was NOT touched.
+        if (!wallet) return { success: false, message: 'المحفظة غير موجودة' };
+        const totalAdded = transaction.to_amount || transaction.from_amount; // amount + commission
+
+        if (wallet.balance < totalAdded) return { success: false, message: 'رصيد المحفظة لا يسمح بإلغاء الإيداع' };
+
+        await supabase.from('e_wallets').update({ balance: wallet.balance - totalAdded }).eq('id', wallet.id);
+
+    } else if (transaction.type === 'wallet_withdrawal') {
+        // Reverse Withdrawal: Add Amount to Wallet, Deduct (Amount + Commission) from Employee Treasury
+        // Logic: Wallet was deducted by Amount. Employee Treasury was credited by (Amount + Commission).
+        if (!wallet || !empTreasury) return { success: false, message: 'بيانات المحفظة أو الموظف غير متوفرة' };
+        const amountDeductedFromWallet = transaction.from_amount;
+        const amountAddedToTreasury = transaction.to_amount || transaction.from_amount;
+
+        if (empTreasury.egp_balance < amountAddedToTreasury) return { success: false, message: 'رصيد الموظف لا يسمح بإلغاء السحب' };
+
+        await supabase.from('e_wallets').update({ balance: wallet.balance + amountDeductedFromWallet }).eq('id', wallet.id);
+        await supabase.from('treasuries').update({ egp_balance: empTreasury.egp_balance - amountAddedToTreasury }).eq('id', empTreasury.id);
     } else {
         // Handle other types if necessary or block
         return { success: false, message: 'لا يمكن حذف هذا النوع من العمليات حالياً' };
