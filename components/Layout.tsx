@@ -2,7 +2,7 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Home, ArrowRightLeft, Landmark, BarChart3, Building } from 'lucide-react';
+import { LogOut, Home, ArrowRightLeft, Landmark, BarChart3, Building, FileBarChart } from 'lucide-react';
 import Toast from './Toast';
 
 interface LayoutProps {
@@ -85,8 +85,8 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
           {currentUser?.role === 'admin' && (
             <>
               <NavItem to="/admin" icon={Home} label="الرئيسية" />
-              <NavItem to="/admin/treasury" icon={Landmark} label="الخزينة" />
               <NavItem to="/reports" icon={BarChart3} label="التقارير" />
+              <NavItem to="/daily-report" icon={FileBarChart} label="تقرير اليوم" />
             </>
           )}
 
@@ -94,6 +94,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
             <>
               <NavItem to="/employee" icon={Home} label="الرئيسية" />
               <NavItem to="/exchange" icon={ArrowRightLeft} label="الصرف" />
+              <NavItem to="/daily-report" icon={FileBarChart} label="تقرير اليوم" />
               <NavItem to="/reports" icon={BarChart3} label="التقارير" />
             </>
           )}
