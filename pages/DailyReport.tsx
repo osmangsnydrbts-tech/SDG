@@ -10,6 +10,9 @@ const DailyReport: React.FC = () => {
   const today = new Date().toISOString().split('T')[0];
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee');
 
+  // Helper for integer formatting
+  const fmt = (num: number) => Math.round(num).toLocaleString();
+
   const reportData = useMemo(() => {
     // 1. Filter by Company and Date and Status
     let relevantTxs = transactions.filter(t => 
@@ -29,7 +32,7 @@ const DailyReport: React.FC = () => {
     let stats = {
         treasuryEGP: 0,
         treasurySDG: 0,
-        incomingSDG: 0, // Added: Incoming SDG
+        incomingSDG: 0, 
         totalExpenses: 0,
         totalSales: 0,
         totalCommissions: 0,
@@ -45,7 +48,7 @@ const DailyReport: React.FC = () => {
             
             if (t.from_currency === 'SDG') {
                 stats.treasurySDG += t.from_amount;
-                stats.incomingSDG += t.from_amount; // Track Incoming SDG separately
+                stats.incomingSDG += t.from_amount;
             }
             if (t.to_currency === 'SDG') stats.treasurySDG -= (t.to_amount || 0);
         }
@@ -119,11 +122,11 @@ const DailyReport: React.FC = () => {
             <div className="flex gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
                 <div className="flex-1 text-center border-l border-gray-300">
                     <p className="text-xs text-gray-500 mb-1">إجمالي مصري (EGP)</p>
-                    <p className="text-xl font-extrabold text-blue-700">{(reportData.treasuryEGP + reportData.totalSales + reportData.totalCommissions - reportData.totalExpenses).toLocaleString()}</p>
+                    <p className="text-xl font-extrabold text-blue-700">{fmt(reportData.treasuryEGP + reportData.totalSales + reportData.totalCommissions - reportData.totalExpenses)}</p>
                 </div>
                 <div className="flex-1 text-center">
                     <p className="text-xs text-gray-500 mb-1">إجمالي سوداني (SDG)</p>
-                    <p className="text-xl font-extrabold text-emerald-700">{reportData.treasurySDG.toLocaleString()}</p>
+                    <p className="text-xl font-extrabold text-emerald-700">{fmt(reportData.treasurySDG)}</p>
                 </div>
             </div>
         </div>
@@ -132,19 +135,19 @@ const DailyReport: React.FC = () => {
         <div className="grid grid-cols-2 gap-3">
             <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-orange-500">
                 <p className="text-xs text-gray-500 font-bold mb-1">وارد سوداني</p>
-                <p className="text-lg font-bold text-gray-800">{reportData.incomingSDG.toLocaleString()}</p>
+                <p className="text-lg font-bold text-gray-800">{fmt(reportData.incomingSDG)}</p>
             </div>
              <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-purple-500">
                 <p className="text-xs text-gray-500 font-bold mb-1">إجمالي المبيعات</p>
-                <p className="text-lg font-bold text-gray-800">{reportData.totalSales.toLocaleString()}</p>
+                <p className="text-lg font-bold text-gray-800">{fmt(reportData.totalSales)}</p>
             </div>
             <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-yellow-500">
                 <p className="text-xs text-gray-500 font-bold mb-1">العمولات المكتسبة</p>
-                <p className="text-lg font-bold text-gray-800">{reportData.totalCommissions.toLocaleString()}</p>
+                <p className="text-lg font-bold text-gray-800">{fmt(reportData.totalCommissions)}</p>
             </div>
             <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-red-500">
                 <p className="text-xs text-gray-500 font-bold mb-1">إجمالي المنصرفات</p>
-                <p className="text-lg font-bold text-red-600">{reportData.totalExpenses.toLocaleString()}</p>
+                <p className="text-lg font-bold text-red-600">{fmt(reportData.totalExpenses)}</p>
             </div>
         </div>
 
@@ -157,15 +160,15 @@ const DailyReport: React.FC = () => {
             <div className="divide-y divide-gray-100">
                 <div className="flex justify-between p-3 text-sm">
                     <span className="text-gray-600">سحب (من المحفظة)</span>
-                    <span className="font-bold">{reportData.vodafone.transfer.toLocaleString()}</span>
+                    <span className="font-bold">{fmt(reportData.vodafone.transfer)}</span>
                 </div>
                 <div className="flex justify-between p-3 text-sm">
                     <span className="text-gray-600">ايداع (في المحفظة)</span>
-                    <span className="font-bold">{reportData.vodafone.deposit.toLocaleString()}</span>
+                    <span className="font-bold">{fmt(reportData.vodafone.deposit)}</span>
                 </div>
                 <div className="flex justify-between p-3 text-sm">
                     <span className="text-gray-600">صرف (من المحفظة)</span>
-                    <span className="font-bold">{reportData.vodafone.exchange.toLocaleString()}</span>
+                    <span className="font-bold">{fmt(reportData.vodafone.exchange)}</span>
                 </div>
             </div>
         </div>
@@ -179,15 +182,15 @@ const DailyReport: React.FC = () => {
             <div className="divide-y divide-gray-100">
                 <div className="flex justify-between p-3 text-sm">
                     <span className="text-gray-600">سحب (من المحفظة)</span>
-                    <span className="font-bold">{reportData.instaPay.transfer.toLocaleString()}</span>
+                    <span className="font-bold">{fmt(reportData.instaPay.transfer)}</span>
                 </div>
                 <div className="flex justify-between p-3 text-sm">
                     <span className="text-gray-600">ايداع (في المحفظة)</span>
-                    <span className="font-bold">{reportData.instaPay.deposit.toLocaleString()}</span>
+                    <span className="font-bold">{fmt(reportData.instaPay.deposit)}</span>
                 </div>
                 <div className="flex justify-between p-3 text-sm">
                     <span className="text-gray-600">صرف (من المحفظة)</span>
-                    <span className="font-bold">{reportData.instaPay.exchange.toLocaleString()}</span>
+                    <span className="font-bold">{fmt(reportData.instaPay.exchange)}</span>
                 </div>
             </div>
         </div>
