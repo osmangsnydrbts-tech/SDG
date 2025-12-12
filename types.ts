@@ -30,7 +30,7 @@ export interface ExchangeRate {
   eg_to_sd_rate: number;
   wholesale_rate: number;
   wholesale_threshold: number;
-  ewallet_commission: number; // Percentage (e.g., 1 for 1%)
+  ewallet_commission: number;
   updated_at: string;
 }
 
@@ -69,7 +69,7 @@ export interface EWallet {
   employee_id: number;
   phone_number: string;
   provider: string;
-  balance: number; // Current balance in the wallet
+  balance: number;
   is_active: boolean;
 }
 
@@ -77,7 +77,7 @@ export interface Transaction {
   id: number;
   company_id: number;
   employee_id?: number;
-  type: 'exchange' | 'e_wallet' | 'treasury_feed' | 'treasury_withdraw' | 'merchant_entry' | 'wallet_feed' | 'wallet_deposit' | 'wallet_withdrawal' | 'expense';
+  type: 'exchange' | 'treasury_feed' | 'treasury_withdraw' | 'merchant_entry' | 'expense' | 'wallet_feed' | 'wallet_transfer';
   from_currency?: string;
   to_currency?: string;
   from_amount: number;
@@ -88,7 +88,7 @@ export interface Transaction {
   description?: string;
   created_at: string;
   is_wholesale?: boolean;
-  e_wallet_id?: number;
+  wallet_id?: number;
 }
 
 export const DEFAULT_SUPER_ADMIN: User = {
