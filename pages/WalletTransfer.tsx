@@ -8,8 +8,7 @@ import { Transaction } from '../types';
 const WalletTransfer: React.FC = () => {
   const { currentUser, eWallets, performEWalletTransfer, exchangeRates, companies } = useStore();
   const [selectedWalletId, setSelectedWalletId] = useState<string>('');
-  const [transferType, setTransferType] = useState<'withdraw' | 'deposit'>('withdraw');
-  const [currency, setCurrency] = useState<'EGP' | 'SDG'>('EGP');
+  const [transferType, setTransferType] = useState<'withdraw' | 'deposit' | 'exchange'>('withdraw');
   const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
   const [receipt, setReceipt] = useState('');
@@ -50,8 +49,7 @@ const WalletTransfer: React.FC = () => {
             transferType,
             parseFloat(amount),
             phone,
-            receipt,
-            currency
+            receipt
         );
 
         if (res.success) {
@@ -77,7 +75,7 @@ const WalletTransfer: React.FC = () => {
       const val = parseFloat(amount);
       if (isNaN(val)) return { commission: 0, total: 0, egpEquivalent: 0 };
 
-      if (currency === 'SDG' && transferType === 'withdraw') {
+      if (transferType === 'exchange') {
           // SDG -> Wallet (EGP)
           const rate = rates?.sd_to_eg_rate || 1;
           const egpEquivalent = val / rate;
@@ -85,9 +83,9 @@ const WalletTransfer: React.FC = () => {
           return { commission, total: 0, egpEquivalent }; 
       }
 
-      // EGP -> Wallet
+      // EGP -> Wallet (Deposit/Withdraw)
       const commission = val * (commissionRate / 100);
-      const total = val + commission;
+      const total = val + commission; // For Withdraw (User gets cash + comm)
       return { commission, total, egpEquivalent: val };
   };
 
@@ -124,46 +122,34 @@ const WalletTransfer: React.FC = () => {
                         </select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-2">
                         <button
                             type="button"
-                            onClick={() => { setTransferType('withdraw'); setCurrency('EGP'); }}
-                            className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition ${transferType === 'withdraw' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}
+                            onClick={() => setTransferType('withdraw')}
+                            className={`p-2 rounded-xl border-2 flex flex-col items-center gap-1 transition ${transferType === 'withdraw' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}
                         >
-                            <ArrowUpCircle size={24} />
-                            <span className="font-bold">سحب (من المحفظة)</span>
+                            <ArrowUpCircle size={20} />
+                            <span className="font-bold text-xs">سحب (من المحفظة)</span>
                         </button>
                         <button
                             type="button"
-                            onClick={() => { setTransferType('deposit'); setCurrency('EGP'); }}
-                            className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition ${transferType === 'deposit' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}`}
+                            onClick={() => setTransferType('deposit')}
+                            className={`p-2 rounded-xl border-2 flex flex-col items-center gap-1 transition ${transferType === 'deposit' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500'}`}
                         >
-                            <ArrowDownCircle size={24} />
-                            <span className="font-bold">إيداع (في المحفظة)</span>
+                            <ArrowDownCircle size={20} />
+                            <span className="font-bold text-xs">إيداع (في المحفظة)</span>
+                        </button>
+                         <button
+                            type="button"
+                            onClick={() => setTransferType('exchange')}
+                            className={`p-2 rounded-xl border-2 flex flex-col items-center gap-1 transition ${transferType === 'exchange' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500'}`}
+                        >
+                            <Coins size={20} />
+                            <span className="font-bold text-xs">صرف (سوداني)</span>
                         </button>
                     </div>
 
-                    {/* Currency Toggle (Only for Withdraw/Send to Customer) */}
-                    {transferType === 'withdraw' && (
-                        <div className="bg-gray-100 p-1 rounded-xl flex gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setCurrency('EGP')}
-                                className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition ${currency === 'EGP' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
-                            >
-                                <Coins size={16}/> مصري (EGP)
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setCurrency('SDG')}
-                                className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition ${currency === 'SDG' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
-                            >
-                                <Coins size={16}/> سوداني (SDG)
-                            </button>
-                        </div>
-                    )}
-
-                    {currency === 'SDG' && transferType === 'withdraw' && (
+                    {transferType === 'exchange' && (
                         <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-sm text-blue-800">
                             <div className="flex justify-between items-center mb-1">
                                 <span>سعر الصرف (SDG {'->'} EGP):</span>
@@ -187,7 +173,7 @@ const WalletTransfer: React.FC = () => {
 
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">
-                            {currency === 'SDG' ? 'المبلغ المستلم (SDG)' : 'المبلغ'}
+                            {transferType === 'exchange' ? 'المبلغ المستلم (SDG)' : 'المبلغ (EGP)'}
                         </label>
                         <input 
                             type="number" 
@@ -201,7 +187,7 @@ const WalletTransfer: React.FC = () => {
                     </div>
 
                     <div className="bg-gray-50 p-4 rounded-xl space-y-2">
-                        {currency === 'SDG' ? (
+                        {transferType === 'exchange' ? (
                             <>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-500">القيمة المعادلة:</span>
@@ -217,8 +203,8 @@ const WalletTransfer: React.FC = () => {
                                         <span className="font-bold">{calc.egpEquivalent.toLocaleString(undefined, {maximumFractionDigits: 0})} EGP</span>
                                     </div>
                                     <div className="flex justify-between items-center text-lg text-green-700 mt-1">
-                                        <span className="font-bold">يضاف للخزينة (SDG):</span>
-                                        <span className="font-extrabold">{amount || 0} SDG</span>
+                                        <span className="font-bold">يضاف للخزينة (EGP):</span>
+                                        <span className="font-extrabold">{(calc.egpEquivalent + calc.commission).toLocaleString(undefined, {maximumFractionDigits: 0})} EGP</span>
                                     </div>
                                 </div>
                             </>
@@ -229,7 +215,7 @@ const WalletTransfer: React.FC = () => {
                                     <span className="font-bold">{amount || 0} EGP</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">الربح ({commissionRate}%):</span>
+                                    <span className="text-gray-500">العمولة ({commissionRate}%):</span>
                                     <span className="font-bold text-green-600">
                                         {calc.commission.toFixed(2)} EGP
                                     </span>
@@ -244,14 +230,18 @@ const WalletTransfer: React.FC = () => {
                                             </div>
                                             <div className="flex justify-between items-center text-lg text-green-700">
                                                 <span className="font-bold">يضاف إلى خزينتك:</span>
-                                                <span className="font-extrabold">{calc.total.toFixed(2)} EGP</span>
+                                                <span className="font-extrabold">{(parseFloat(amount || '0') + calc.commission).toFixed(2)} EGP</span>
                                             </div>
                                         </>
                                     ) : (
                                         <>
-                                            <div className="flex justify-between items-center text-lg text-green-700">
+                                            <div className="flex justify-between items-center text-sm text-red-600 mb-1">
+                                                <span>يخصم من خزينتك:</span>
+                                                <span className="font-bold">{(parseFloat(amount || '0') - calc.commission).toFixed(2)} EGP</span>
+                                            </div>
+                                             <div className="flex justify-between items-center text-lg text-green-700">
                                                 <span className="font-bold">يضاف إلى المحفظة:</span>
-                                                <span className="font-extrabold">{calc.total.toFixed(2)} EGP</span>
+                                                <span className="font-extrabold">{parseFloat(amount || '0').toFixed(2)} EGP</span>
                                             </div>
                                         </>
                                     )}
@@ -287,7 +277,7 @@ const WalletTransfer: React.FC = () => {
                             </>
                         ) : (
                             <>
-                                <Send size={20} /> تنفيذ {transferType === 'withdraw' ? 'السحب' : 'الإيداع'}
+                                <Send size={20} /> تنفيذ العملية
                             </>
                         )}
                     </button>
