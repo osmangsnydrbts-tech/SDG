@@ -1,99 +1,83 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { WalletCards, Banknote, TrendingDown, DollarSign, Filter, User } from 'lucide-react';
+import { WalletCards, Banknote, ShoppingCart, Share2, User, Smartphone, AlertCircle } from 'lucide-react';
 
 const DailyReport: React.FC = () => {
-  const { transactions, currentUser, eWallets, users } = useStore();
+  const { currentUser, treasuries, eWallets, users, companies } = useStore();
   const [selectedEmpId, setSelectedEmpId] = useState<string>('all');
   
-  const today = new Date().toISOString().split('T')[0];
+  const company = companies.find(c => c.id === currentUser?.company_id);
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee');
 
-  // Helper for integer formatting
-  const fmt = (num: number) => Math.round(num).toLocaleString();
+  // Determine which employee to show
+  const targetEmployeeId = currentUser?.role === 'employee' 
+      ? currentUser.id 
+      : (selectedEmpId === 'all' ? null : parseInt(selectedEmpId));
 
   const reportData = useMemo(() => {
-    // 1. Filter by Company and Date and Status
-    let relevantTxs = transactions.filter(t => 
-        t.company_id === currentUser?.company_id &&
-        !t.is_cancelled &&
-        t.created_at.startsWith(today)
-    );
+    if (!targetEmployeeId) return null;
 
-    // 2. Filter by Role/Selection
-    if (currentUser?.role === 'employee') {
-        relevantTxs = relevantTxs.filter(t => t.employee_id === currentUser.id);
-    } else if (selectedEmpId !== 'all') {
-        relevantTxs = relevantTxs.filter(t => t.employee_id === parseInt(selectedEmpId));
-    }
+    const treasury = treasuries.find(t => t.employee_id === targetEmployeeId);
+    const wallets = eWallets.filter(w => w.employee_id === targetEmployeeId && w.is_active);
+    const employee = users.find(u => u.id === targetEmployeeId);
 
-    // Initial Stats
-    let stats = {
-        treasuryEGP: 0,
-        treasurySDG: 0,
-        incomingSDG: 0, 
-        totalExpenses: 0,
-        totalSales: 0,
-        totalCommissions: 0,
-        vodafone: { transfer: 0, deposit: 0, exchange: 0 },
-        instaPay: { transfer: 0, deposit: 0, exchange: 0 }
+    return {
+        employeeName: employee?.full_name || '',
+        egpBalance: Math.round(treasury?.egp_balance || 0),
+        sdgBalance: Math.round(treasury?.sdg_balance || 0),
+        salesBalance: Math.round(treasury?.sales_balance || 0),
+        wallets: wallets.map(w => ({
+            provider: w.provider,
+            phone: w.phone_number,
+            balance: Math.round(w.balance)
+        }))
     };
+  }, [targetEmployeeId, treasuries, eWallets, users]);
 
-    relevantTxs.forEach(t => {
-        // Exchange
-        if (t.type === 'exchange') {
-            if (t.from_currency === 'EGP') stats.treasuryEGP += t.from_amount;
-            if (t.to_currency === 'EGP') stats.treasuryEGP -= (t.to_amount || 0);
-            
-            if (t.from_currency === 'SDG') {
-                stats.treasurySDG += t.from_amount;
-                stats.incomingSDG += t.from_amount;
-            }
-            if (t.to_currency === 'SDG') stats.treasurySDG -= (t.to_amount || 0);
-        }
+  // Helper for formatting
+  const fmt = (num: number) => Math.round(num).toLocaleString('en-US');
 
-        // Expenses
-        if (t.type === 'expense') {
-             if (t.from_currency === 'EGP') stats.totalExpenses += t.from_amount;
-        }
+  const handleShare = async () => {
+      if (!reportData) return;
+      
+      const date = new Date().toLocaleDateString('ar-EG');
+      let text = `*تقرير اليومية - ${date}*\n`;
+      text += `الموظف: ${reportData.employeeName}\n`;
+      text += `------------------\n`;
+      text += `💰 *الخزينة النقدية:*\n`;
+      text += `مصري: ${fmt(reportData.egpBalance)} EGP\n`;
+      text += `سوداني: ${fmt(reportData.sdgBalance)} SDG\n\n`;
+      
+      text += `🛒 *خزينة المبيعات:*\n`;
+      text += `الرصيد: ${fmt(reportData.salesBalance)} EGP\n\n`;
+      
+      text += `📱 *المحافظ الإلكترونية:*\n`;
+      if (reportData.wallets.length > 0) {
+          reportData.wallets.forEach((w) => {
+              text += `- ${w.provider} (${w.phone}): ${fmt(w.balance)}\n`;
+          });
+      } else {
+          text += `لا توجد محافظ.\n`;
+      }
+      text += `------------------\n`;
+      text += `نظام الصرفة`;
 
-        // Sales
-        if (t.type === 'sale') {
-            stats.totalSales += t.from_amount;
-        }
-
-        // Commissions
-        if (t.commission) {
-            stats.totalCommissions += t.commission;
-        }
-
-        // Wallet Logic
-        if (t.type === 'wallet_transfer' && t.wallet_id) {
-            const wallet = eWallets.find(w => w.id === t.wallet_id);
-            const provider = wallet?.provider.toLowerCase() || '';
-
-            // Sums for Breakdown
-            if (provider.includes('vodafone')) {
-                if (t.wallet_type === 'withdraw') stats.vodafone.transfer += t.from_amount;
-                if (t.wallet_type === 'deposit') stats.vodafone.deposit += t.from_amount;
-                if (t.wallet_type === 'exchange') stats.vodafone.exchange += t.from_amount;
-            }
-            else if (provider.includes('instapay') || provider.includes('insta')) {
-                if (t.wallet_type === 'withdraw') stats.instaPay.transfer += t.from_amount;
-                if (t.wallet_type === 'deposit') stats.instaPay.deposit += t.from_amount;
-                if (t.wallet_type === 'exchange') stats.instaPay.exchange += t.from_amount;
-            }
-        }
-    });
-
-    // Round everything at the end just in case
-    stats.treasuryEGP = Math.round(stats.treasuryEGP);
-    stats.treasurySDG = Math.round(stats.treasurySDG);
-
-    return stats;
-
-  }, [transactions, currentUser, today, eWallets, selectedEmpId]);
+      if (navigator.share) {
+          try {
+              await navigator.share({ title: 'تقرير اليومية', text: text });
+          } catch (err) {
+              console.log('Share cancelled');
+          }
+      } else {
+          try {
+              await navigator.clipboard.writeText(text);
+              alert('تم نسخ التقرير للحافظة');
+          } catch (err) {
+              alert('لا يمكن النسخ');
+          }
+      }
+  };
 
   return (
     <div className="space-y-6 pb-20">
@@ -112,7 +96,7 @@ const DailyReport: React.FC = () => {
                             onChange={(e) => setSelectedEmpId(e.target.value)}
                             className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 pr-8 font-bold"
                         >
-                            <option value="all">كل الموظفين</option>
+                            <option value="all">اختر موظف...</option>
                             {companyEmployees.map(emp => (
                                 <option key={emp.id} value={emp.id}>{emp.full_name}</option>
                             ))}
@@ -121,84 +105,78 @@ const DailyReport: React.FC = () => {
                     </div>
                 )}
             </div>
+            
+            {!targetEmployeeId && (
+                <div className="text-center p-8 bg-gray-50 rounded-xl text-gray-500 font-bold">
+                    <User size={48} className="mx-auto mb-2 opacity-50"/>
+                    الرجاء اختيار موظف لعرض التقرير
+                </div>
+            )}
 
-            {/* Grand Totals */}
-            <div className="flex gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
-                <div className="flex-1 text-center border-l border-gray-300">
-                    <p className="text-xs text-gray-500 mb-1">إجمالي مصري (EGP)</p>
-                    <p className="text-xl font-extrabold text-blue-700">{fmt(reportData.treasuryEGP + reportData.totalSales + reportData.totalCommissions - reportData.totalExpenses)}</p>
+            {reportData && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {/* Share Button */}
+                    <button 
+                        onClick={handleShare}
+                        className="w-full bg-blue-600 text-white p-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-blue-700 active:scale-95 transition"
+                    >
+                        <Share2 size={20} /> مشاركة التقرير اليومي
+                    </button>
+
+                    {/* Cash Treasury */}
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-gray-500 font-bold text-sm mb-3 flex items-center gap-2">
+                            <Banknote size={18} className="text-green-600"/> الخزينة النقدية (العهدة)
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-green-50 p-3 rounded-lg text-center border border-green-100">
+                                <span className="text-xs text-green-600 block mb-1 font-bold">مصري (EGP)</span>
+                                <span className="text-xl font-extrabold text-green-800">{fmt(reportData.egpBalance)}</span>
+                            </div>
+                            <div className="bg-indigo-50 p-3 rounded-lg text-center border border-indigo-100">
+                                <span className="text-xs text-indigo-600 block mb-1 font-bold">سوداني (SDG)</span>
+                                <span className="text-xl font-extrabold text-indigo-800">{fmt(reportData.sdgBalance)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Sales Treasury */}
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-gray-500 font-bold text-sm mb-3 flex items-center gap-2">
+                            <ShoppingCart size={18} className="text-purple-600"/> خزينة المبيعات
+                        </h3>
+                        <div className="bg-purple-50 p-4 rounded-lg flex justify-between items-center border border-purple-100">
+                            <span className="text-purple-700 font-bold">رصيد المبيعات الحالي</span>
+                            <span className="text-2xl font-extrabold text-purple-900">{fmt(reportData.salesBalance)} <span className="text-sm">EGP</span></span>
+                        </div>
+                    </div>
+
+                    {/* E-Wallets */}
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-gray-500 font-bold text-sm mb-3 flex items-center gap-2">
+                            <Smartphone size={18} className="text-pink-600"/> المحافظ الإلكترونية
+                        </h3>
+                        {reportData.wallets.length > 0 ? (
+                            <div className="space-y-2">
+                                {reportData.wallets.map((wallet, idx) => (
+                                    <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-gray-800">{wallet.provider}</span>
+                                            <span className="text-xs text-gray-500" dir="ltr">{wallet.phone}</span>
+                                        </div>
+                                        <span className="font-bold text-lg text-gray-800">{fmt(wallet.balance)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-4 text-gray-400 text-sm font-medium">
+                                لا توجد محافظ مضافة لهذا الموظف
+                            </div>
+                        )}
+                    </div>
                 </div>
-                <div className="flex-1 text-center">
-                    <p className="text-xs text-gray-500 mb-1">إجمالي سوداني (SDG)</p>
-                    <p className="text-xl font-extrabold text-emerald-700">{fmt(reportData.treasurySDG)}</p>
-                </div>
-            </div>
+            )}
         </div>
-
-        {/* Detailed Stats */}
-        <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-orange-500">
-                <p className="text-xs text-gray-500 font-bold mb-1">وارد سوداني</p>
-                <p className="text-lg font-bold text-gray-800">{fmt(reportData.incomingSDG)}</p>
-            </div>
-             <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-purple-500">
-                <p className="text-xs text-gray-500 font-bold mb-1">إجمالي المبيعات</p>
-                <p className="text-lg font-bold text-gray-800">{fmt(reportData.totalSales)}</p>
-            </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-yellow-500">
-                <p className="text-xs text-gray-500 font-bold mb-1">العمولات المكتسبة</p>
-                <p className="text-lg font-bold text-gray-800">{fmt(reportData.totalCommissions)}</p>
-            </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-red-500">
-                <p className="text-xs text-gray-500 font-bold mb-1">إجمالي المنصرفات</p>
-                <p className="text-lg font-bold text-red-600">{fmt(reportData.totalExpenses)}</p>
-            </div>
-        </div>
-
-        {/* Vodafone Breakdown */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-            <div className="bg-red-600 text-white p-3 font-bold flex items-center gap-2">
-                <span className="bg-white text-red-600 p-1 rounded text-xs font-bold">V</span>
-                فودافون كاش (حركة الأموال)
-            </div>
-            <div className="divide-y divide-gray-100">
-                <div className="flex justify-between p-3 text-sm">
-                    <span className="text-gray-600">سحب (من المحفظة)</span>
-                    <span className="font-bold">{fmt(reportData.vodafone.transfer)}</span>
-                </div>
-                <div className="flex justify-between p-3 text-sm">
-                    <span className="text-gray-600">ايداع (في المحفظة)</span>
-                    <span className="font-bold">{fmt(reportData.vodafone.deposit)}</span>
-                </div>
-                <div className="flex justify-between p-3 text-sm">
-                    <span className="text-gray-600">صرف (من المحفظة)</span>
-                    <span className="font-bold">{fmt(reportData.vodafone.exchange)}</span>
-                </div>
-            </div>
-        </div>
-
-        {/* InstaPay Breakdown */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-            <div className="bg-purple-600 text-white p-3 font-bold flex items-center gap-2">
-                <span className="bg-white text-purple-600 p-1 rounded text-xs font-bold">I</span>
-                انستا باي (حركة الأموال)
-            </div>
-            <div className="divide-y divide-gray-100">
-                <div className="flex justify-between p-3 text-sm">
-                    <span className="text-gray-600">سحب (من المحفظة)</span>
-                    <span className="font-bold">{fmt(reportData.instaPay.transfer)}</span>
-                </div>
-                <div className="flex justify-between p-3 text-sm">
-                    <span className="text-gray-600">ايداع (في المحفظة)</span>
-                    <span className="font-bold">{fmt(reportData.instaPay.deposit)}</span>
-                </div>
-                <div className="flex justify-between p-3 text-sm">
-                    <span className="text-gray-600">صرف (من المحفظة)</span>
-                    <span className="font-bold">{fmt(reportData.instaPay.exchange)}</span>
-                </div>
-            </div>
-        </div>
-
     </div>
   );
 };
