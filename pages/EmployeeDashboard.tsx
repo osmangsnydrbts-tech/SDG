@@ -51,7 +51,7 @@ const EmployeeDashboard: React.FC = () => {
   const formatInput = (val: string) => {
     const raw = val.replace(/,/g, '');
     if (isNaN(Number(raw))) return val;
-    return Number(raw).toLocaleString();
+    return Math.round(Number(raw)).toLocaleString();
   };
 
   const handleExpAmount = (e: React.ChangeEvent<HTMLInputElement>) => setExpAmount(formatInput(e.target.value));
@@ -68,7 +68,7 @@ const EmployeeDashboard: React.FC = () => {
               currentUser.id, 
               currentUser.company_id, 
               expCurrency, 
-              raw, 
+              Math.round(raw), 
               expDesc
           );
           setIsProcessing(false);
@@ -92,7 +92,7 @@ const EmployeeDashboard: React.FC = () => {
               currentUser.id,
               currentUser.company_id,
               saleProduct,
-              raw
+              Math.round(raw)
           );
           setIsProcessing(false);
           if (res.success) {
@@ -134,6 +134,8 @@ ${footer}
     }
   };
 
+  const fmt = (n?: number) => n ? Math.round(n).toLocaleString() : '0';
+
   return (
     <div className="space-y-6">
       
@@ -167,11 +169,11 @@ ${footer}
         <div className="grid grid-cols-2 gap-4">
             <div className="p-3 bg-blue-50 rounded-xl">
                 <p className="text-xs text-blue-400 mb-1">مصري (EGP)</p>
-                <p className="text-xl font-bold text-blue-700">{myTreasury?.egp_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                <p className="text-xl font-bold text-blue-700">{fmt(myTreasury?.egp_balance)}</p>
             </div>
             <div className="p-3 bg-emerald-50 rounded-xl">
                 <p className="text-xs text-emerald-400 mb-1">سوداني (SDG)</p>
-                <p className="text-xl font-bold text-emerald-700">{myTreasury?.sdg_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                <p className="text-xl font-bold text-emerald-700">{fmt(myTreasury?.sdg_balance)}</p>
             </div>
         </div>
 
@@ -181,7 +183,7 @@ ${footer}
                  <ShoppingCart size={18} />
                  <span className="text-sm">مبيعات اليوم</span>
             </div>
-            <span className="text-lg font-bold text-purple-800">{dailySales.toLocaleString()} EGP</span>
+            <span className="text-lg font-bold text-purple-800">{fmt(dailySales)} EGP</span>
         </div>
       </div>
 
@@ -198,7 +200,7 @@ ${footer}
                              <div className="text-xs font-bold text-gray-600">{w.provider}</div>
                              <div className="text-[10px] text-gray-400">{w.phone_number}</div>
                          </div>
-                         <div className="font-bold text-gray-800">{Math.round(w.balance).toLocaleString()} EGP</div>
+                         <div className="font-bold text-gray-800">{fmt(w.balance)} EGP</div>
                      </div>
                  ))}
              </div>
@@ -263,7 +265,7 @@ ${footer}
                             </div>
                         </div>
                         <div className="text-right">
-                            <p className="text-sm font-bold">{t.from_amount.toLocaleString()} <span className="text-xs">{t.from_currency}</span></p>
+                            <p className="text-sm font-bold">{fmt(t.from_amount)} <span className="text-xs">{t.from_currency}</span></p>
                         </div>
                     </div>
               ))}
