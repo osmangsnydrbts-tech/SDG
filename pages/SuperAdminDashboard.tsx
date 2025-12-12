@@ -127,22 +127,30 @@ const SuperAdminDashboard: React.FC = () => {
   };
 
   const SQL_FIX = `
--- FIX MISSING COLUMNS
+/* 1. SALES TABLE STRUCTURE (INSIDE TRANSACTIONS) */
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS product_name text;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS is_cancelled boolean DEFAULT false;
+
+/* 2. SALES TREASURY BALANCE */
+ALTER TABLE public.treasuries ADD COLUMN IF NOT EXISTS sales_balance float8 DEFAULT 0;
+
+/* 3. COMPANY SETTINGS */
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS logo text;
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS phone_numbers text;
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS footer_message text;
 
--- Fix Transactions Table for Wallets
+/* 4. E-WALLETS STRUCTURE */
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_id bigint;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_type text;
+ALTER TABLE public.e_wallets ADD COLUMN IF NOT EXISTS commission float8 DEFAULT 0;
 
--- FORCE REFRESH CACHE
+/* 5. REFRESH CACHE */
 NOTIFY pgrst, 'reload schema';
   `.trim();
 
   const copySql = () => {
     navigator.clipboard.writeText(SQL_FIX);
-    alert('تم نسخ كود الإصلاح. يرجى تشغيله في Supabase SQL Editor.');
+    alert('تم نسخ كود إنشاء الجداول وتحديث الهيكل.');
   };
 
   return (
@@ -153,11 +161,11 @@ NOTIFY pgrst, 'reload schema';
         <div className="flex justify-between items-start">
              <div>
                 <h3 className="flex items-center gap-2 font-bold text-yellow-800 text-sm mb-1">
-                    <AlertTriangle size={16}/> هل تواجه مشكلة "Column does not exist"?
+                    <AlertTriangle size={16}/> إنشاء جداول المبيعات وتحديث الهيكل
                 </h3>
                 <p className="text-xs text-yellow-700 leading-relaxed mb-2">
-                    إذا ظهرت رسالة خطأ عند إنشاء أو تعديل شركة أو عمليات المحفظة، فهذا يعني أن قاعدة البيانات تحتاج إلى تحديث.
-                    انسخ الكود التالي وشغله في Supabase SQL Editor.
+                    لتفعيل نظام المبيعات والمحافظ، انسخ الكود التالي وضعه في Supabase SQL Editor.
+                    هذا الكود يقوم بإنشاء الأعمدة المطلوبة في جدول العمليات (Transactions) وجدول الخزينة.
                 </p>
              </div>
              <button onClick={copySql} className="text-yellow-700 bg-yellow-100 hover:bg-yellow-200 p-2 rounded-lg text-xs font-bold flex items-center gap-1">
