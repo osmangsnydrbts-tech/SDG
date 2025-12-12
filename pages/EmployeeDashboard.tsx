@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRightLeft, ArrowUpRight, ArrowDownLeft, Share2, TrendingDown, CheckCircle, Loader2, X } from 'lucide-react';
+import { ArrowRightLeft, ArrowUpRight, ArrowDownLeft, Share2, TrendingDown, CheckCircle, Loader2, X, Smartphone } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -32,7 +32,7 @@ const EmployeeDashboard: React.FC = () => {
   const getEmployee = (empId?: number) => users.find(u => u.id === empId);
 
   const getTransactionIcon = (type: string) => {
-      if (type === 'exchange' || type === 'treasury_withdraw' || type === 'expense') {
+      if (type === 'exchange' || type === 'treasury_withdraw' || type === 'expense' || type === 'wallet_transfer') {
           return { icon: <ArrowUpRight size={16} />, bg: 'bg-red-100', text: 'text-red-600' };
       } else {
           return { icon: <ArrowDownLeft size={16} />, bg: 'bg-green-100', text: 'text-green-600' };
@@ -44,6 +44,7 @@ const EmployeeDashboard: React.FC = () => {
           case 'exchange': return 'صرف عملة';
           case 'treasury_feed': return 'تغذية خزينة';
           case 'expense': return 'منصرفات';
+          case 'wallet_transfer': return 'تحويل إلكتروني';
           default: return 'سحب رصيد';
       }
   };
@@ -156,20 +157,29 @@ ${footer}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-3">
         <button 
             onClick={() => navigate('/exchange')}
-            className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:bg-blue-700"
+            className="bg-blue-600 text-white p-3 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:bg-blue-700"
         >
             <ArrowRightLeft size={24}/>
-            <span className="font-bold text-sm">صرف عملة</span>
+            <span className="font-bold text-xs">صرف عملة</span>
         </button>
+
+        <button 
+            onClick={() => navigate('/wallet-transfer')}
+            className="bg-pink-600 text-white p-3 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:bg-pink-700"
+        >
+            <Smartphone size={24}/>
+            <span className="font-bold text-xs">تحويل إلكتروني</span>
+        </button>
+
         <button 
             onClick={() => setShowExpenseModal(true)}
-            className="bg-red-50 text-red-600 border border-red-100 p-4 rounded-2xl shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:bg-red-100"
+            className="bg-red-50 text-red-600 border border-red-100 p-3 rounded-2xl shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:bg-red-100"
         >
             <TrendingDown size={24}/>
-            <span className="font-bold text-sm">تسجيل منصرف</span>
+            <span className="font-bold text-xs">تسجيل منصرف</span>
         </button>
       </div>
 
