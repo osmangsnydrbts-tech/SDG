@@ -29,17 +29,19 @@ const Reports: React.FC = () => {
   };
 
   const handleCancel = async (id: number) => {
-      // Prompt for cancellation reason (Required by new audit logic)
       const reason = window.prompt('الرجاء إدخال سبب الإلغاء (مطلوب):');
       
-      if (reason === null) return; // User pressed cancel
+      if (reason === null) return;
       if (reason.trim() === '') {
           alert('يجب كتابة سبب للإلغاء!');
           return;
       }
 
       if (window.confirm('هل أنت متأكد من إلغاء العملية؟ سيتم عكس المبالغ المالية وتوثيق الإجراء في السجل.')) {
-          await cancelTransaction(id, reason);
+          const res = await cancelTransaction(id, reason);
+          if (!res.success) {
+              alert(res.message);
+          }
       }
   };
 
@@ -57,15 +59,12 @@ const Reports: React.FC = () => {
       setEndDate(lastDay);
   };
 
-  // Helper for integer formatting (No decimals)
+  // Helper for integer formatting
   const fmt = (num: number) => Math.round(num).toLocaleString();
 
   // Filter Logic
   const getFilteredTransactions = () => {
       return transactions.filter(t => {
-        // NOTE: For the 'cancelled' tab, we want ONLY cancelled. For other tabs, we usually hide them.
-        // Logic handled in tab section below.
-
         let roleMatch = false;
         if (currentUser?.role === 'super_admin') roleMatch = true;
         else if (currentUser?.role === 'admin') roleMatch = t.company_id === currentUser.company_id;
@@ -92,8 +91,8 @@ const Reports: React.FC = () => {
   // Active Transactions (Not Cancelled)
   const activeTx = allFiltered.filter(t => !t.is_cancelled);
   
-  // Cancelled Transactions
-  const cancelledTx = allFiltered.filter(t => t.is_cancelled);
+  // Cancelled Transactions (Ensure explicit check)
+  const cancelledTx = allFiltered.filter(t => t.is_cancelled === true);
 
   const exchangeTx = activeTx.filter(t => t.type === 'exchange');
   const treasuryTx = activeTx.filter(t => ['treasury_feed', 'treasury_withdraw'].includes(t.type));
@@ -114,7 +113,7 @@ const Reports: React.FC = () => {
 
   const CardRow = ({ t }: { t: Transaction }) => {
     const isWallet = ['wallet_feed', 'wallet_transfer'].includes(t.type);
-    const isCancelled = t.is_cancelled;
+    const isCancelled = t.is_cancelled === true;
     
     return (
         <div className={`p-4 rounded-xl shadow-sm border flex flex-col gap-3 relative overflow-hidden group transition-all ${isCancelled ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
