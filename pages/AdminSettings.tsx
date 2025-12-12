@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Building, UploadCloud, Save, Loader2, Share2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Building, UploadCloud, Save, Loader2, Share2, CheckCircle, AlertCircle, ArrowLeft, Copy, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const AdminSettings: React.FC = () => {
@@ -9,6 +9,7 @@ const AdminSettings: React.FC = () => {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [showSqlFix, setShowSqlFix] = useState(false);
   
   const currentCompany = companies.find(c => c.id === currentUser?.company_id);
 
@@ -16,6 +17,20 @@ const AdminSettings: React.FC = () => {
   const [logo, setLogo] = useState('');
   const [footerMsg, setFooterMsg] = useState('');
   const [phoneNumbers, setPhoneNumbers] = useState('');
+
+  const SQL_FIX_CODE = `
+-- FIX MISSING COLUMNS
+ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS logo text;
+ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS phone_numbers text;
+ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS footer_message text;
+
+-- Fix Transactions Table for Wallets
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_id bigint;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_type text;
+
+-- Refresh Cache
+NOTIFY pgrst, 'reload schema';
+  `.trim();
 
   useEffect(() => {
     if (currentCompany) {
@@ -94,6 +109,7 @@ const AdminSettings: React.FC = () => {
       if (!currentCompany) return;
       setIsProcessing(true);
       setMsg(null);
+      setShowSqlFix(false);
       
       try {
         const res = await updateCompany(currentCompany.id, {
@@ -110,8 +126,9 @@ const AdminSettings: React.FC = () => {
         } else {
             console.error('Update failed:', res.message);
             // Check specifically for the missing column error
-            if (res.message.includes('footer_message') || res.message.includes('schema cache')) {
-                setMsg({ type: 'error', text: 'تنبيه: قاعدة البيانات غير محدثة. يرجى تشغيل كود SQL الذي تم توفيره لإضافة الأعمدة الجديدة.' });
+            if (res.message.includes('footer_message') || res.message.includes('column') || res.message.includes('schema cache')) {
+                setMsg({ type: 'error', text: 'تنبيه: قاعدة البيانات تحتاج لتحديث (إضافة الأعمدة الجديدة).' });
+                setShowSqlFix(true);
             } else {
                 setMsg({ type: 'error', text: `فشل الحفظ: ${res.message}` });
             }
@@ -122,6 +139,11 @@ const AdminSettings: React.FC = () => {
       } finally {
         setIsProcessing(false);
       }
+  };
+
+  const copySql = () => {
+    navigator.clipboard.writeText(SQL_FIX_CODE);
+    alert('تم نسخ الكود');
   };
 
   return (
@@ -144,6 +166,28 @@ const AdminSettings: React.FC = () => {
                     <span>{msg.text}</span>
                 </div>
             )}
+
+            {/* Always show SQL Repair Helper in a collapsed state or visible if needed */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-6">
+                <h3 className="flex items-center gap-2 font-bold text-yellow-800 mb-2">
+                    <Database size={20}/> إصلاح مشاكل قاعدة البيانات
+                </h3>
+                <p className="text-sm text-yellow-700 mb-4">
+                    إذا واجهت مشاكل "Failed to fetch" أو "Column does not exist"، يرجى نسخ الكود التالي وتشغيله في <strong>SQL Editor</strong> في لوحة تحكم Supabase.
+                </p>
+                <div className="relative">
+                    <pre className="bg-gray-800 text-gray-100 p-4 rounded-lg text-xs overflow-x-auto font-mono text-left" dir="ltr">
+{SQL_FIX_CODE}
+                    </pre>
+                    <button 
+                        onClick={copySql}
+                        className="absolute top-2 right-2 bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition"
+                        title="نسخ الكود"
+                    >
+                        <Copy size={16} />
+                    </button>
+                </div>
+            </div>
 
             <form onSubmit={handleSave} className="space-y-8">
                 
