@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart, Ban, Info } from 'lucide-react';
+import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart, Ban, Info, Loader2 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -15,6 +15,7 @@ const Reports: React.FC = () => {
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedEmp, setSelectedEmp] = useState<string>('all');
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
   
   // Modal
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
@@ -29,6 +30,8 @@ const Reports: React.FC = () => {
   };
 
   const handleCancel = async (id: number) => {
+      if (cancellingId) return; // Prevent double click
+
       const reason = window.prompt('الرجاء إدخال سبب الإلغاء (مطلوب):');
       
       if (reason === null) return;
@@ -38,7 +41,9 @@ const Reports: React.FC = () => {
       }
 
       if (window.confirm('هل أنت متأكد من إلغاء العملية؟ سيتم عكس المبالغ المالية وتوثيق الإجراء في السجل.')) {
+          setCancellingId(id);
           const res = await cancelTransaction(id, reason);
+          setCancellingId(null);
           if (!res.success) {
               alert(res.message);
           }
@@ -114,6 +119,7 @@ const Reports: React.FC = () => {
   const CardRow = ({ t }: { t: Transaction }) => {
     const isWallet = ['wallet_feed', 'wallet_transfer'].includes(t.type);
     const isCancelled = t.is_cancelled === true;
+    const isProcessing = cancellingId === t.id;
     
     return (
         <div className={`p-4 rounded-xl shadow-sm border flex flex-col gap-3 relative overflow-hidden group transition-all ${isCancelled ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
@@ -215,8 +221,13 @@ const Reports: React.FC = () => {
                      
                      {/* Show Cancel Button ONLY if Not Cancelled AND User is Admin */}
                      {!isCancelled && currentUser?.role === 'admin' && (
-                        <button onClick={() => handleCancel(t.id)} className="p-2 text-orange-500 bg-orange-50 hover:bg-orange-100 rounded-lg transition" title="إلغاء العملية">
-                            <XCircle size={16} />
+                        <button 
+                            onClick={() => handleCancel(t.id)} 
+                            disabled={isProcessing}
+                            className={`p-2 rounded-lg transition flex items-center gap-1 ${isProcessing ? 'bg-gray-100 text-gray-400 cursor-wait' : 'text-orange-500 bg-orange-50 hover:bg-orange-100'}`}
+                            title="إلغاء العملية"
+                        >
+                            {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
                         </button>
                      )}
 
