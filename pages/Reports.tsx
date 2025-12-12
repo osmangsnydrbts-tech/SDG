@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart } from 'lucide-react';
+import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart, Lock } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -29,8 +29,17 @@ const Reports: React.FC = () => {
   };
 
   const handleCancel = async (id: number) => {
-      if (window.confirm('هل أنت متأكد من إلغاء العملية؟ سيتم عكس المبالغ المالية.')) {
-          await cancelTransaction(id);
+      // Prompt for cancellation reason (Required by new audit logic)
+      const reason = window.prompt('الرجاء إدخال سبب الإلغاء (مطلوب):');
+      
+      if (reason === null) return; // User pressed cancel
+      if (reason.trim() === '') {
+          alert('يجب كتابة سبب للإلغاء!');
+          return;
+      }
+
+      if (window.confirm('هل أنت متأكد من إلغاء العملية؟ سيتم عكس المبالغ المالية وتوثيق الإجراء في السجل.')) {
+          await cancelTransaction(id, reason);
       }
   };
 
@@ -48,7 +57,7 @@ const Reports: React.FC = () => {
       setEndDate(lastDay);
   };
 
-  // Helper for integer formatting
+  // Helper for integer formatting (No decimals)
   const fmt = (num: number) => Math.round(num).toLocaleString();
 
   // Filter Logic
@@ -87,6 +96,7 @@ const Reports: React.FC = () => {
 
   const stats = {
       receivedSdg: exchangeTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
+      // New: Incoming EGP from Exchange (Customer gave EGP, wanted SDG)
       receivedEgp: exchangeTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
       totalExpensesEgp: expenseTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
       totalExpensesSdg: expenseTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
@@ -173,9 +183,12 @@ const Reports: React.FC = () => {
                      <button onClick={() => setViewTransaction(t)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition" title="عرض الإيصال">
                          <Eye size={16} />
                      </button>
-                     <button onClick={() => handleCancel(t.id)} className="p-2 text-orange-500 bg-orange-50 hover:bg-orange-100 rounded-lg transition" title="إلغاء العملية">
-                         <XCircle size={16} />
-                     </button>
+                     {/* Allow Admin Only to Cancel */}
+                     {currentUser?.role === 'admin' && (
+                        <button onClick={() => handleCancel(t.id)} className="p-2 text-orange-500 bg-orange-50 hover:bg-orange-100 rounded-lg transition" title="إلغاء العملية">
+                            <XCircle size={16} />
+                        </button>
+                     )}
                  </div>
             </div>
             
