@@ -203,8 +203,8 @@ const WalletTransfer: React.FC = () => {
                                         <span className="font-bold">{calc.egpEquivalent.toLocaleString(undefined, {maximumFractionDigits: 0})} EGP</span>
                                     </div>
                                     <div className="flex justify-between items-center text-lg text-green-700 mt-1">
-                                        <span className="font-bold">يضاف للخزينة (EGP):</span>
-                                        <span className="font-extrabold">{(calc.egpEquivalent + calc.commission).toLocaleString(undefined, {maximumFractionDigits: 0})} EGP</span>
+                                        <span className="font-bold">يضاف للخزينة (SDG):</span>
+                                        <span className="font-extrabold">{parseFloat(amount || '0').toLocaleString(undefined, {maximumFractionDigits: 0})} SDG</span>
                                     </div>
                                 </div>
                             </>
