@@ -127,10 +127,14 @@ const SuperAdminDashboard: React.FC = () => {
   };
 
   const SQL_FIX = `
--- FIX MISSING COLUMNS ERROR
+-- FIX MISSING COLUMNS
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS logo text;
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS phone_numbers text;
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS footer_message text;
+
+-- Fix Transactions Table for Wallets
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_id bigint;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_type text;
 
 -- FORCE REFRESH CACHE
 NOTIFY pgrst, 'reload schema';
@@ -149,10 +153,10 @@ NOTIFY pgrst, 'reload schema';
         <div className="flex justify-between items-start">
              <div>
                 <h3 className="flex items-center gap-2 font-bold text-yellow-800 text-sm mb-1">
-                    <AlertTriangle size={16}/> هل تواجه مشكلة "Could not find column"?
+                    <AlertTriangle size={16}/> هل تواجه مشكلة "Column does not exist"?
                 </h3>
                 <p className="text-xs text-yellow-700 leading-relaxed mb-2">
-                    إذا ظهرت رسالة خطأ عند إنشاء أو تعديل شركة، فهذا يعني أن قاعدة البيانات تحتاج إلى تحديث.
+                    إذا ظهرت رسالة خطأ عند إنشاء أو تعديل شركة أو عمليات المحفظة، فهذا يعني أن قاعدة البيانات تحتاج إلى تحديث.
                     انسخ الكود التالي وشغله في Supabase SQL Editor.
                 </p>
              </div>
