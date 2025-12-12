@@ -597,7 +597,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
              }).eq('id', empTreasury.id);
 
         } else if (walletType === 'deposit') {
-             // Logic was: Treasury - Amount, Treasury + Comm, Wallet + Amount. Net Treasury = -Amount + Comm.
+             // Logic was: Treasury - Amount + Comm, Wallet + Amount.
              // Reverse: Treasury + Amount - Comm, Wallet - Amount.
              await supabase.from('e_wallets').update({ balance: wallet.balance - amount }).eq('id', wallet.id);
              await supabase.from('treasuries').update({
@@ -605,14 +605,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
              }).eq('id', empTreasury.id);
 
         } else if (walletType === 'exchange') {
-             // Logic was: Wallet - EGP, Treasury + SDG (Cash).
-             // Reverse: Wallet + EGP, Treasury - SDG (Cash).
+             // Logic was: Wallet - EGP_Value, Treasury(SDG) + SDG_Amount, Treasury(EGP) + Comm.
+             // Reverse: Wallet + EGP_Value, Treasury(SDG) - SDG_Amount, Treasury(EGP) - Comm.
              const rate = transaction.rate || 1;
              const egpValue = amount / rate; // This is the EGP value deducted from wallet
              
              await supabase.from('e_wallets').update({ balance: wallet.balance + egpValue }).eq('id', wallet.id);
              await supabase.from('treasuries').update({
-                 sdg_balance: empTreasury.sdg_balance - amount
+                 sdg_balance: empTreasury.sdg_balance - amount,
+                 egp_balance: empTreasury.egp_balance - commission
              }).eq('id', empTreasury.id);
         }
     } else {
@@ -826,7 +827,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         } else if (type === 'deposit') {
             // "Lo Edaa (Deposit)": Deduct from Employee Treasury (EGP) -> Add Commission -> Add to Wallet
-            // Input: Amount (EGP) to be added to wallet
+            // Note: Deduct Amount (Employee Pays Cash), Add Commission (Employee keeps profit), Add to Wallet (Balance)
+            // Mathematical Net Effect on Treasury: -Amount + Commission
             
             commissionAmount = amount * (commissionRate / 100);
             
@@ -854,8 +856,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             if (wallet.balance < egpValue) return { success: false, message: 'رصيد المحفظة (EGP) غير كافي للصرف' };
 
             await supabase.from('e_wallets').update({ balance: wallet.balance - egpValue }).eq('id', walletId);
+            
+            // Fix: Add SDG to SDG Treasury, Add Commission to EGP Treasury (Profit)
             await supabase.from('treasuries').update({
-                sdg_balance: empTreasury.sdg_balance + amount
+                sdg_balance: empTreasury.sdg_balance + amount,
+                egp_balance: empTreasury.egp_balance + commissionAmount
             }).eq('id', empTreasury.id);
 
             description = `صرف ${amount} سوداني عبر ${wallet.provider}`;
