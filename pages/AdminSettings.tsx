@@ -18,24 +18,24 @@ const AdminSettings: React.FC = () => {
   const [phoneNumbers, setPhoneNumbers] = useState('');
 
   const SQL_FIX_CODE = `
--- FIX MISSING COLUMNS
+/* 1. SALES TABLE STRUCTURE (INSIDE TRANSACTIONS) */
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS product_name text;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS is_cancelled boolean DEFAULT false;
+
+/* 2. SALES TREASURY BALANCE */
+ALTER TABLE public.treasuries ADD COLUMN IF NOT EXISTS sales_balance float8 DEFAULT 0;
+
+/* 3. COMPANY SETTINGS */
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS logo text;
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS phone_numbers text;
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS footer_message text;
 
--- E-Wallet Commission
-ALTER TABLE public.e_wallets ADD COLUMN IF NOT EXISTS commission float8 DEFAULT 0;
-
--- Sales and Cancellation
+/* 4. E-WALLETS STRUCTURE */
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_id bigint;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_type text;
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS product_name text;
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS is_cancelled boolean DEFAULT false;
+ALTER TABLE public.e_wallets ADD COLUMN IF NOT EXISTS commission float8 DEFAULT 0;
 
--- Sales Treasury
-ALTER TABLE public.treasuries ADD COLUMN IF NOT EXISTS sales_balance float8 DEFAULT 0;
-
--- Refresh Cache
+/* 5. REFRESH CACHE */
 NOTIFY pgrst, 'reload schema';
   `.trim();
 
@@ -131,7 +131,7 @@ NOTIFY pgrst, 'reload schema';
 
   const copySql = () => {
     navigator.clipboard.writeText(SQL_FIX_CODE);
-    alert('تم نسخ الكود');
+    alert('تم نسخ كود إنشاء جداول المبيعات');
   };
 
   return (
@@ -148,17 +148,18 @@ NOTIFY pgrst, 'reload schema';
             </h2>
 
             {/* Database Repair Helper - High Visibility */}
-            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 mb-8 shadow-sm">
+            <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-6 mb-8 shadow-sm">
                 <div className="flex items-start gap-3">
-                    <div className="bg-red-100 p-2 rounded-full text-red-600">
+                    <div className="bg-indigo-100 p-2 rounded-full text-indigo-600">
                         <Database size={24}/>
                     </div>
                     <div className="flex-1">
-                        <h3 className="font-bold text-red-800 text-lg mb-1">
-                            تحديث قاعدة البيانات مطلوب (هام جداً)
+                        <h3 className="font-bold text-indigo-800 text-lg mb-1">
+                            إنشاء جدول المبيعات وتحديث الهيكل
                         </h3>
-                        <p className="text-sm text-red-700 mb-3 leading-relaxed">
-                           تم إضافة ميزات المبيعات والعمولات الخاصة بالمحافظ. يجب تشغيل الكود لتحديث الجداول.
+                        <p className="text-sm text-indigo-700 mb-3 leading-relaxed">
+                           لتفعيل نظام المبيعات، العمولات، والإلغاء، يرجى نسخ الكود أدناه وتشغيله في قاعدة البيانات (Supabase SQL Editor).
+                           سيقوم هذا الكود بإضافة أعمدة `product_name` و `sales_balance` المطلوبة.
                         </p>
                         
                         <div className="relative group">
