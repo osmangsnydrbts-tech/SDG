@@ -47,15 +47,28 @@ const EmployeeDashboard: React.FC = () => {
   const getCompany = (companyId: number) => companies.find(c => c.id === companyId);
   const getEmployee = (empId?: number) => users.find(u => u.id === empId);
 
+  // Input Formatting
+  const formatInput = (val: string) => {
+    const raw = val.replace(/,/g, '');
+    if (isNaN(Number(raw))) return val;
+    return Number(raw).toLocaleString();
+  };
+
+  const handleExpAmount = (e: React.ChangeEvent<HTMLInputElement>) => setExpAmount(formatInput(e.target.value));
+  const handleSaleAmount = (e: React.ChangeEvent<HTMLInputElement>) => setSaleAmount(formatInput(e.target.value));
+
   const handleRecordExpense = async (e: React.FormEvent) => {
       e.preventDefault();
       if (currentUser?.company_id) {
+          const raw = parseFloat(expAmount.replace(/,/g, ''));
+          if(isNaN(raw) || raw <= 0) return;
+
           setIsProcessing(true);
           const res = await recordExpense(
               currentUser.id, 
               currentUser.company_id, 
               expCurrency, 
-              parseFloat(expAmount), 
+              raw, 
               expDesc
           );
           setIsProcessing(false);
@@ -71,12 +84,15 @@ const EmployeeDashboard: React.FC = () => {
   const handleRecordSale = async (e: React.FormEvent) => {
       e.preventDefault();
       if (currentUser?.company_id) {
+          const raw = parseFloat(saleAmount.replace(/,/g, ''));
+          if(isNaN(raw) || raw <= 0) return;
+
           setIsProcessing(true);
           const res = await performSale(
               currentUser.id,
               currentUser.company_id,
               saleProduct,
-              parseFloat(saleAmount)
+              raw
           );
           setIsProcessing(false);
           if (res.success) {
@@ -182,7 +198,7 @@ ${footer}
                              <div className="text-xs font-bold text-gray-600">{w.provider}</div>
                              <div className="text-[10px] text-gray-400">{w.phone_number}</div>
                          </div>
-                         <div className="font-bold text-gray-800">{w.balance.toLocaleString()} EGP</div>
+                         <div className="font-bold text-gray-800">{Math.round(w.balance).toLocaleString()} EGP</div>
                      </div>
                  ))}
              </div>
@@ -277,7 +293,15 @@ ${footer}
                           <button type="button" onClick={() => setExpCurrency('EGP')} className={`flex-1 py-2 rounded text-sm font-bold transition ${expCurrency === 'EGP' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}>مصري</button>
                           <button type="button" onClick={() => setExpCurrency('SDG')} className={`flex-1 py-2 rounded text-sm font-bold transition ${expCurrency === 'SDG' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}>سوداني</button>
                       </div>
-                      <input type="number" inputMode="decimal" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full p-3 border rounded-xl text-lg font-bold" placeholder="0.00" required />
+                      <input 
+                        type="text" 
+                        inputMode="decimal"
+                        value={expAmount} 
+                        onChange={handleExpAmount} 
+                        className="w-full p-3 border rounded-xl text-lg font-bold" 
+                        placeholder="0" 
+                        required 
+                      />
                       <input type="text" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 border rounded-xl" placeholder="السبب" required />
                       {msg && <div className="text-green-600 text-center font-bold">{msg}</div>}
                       <button disabled={isProcessing} className="w-full bg-red-600 text-white py-3 rounded-xl font-bold flex items-center justify-center">
@@ -303,7 +327,15 @@ ${footer}
                       </div>
                       <div>
                           <label className="text-xs font-bold text-gray-500 mb-1 block">سعر البيع (EGP)</label>
-                          <input type="number" inputMode="decimal" value={saleAmount} onChange={e => setSaleAmount(e.target.value)} className="w-full p-3 border rounded-xl text-lg font-bold" placeholder="0.00" required />
+                          <input 
+                            type="text" 
+                            inputMode="decimal"
+                            value={saleAmount} 
+                            onChange={handleSaleAmount} 
+                            className="w-full p-3 border rounded-xl text-lg font-bold" 
+                            placeholder="0" 
+                            required 
+                          />
                       </div>
                       <p className="text-xs text-purple-600 text-center">سيتم إضافة المبلغ إلى رصيد المبيعات المنفصل</p>
                       {msg && <div className="text-green-600 text-center font-bold">{msg}</div>}
