@@ -11,8 +11,6 @@ import Exchange from './pages/Exchange';
 import Treasury from './pages/Treasury';
 import Merchants from './pages/Merchants';
 import Reports from './pages/Reports';
-import EWallets from './pages/EWallets';
-import WalletTransfer from './pages/WalletTransfer';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode, allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
   const { currentUser } = useStore();
@@ -68,14 +66,6 @@ const AppRoutes = () => {
         </ProtectedRoute>
       } />
 
-      <Route path="/admin/ewallets" element={
-        <ProtectedRoute allowedRoles={['admin']}>
-          <Layout title="إدارة المحافظ">
-            <EWallets />
-          </Layout>
-        </ProtectedRoute>
-      } />
-
       {/* Employee Routes */}
       <Route path="/employee" element={
         <ProtectedRoute allowedRoles={['employee']}>
@@ -90,15 +80,6 @@ const AppRoutes = () => {
         <ProtectedRoute allowedRoles={['employee']}>
           <Layout title="نظام الصرف">
             <Exchange />
-          </Layout>
-        </ProtectedRoute>
-      } />
-
-      {/* Wallet Transfer - Restricted to Employee Only */}
-      <Route path="/wallet-transfer" element={
-        <ProtectedRoute allowedRoles={['employee']}>
-          <Layout title="تحويل محفظة">
-            <WalletTransfer />
           </Layout>
         </ProtectedRoute>
       } />
