@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Send, Smartphone, CheckCircle, Loader2, ArrowUpCircle, ArrowDownCircle, Coins } from 'lucide-react';
@@ -26,7 +25,8 @@ const WalletTransfer: React.FC = () => {
   );
 
   const rates = exchangeRates.find(r => r.company_id === currentUser?.company_id);
-  const commissionRate = rates?.ewallet_commission || 1;
+  const selectedWallet = myWallets.find(w => w.id === Number(selectedWalletId));
+  const commissionRate = selectedWallet?.commission || 0;
   const company = companies.find(c => c.id === currentUser?.company_id);
 
   const handleTransfer = async (e: React.FormEvent) => {
