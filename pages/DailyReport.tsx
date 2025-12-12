@@ -1,12 +1,16 @@
 
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { WalletCards, Banknote, ShoppingCart, Share2, User, Smartphone, AlertCircle } from 'lucide-react';
+import { WalletCards, Banknote, ShoppingCart, Share2, User, Smartphone, TrendingDown, ChevronLeft, X, Clock } from 'lucide-react';
+import { Transaction } from '../types';
 
 const DailyReport: React.FC = () => {
-  const { currentUser, treasuries, eWallets, users, companies } = useStore();
+  const { currentUser, treasuries, eWallets, users, companies, transactions } = useStore();
   const [selectedEmpId, setSelectedEmpId] = useState<string>('all');
   
+  // Modal States
+  const [detailsModalType, setDetailsModalType] = useState<'sales' | 'expenses' | null>(null);
+
   const company = companies.find(c => c.id === currentUser?.company_id);
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee');
 
@@ -22,18 +26,37 @@ const DailyReport: React.FC = () => {
     const wallets = eWallets.filter(w => w.employee_id === targetEmployeeId && w.is_active);
     const employee = users.find(u => u.id === targetEmployeeId);
 
+    // Calculate Daily Stats based on Transactions for "Today"
+    const today = new Date().toISOString().split('T')[0];
+    
+    const todayTx = transactions.filter(t => 
+        t.employee_id === targetEmployeeId && 
+        !t.is_cancelled && 
+        t.created_at.startsWith(today)
+    );
+
+    const salesTx = todayTx.filter(t => t.type === 'sale');
+    const expensesTx = todayTx.filter(t => t.type === 'expense');
+
+    const totalSalesToday = salesTx.reduce((sum, t) => sum + t.from_amount, 0);
+    const totalExpensesToday = expensesTx.reduce((sum, t) => sum + t.from_amount, 0);
+
     return {
         employeeName: employee?.full_name || '',
         egpBalance: Math.round(treasury?.egp_balance || 0),
         sdgBalance: Math.round(treasury?.sdg_balance || 0),
         salesBalance: Math.round(treasury?.sales_balance || 0),
+        totalSalesToday,
+        totalExpensesToday,
+        salesTx,
+        expensesTx,
         wallets: wallets.map(w => ({
             provider: w.provider,
             phone: w.phone_number,
             balance: Math.round(w.balance)
         }))
     };
-  }, [targetEmployeeId, treasuries, eWallets, users]);
+  }, [targetEmployeeId, treasuries, eWallets, users, transactions]);
 
   // Helper for formatting
   const fmt = (num: number) => Math.round(num).toLocaleString('en-US');
@@ -50,7 +73,11 @@ const DailyReport: React.FC = () => {
       text += `سوداني: ${fmt(reportData.sdgBalance)} SDG\n\n`;
       
       text += `🛒 *خزينة المبيعات:*\n`;
-      text += `الرصيد: ${fmt(reportData.salesBalance)} EGP\n\n`;
+      text += `الرصيد الكلي: ${fmt(reportData.salesBalance)} EGP\n`;
+      text += `مبيعات اليوم: ${fmt(reportData.totalSalesToday)} EGP\n\n`;
+
+      text += `📉 *المنصرفات اليومية:*\n`;
+      text += `القيمة: ${fmt(reportData.totalExpensesToday)} EGP\n\n`;
       
       text += `📱 *المحافظ الإلكترونية:*\n`;
       if (reportData.wallets.length > 0) {
@@ -77,6 +104,60 @@ const DailyReport: React.FC = () => {
               alert('لا يمكن النسخ');
           }
       }
+  };
+
+  const DetailsModal = () => {
+      if (!detailsModalType || !reportData) return null;
+
+      const isSales = detailsModalType === 'sales';
+      const title = isSales ? 'تفاصيل مبيعات اليوم' : 'تفاصيل منصرفات اليوم';
+      const list = isSales ? reportData.salesTx : reportData.expensesTx;
+      const colorClass = isSales ? 'text-purple-600' : 'text-red-600';
+      const bgClass = isSales ? 'bg-purple-50' : 'bg-red-50';
+
+      return (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl">
+                  <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                      <h3 className={`font-bold text-lg flex items-center gap-2 ${colorClass}`}>
+                          {isSales ? <ShoppingCart size={20}/> : <TrendingDown size={20}/>}
+                          {title}
+                      </h3>
+                      <button onClick={() => setDetailsModalType(null)} className="p-1 hover:bg-gray-200 rounded-full">
+                          <X size={20} className="text-gray-500"/>
+                      </button>
+                  </div>
+                  
+                  <div className="overflow-y-auto p-4 space-y-3 flex-1">
+                      {list.length > 0 ? list.map((t, idx) => (
+                          <div key={t.id} className="border border-gray-100 p-3 rounded-xl shadow-sm flex justify-between items-center">
+                              <div>
+                                  <p className="font-bold text-gray-800 text-sm mb-1">
+                                      {isSales ? t.product_name : t.description || 'منصرف عام'}
+                                  </p>
+                                  <p className="text-xs text-gray-400 flex items-center gap-1">
+                                      <Clock size={10}/>
+                                      {new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
+                                  </p>
+                              </div>
+                              <span className={`font-bold text-lg ${colorClass}`}>
+                                  {fmt(t.from_amount)} <span className="text-xs">{t.from_currency}</span>
+                              </span>
+                          </div>
+                      )) : (
+                          <div className="text-center py-10 text-gray-400">لا توجد بيانات اليوم</div>
+                      )}
+                  </div>
+
+                  <div className={`p-4 border-t font-bold flex justify-between items-center rounded-b-2xl ${bgClass}`}>
+                      <span>الإجمالي</span>
+                      <span className="text-xl">
+                          {fmt(isSales ? reportData.totalSalesToday : reportData.totalExpensesToday)}
+                      </span>
+                  </div>
+              </div>
+          </div>
+      );
   };
 
   return (
@@ -140,14 +221,44 @@ const DailyReport: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Sales Treasury */}
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-gray-500 font-bold text-sm mb-3 flex items-center gap-2">
-                            <ShoppingCart size={18} className="text-purple-600"/> خزينة المبيعات
-                        </h3>
-                        <div className="bg-purple-50 p-4 rounded-lg flex justify-between items-center border border-purple-100">
-                            <span className="text-purple-700 font-bold">رصيد المبيعات الحالي</span>
-                            <span className="text-2xl font-extrabold text-purple-900">{fmt(reportData.salesBalance)} <span className="text-sm">EGP</span></span>
+                    {/* Sales Treasury (Clickable) */}
+                    <div 
+                        onClick={() => setDetailsModalType('sales')}
+                        className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:border-purple-300 transition active:scale-95 group"
+                    >
+                        <div className="flex justify-between items-center mb-3">
+                             <h3 className="text-gray-500 font-bold text-sm flex items-center gap-2">
+                                <ShoppingCart size={18} className="text-purple-600"/> خزينة المبيعات
+                            </h3>
+                            <ChevronLeft size={16} className="text-gray-300 group-hover:text-purple-500 transition"/>
+                        </div>
+                        
+                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-purple-700 font-bold">رصيد المبيعات الحالي</span>
+                                <span className="text-2xl font-extrabold text-purple-900">{fmt(reportData.salesBalance)} <span className="text-sm">EGP</span></span>
+                            </div>
+                            <div className="text-xs text-purple-400 font-bold text-right mt-1">
+                                مبيعات اليوم: {fmt(reportData.totalSalesToday)} EGP
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Expenses (Clickable) */}
+                    <div 
+                        onClick={() => setDetailsModalType('expenses')}
+                        className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:border-red-300 transition active:scale-95 group"
+                    >
+                        <div className="flex justify-between items-center mb-3">
+                             <h3 className="text-gray-500 font-bold text-sm flex items-center gap-2">
+                                <TrendingDown size={18} className="text-red-600"/> منصرفات اليوم
+                            </h3>
+                            <ChevronLeft size={16} className="text-gray-300 group-hover:text-red-500 transition"/>
+                        </div>
+                        
+                        <div className="bg-red-50 p-4 rounded-lg border border-red-100 flex justify-between items-center">
+                            <span className="text-red-700 font-bold">إجمالي المنصرفات</span>
+                            <span className="text-2xl font-extrabold text-red-900">{fmt(reportData.totalExpensesToday)} <span className="text-sm">EGP</span></span>
                         </div>
                     </div>
 
@@ -176,6 +287,9 @@ const DailyReport: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* Render Modal */}
+            <DetailsModal />
         </div>
     </div>
   );
