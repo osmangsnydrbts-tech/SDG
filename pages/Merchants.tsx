@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Plus, User, ArrowUpRight, ArrowDownLeft, Trash2, Loader2 } from 'lucide-react';
-import FormattedInput from '../components/FormattedInput';
 
 const Merchants: React.FC = () => {
   const { currentUser, merchants, addMerchant, addMerchantEntry, deleteMerchant } = useStore();
@@ -21,6 +20,17 @@ const Merchants: React.FC = () => {
 
   const companyMerchants = merchants.filter(m => m.company_id === currentUser?.company_id && m.is_active);
 
+  // Input Formatting
+  const formatInput = (val: string) => {
+    const raw = val.replace(/,/g, '');
+    if (isNaN(Number(raw))) return val;
+    return Number(raw).toLocaleString();
+  };
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setAmount(formatInput(e.target.value));
+  };
+
   const handleAddMerchant = async (e: React.FormEvent) => {
       e.preventDefault();
       if(currentUser?.company_id) {
@@ -35,8 +45,11 @@ const Merchants: React.FC = () => {
   const handleEntry = async (e: React.FormEvent) => {
       e.preventDefault();
       if(showEntryModal) {
+          const rawAmount = parseFloat(amount.replace(/,/g, ''));
+          if (isNaN(rawAmount) || rawAmount <= 0) return;
+
           setIsProcessing(true);
-          await addMerchantEntry(showEntryModal, entryType, currency, parseFloat(amount));
+          await addMerchantEntry(showEntryModal, entryType, currency, rawAmount);
           setIsProcessing(false);
           setShowEntryModal(null);
           setAmount('');
@@ -49,7 +62,7 @@ const Merchants: React.FC = () => {
       }
   };
 
-  const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="space-y-4">
@@ -131,12 +144,14 @@ const Merchants: React.FC = () => {
                             <option value="EGP">EGP</option>
                             <option value="SDG">SDG</option>
                         </select>
-                        <FormattedInput 
-                            value={amount}
-                            onChange={setAmount}
-                            className="w-full p-3 border rounded-lg text-lg font-bold"
-                            placeholder="المبلغ"
-                            required
+                        <input 
+                            type="text" 
+                            inputMode="decimal"
+                            placeholder="المبلغ" 
+                            value={amount} 
+                            onChange={handleAmountChange} 
+                            className="w-full p-3 border rounded-lg text-lg font-bold" 
+                            required 
                         />
                         <button disabled={isProcessing} className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center">
                             {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'تسجيل'}
