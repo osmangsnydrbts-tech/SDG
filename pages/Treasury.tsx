@@ -28,7 +28,7 @@ const Treasury: React.FC = () => {
   const formatInput = (val: string) => {
     const raw = val.replace(/,/g, '');
     if (isNaN(Number(raw))) return val;
-    return Number(raw).toLocaleString();
+    return Math.round(Number(raw)).toLocaleString();
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,7 +64,7 @@ const Treasury: React.FC = () => {
             modalTargetType,
             currentUser.company_id,
             currency,
-            numericAmount,
+            Math.round(numericAmount),
             selectedEmployee || undefined
         );
         
@@ -82,11 +82,7 @@ const Treasury: React.FC = () => {
     }
   };
 
-  const getFormattedAmount = () => {
-      const val = parseFloat(amount.replace(/,/g, ''));
-      if (isNaN(val)) return '0.00';
-      return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+  const fmt = (n?: number) => n ? Math.round(n).toLocaleString() : '0';
 
   return (
     <div className="space-y-6">
@@ -94,11 +90,11 @@ const Treasury: React.FC = () => {
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white p-5 rounded-2xl shadow-lg">
           <p className="text-blue-200 text-sm mb-1">الخزينة الرئيسية (EGP)</p>
-          <h3 className="text-2xl font-bold">{mainTreasury?.egp_balance.toLocaleString()}</h3>
+          <h3 className="text-2xl font-bold">{fmt(mainTreasury?.egp_balance)}</h3>
         </div>
         <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 text-white p-5 rounded-2xl shadow-lg">
           <p className="text-emerald-200 text-sm mb-1">الخزينة الرئيسية (SDG)</p>
-          <h3 className="text-2xl font-bold">{mainTreasury?.sdg_balance.toLocaleString()}</h3>
+          <h3 className="text-2xl font-bold">{fmt(mainTreasury?.sdg_balance)}</h3>
         </div>
       </div>
 
@@ -159,8 +155,8 @@ const Treasury: React.FC = () => {
                                   </div>
                               </div>
                               <div className="text-right text-xs">
-                                  <div className="font-bold text-gray-800">{t?.egp_balance.toLocaleString()} EGP</div>
-                                  <div className="text-gray-500">{t?.sdg_balance.toLocaleString()} SDG</div>
+                                  <div className="font-bold text-gray-800">{fmt(t?.egp_balance)} EGP</div>
+                                  <div className="text-gray-500">{fmt(t?.sdg_balance)} SDG</div>
                               </div>
                           </div>
                           
@@ -218,7 +214,7 @@ const Treasury: React.FC = () => {
                           />
                           {amount && (
                             <div className="text-center mt-2 text-sm font-bold text-blue-600 bg-blue-50 py-1 rounded-lg">
-                                {getFormattedAmount()} {currency}
+                                {amount} {currency}
                             </div>
                           )}
                       </div>
