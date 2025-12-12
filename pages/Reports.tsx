@@ -48,6 +48,9 @@ const Reports: React.FC = () => {
       setEndDate(lastDay);
   };
 
+  // Helper for integer formatting
+  const fmt = (num: number) => Math.round(num).toLocaleString();
+
   // Filter Logic
   const getFilteredTransactions = () => {
       return transactions.filter(t => {
@@ -114,17 +117,17 @@ const Reports: React.FC = () => {
                      {t.type === 'expense' ? (
                         <div className="text-red-600">
                              <span className="text-xs font-bold block mb-1 flex items-center gap-1"><TrendingDown size={14}/> منصرف</span>
-                             <span className="text-xl font-bold">{t.from_amount.toLocaleString()} {t.from_currency}</span>
+                             <span className="text-xl font-bold">{fmt(t.from_amount)} {t.from_currency}</span>
                         </div>
                      ) : t.type === 'sale' ? (
                         <div className="text-purple-600">
                              <span className="text-xs font-bold block mb-1 flex items-center gap-1"><ShoppingCart size={14}/> بيع: {t.product_name}</span>
-                             <span className="text-xl font-bold">{t.from_amount.toLocaleString()} {t.from_currency}</span>
+                             <span className="text-xl font-bold">{fmt(t.from_amount)} {t.from_currency}</span>
                         </div>
                      ) : t.type === 'exchange' ? (
                          <div className="text-green-600">
                              <span className="text-xs font-bold block mb-1 flex items-center gap-1"><ArrowDownLeft size={14}/> استلام</span>
-                             <span className="text-xl font-bold">{t.from_amount.toLocaleString()} {t.from_currency}</span>
+                             <span className="text-xl font-bold">{fmt(t.from_amount)} {t.from_currency}</span>
                          </div>
                      ) : isWallet ? (
                         <div className="text-pink-600">
@@ -132,12 +135,12 @@ const Reports: React.FC = () => {
                                 {t.type === 'wallet_feed' ? 'تغذية' : t.wallet_type === 'withdraw' ? 'سحب' : t.wallet_type === 'deposit' ? 'إيداع' : 'صرف'}
                              </span>
                              <span className="text-xs block text-gray-500 mb-1">{getWalletInfo(t.wallet_id)}</span>
-                             <span className="text-xl font-bold">{t.from_amount.toLocaleString()} {t.from_currency}</span>
+                             <span className="text-xl font-bold">{fmt(t.from_amount)} {t.from_currency}</span>
                         </div>
                      ) : (
                          <div className={t.type === 'treasury_feed' ? 'text-green-600' : 'text-red-600'}>
                              <span className="text-xs font-bold block mb-1">{t.type === 'treasury_feed' ? 'إيداع خزينة' : 'سحب خزينة'}</span>
-                             <span className="text-xl font-bold">{t.from_amount.toLocaleString()} {t.from_currency}</span>
+                             <span className="text-xl font-bold">{fmt(t.from_amount)} {t.from_currency}</span>
                          </div>
                      )}
                 </div>
@@ -146,7 +149,7 @@ const Reports: React.FC = () => {
                     {t.type === 'exchange' && t.to_amount && (
                         <div className="text-red-500">
                             <span className="text-xs font-bold block mb-1 flex items-center justify-end gap-1">تسليم <ArrowUpRight size={14}/></span>
-                            <span className="text-xl font-bold">{t.to_amount.toLocaleString()} {t.to_currency}</span>
+                            <span className="text-xl font-bold">{fmt(t.to_amount)} {t.to_currency}</span>
                         </div>
                     )}
                     {(t.type === 'expense' || t.type.includes('treasury')) && (
@@ -156,7 +159,7 @@ const Reports: React.FC = () => {
                     )}
                     {isWallet && t.commission && t.commission > 0 && (
                          <div className="text-green-600 text-xs font-bold mt-1">
-                            + {t.commission.toLocaleString()} عمولة
+                            + {fmt(t.commission)} عمولة
                         </div>
                     )}
                 </div>
@@ -243,19 +246,19 @@ const Reports: React.FC = () => {
                  <div className="grid grid-cols-2 gap-4">
                      <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-orange-500">
                          <h4 className="text-xs text-gray-500 mb-1 font-bold">وارد سوداني</h4>
-                         <p className="text-xl font-bold text-gray-800">{stats.receivedSdg.toLocaleString()}</p>
+                         <p className="text-xl font-bold text-gray-800">{fmt(stats.receivedSdg)}</p>
+                     </div>
+                     <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-blue-600">
+                         <h4 className="text-xs text-gray-500 mb-1 font-bold">وارد مصري</h4>
+                         <p className="text-xl font-bold text-gray-800">{fmt(stats.receivedEgp)}</p>
                      </div>
                      <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-purple-500">
                          <h4 className="text-xs text-gray-500 mb-1 font-bold">إجمالي المبيعات</h4>
-                         <p className="text-xl font-bold text-gray-800">{stats.totalSales.toLocaleString()} EGP</p>
-                     </div>
-                     <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-blue-500">
-                         <h4 className="text-xs text-gray-500 mb-1 font-bold">إجمالي العملات</h4>
-                         <p className="text-xl font-bold text-gray-800">{stats.totalCurrencies.toLocaleString()}</p>
+                         <p className="text-xl font-bold text-gray-800">{fmt(stats.totalSales)} EGP</p>
                      </div>
                      <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-red-500">
                          <h4 className="text-xs text-gray-500 mb-1 font-bold">إجمالي المنصرفات</h4>
-                         <p className="text-xl font-bold text-red-600">{stats.totalExpensesEgp.toLocaleString()} EGP</p>
+                         <p className="text-xl font-bold text-red-600">{fmt(stats.totalExpensesEgp)} EGP</p>
                      </div>
                  </div>
              </div>
