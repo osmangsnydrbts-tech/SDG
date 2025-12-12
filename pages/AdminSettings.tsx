@@ -18,24 +18,29 @@ const AdminSettings: React.FC = () => {
   const [phoneNumbers, setPhoneNumbers] = useState('');
 
   const SQL_FIX_CODE = `
-/* 1. SALES TABLE STRUCTURE (INSIDE TRANSACTIONS) */
+/* 1. SALES TABLE STRUCTURE */
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS product_name text;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS is_cancelled boolean DEFAULT false;
 
-/* 2. SALES TREASURY BALANCE */
+/* 2. AUDIT TRAIL COLUMNS (FOR CANCELLATION ACCURACY) */
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS cancellation_reason text;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS cancelled_by bigint;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS cancelled_at timestamptz;
+
+/* 3. SALES TREASURY BALANCE */
 ALTER TABLE public.treasuries ADD COLUMN IF NOT EXISTS sales_balance float8 DEFAULT 0;
 
-/* 3. COMPANY SETTINGS */
+/* 4. COMPANY SETTINGS */
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS logo text;
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS phone_numbers text;
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS footer_message text;
 
-/* 4. E-WALLETS STRUCTURE */
+/* 5. E-WALLETS STRUCTURE */
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_id bigint;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_type text;
 ALTER TABLE public.e_wallets ADD COLUMN IF NOT EXISTS commission float8 DEFAULT 0;
 
-/* 5. REFRESH CACHE */
+/* 6. REFRESH CACHE */
 NOTIFY pgrst, 'reload schema';
   `.trim();
 
@@ -155,11 +160,10 @@ NOTIFY pgrst, 'reload schema';
                     </div>
                     <div className="flex-1">
                         <h3 className="font-bold text-indigo-800 text-lg mb-1">
-                            إنشاء جدول المبيعات وتحديث الهيكل
+                            تحديث هيكل النظام (هام جداً للحسابات)
                         </h3>
                         <p className="text-sm text-indigo-700 mb-3 leading-relaxed">
-                           لتفعيل نظام المبيعات، العمولات، والإلغاء، يرجى نسخ الكود أدناه وتشغيله في قاعدة البيانات (Supabase SQL Editor).
-                           سيقوم هذا الكود بإضافة أعمدة `product_name` و `sales_balance` المطلوبة.
+                           لضمان دقة الحسابات وتفعيل نظام "سجل التعديلات" (Audit Log) للمبيعات والإلغاء، يرجى نسخ الكود أدناه وتشغيله في قاعدة البيانات.
                         </p>
                         
                         <div className="relative group">
