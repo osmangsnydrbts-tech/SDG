@@ -549,11 +549,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       if (updateError) {
         console.error("Cancellation Update Failed:", updateError);
-        // Handle case where 'is_cancelled' column might not exist
-        if (updateError.message.includes("column") && updateError.message.includes("does not exist")) {
-           return { success: false, message: 'خطأ: جدول البيانات غير محدث. يرجى الذهاب للإعدادات وتحديث الهيكل.' };
-        }
-        return { success: false, message: 'فشل تحديث حالة العملية.' };
+        // Return explicit error to help user debug missing columns
+        return { success: false, message: `فشل التحديث: ${updateError.message} - تأكد من تحديث قاعدة البيانات من الإعدادات.` };
       }
 
       // 3. REVERSE FINANCIALS
