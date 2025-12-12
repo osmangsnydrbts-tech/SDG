@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, Landmark, Clock, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart } from 'lucide-react';
+import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -23,7 +23,6 @@ const Reports: React.FC = () => {
   const getCompany = (companyId: number) => companies.find(c => c.id === companyId);
   const getEmployee = (empId?: number) => users.find(u => u.id === empId);
 
-  // Get Wallet Info for Display
   const getWalletInfo = (walletId?: number) => {
       const w = eWallets.find(x => x.id === walletId);
       return w ? `${w.provider} (${w.phone_number})` : 'محفظة محذوفة';
@@ -52,7 +51,6 @@ const Reports: React.FC = () => {
   // Filter Logic
   const getFilteredTransactions = () => {
       return transactions.filter(t => {
-        // Exclude cancelled for stats (but maybe show them in list? Let's show active only for now or show with strikethrough)
         if (t.is_cancelled) return false;
 
         let roleMatch = false;
@@ -62,7 +60,6 @@ const Reports: React.FC = () => {
 
         if (!roleMatch) return false;
 
-        // Employee Filter
         if (selectedEmp !== 'all') {
             if (t.employee_id !== parseInt(selectedEmp)) return false;
         }
@@ -91,10 +88,9 @@ const Reports: React.FC = () => {
       totalExpensesEgp: expenseTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
       totalExpensesSdg: expenseTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
       totalSales: salesTx.reduce((sum, t) => sum + t.from_amount, 0),
-      totalCurrencies: 0 // Will be calculated based on exchange flow total volume
+      totalCurrencies: 0
   };
   
-  // Total currency volume (just summing 'from_amount' of exchanges)
   stats.totalCurrencies = stats.receivedSdg + stats.receivedEgp;
 
   const CardRow = ({ t }: { t: Transaction }) => {
@@ -104,9 +100,8 @@ const Reports: React.FC = () => {
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3 relative overflow-hidden group">
             <div className="flex justify-between items-start">
                 <div className="flex items-center gap-2 text-gray-500 text-xs">
-                    <Clock size={12} />
-                    <span>{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</span>
                     <span className="bg-gray-100 px-2 py-0.5 rounded-full">{new Date(t.created_at).toLocaleDateString('ar-EG')}</span>
+                    <span>{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</span>
                 </div>
                 <div className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded-lg">
                     <User size={12} />
@@ -175,7 +170,6 @@ const Reports: React.FC = () => {
                      <button onClick={() => setViewTransaction(t)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition" title="عرض الإيصال">
                          <Eye size={16} />
                      </button>
-                     {/* Cancel Button instead of Delete */}
                      <button onClick={() => handleCancel(t.id)} className="p-2 text-orange-500 bg-orange-50 hover:bg-orange-100 rounded-lg transition" title="إلغاء العملية">
                          <XCircle size={16} />
                      </button>
@@ -191,7 +185,6 @@ const Reports: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-10">
-        {/* Controls Section */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4">
             <h2 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
                 <Filter size={20} className="text-blue-600" /> فلترة التقارير
@@ -227,7 +220,6 @@ const Reports: React.FC = () => {
             </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex bg-white p-1 rounded-xl border border-gray-200 overflow-x-auto shadow-sm no-scrollbar">
             <button onClick={() => setActiveTab('breakdown')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'breakdown' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
                 <FileText size={16}/> الملخص
@@ -246,10 +238,13 @@ const Reports: React.FC = () => {
             </button>
         </div>
 
-        {/* Breakdown Tab */}
         {activeTab === 'breakdown' && (
              <div className="space-y-4 animate-in fade-in duration-300">
                  <div className="grid grid-cols-2 gap-4">
+                     <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-orange-500">
+                         <h4 className="text-xs text-gray-500 mb-1 font-bold">وارد سوداني</h4>
+                         <p className="text-xl font-bold text-gray-800">{stats.receivedSdg.toLocaleString()}</p>
+                     </div>
                      <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-purple-500">
                          <h4 className="text-xs text-gray-500 mb-1 font-bold">إجمالي المبيعات</h4>
                          <p className="text-xl font-bold text-gray-800">{stats.totalSales.toLocaleString()} EGP</p>
@@ -257,10 +252,6 @@ const Reports: React.FC = () => {
                      <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-blue-500">
                          <h4 className="text-xs text-gray-500 mb-1 font-bold">إجمالي العملات</h4>
                          <p className="text-xl font-bold text-gray-800">{stats.totalCurrencies.toLocaleString()}</p>
-                     </div>
-                     <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-orange-500">
-                         <h4 className="text-xs text-gray-500 mb-1 font-bold">وارد سوداني</h4>
-                         <p className="text-xl font-bold text-gray-800">{stats.receivedSdg.toLocaleString()}</p>
                      </div>
                      <div className="bg-white p-4 rounded-xl shadow-sm border-r-4 border-r-red-500">
                          <h4 className="text-xs text-gray-500 mb-1 font-bold">إجمالي المنصرفات</h4>
@@ -270,7 +261,6 @@ const Reports: React.FC = () => {
              </div>
         )}
 
-        {/* Lists */}
         {activeTab === 'sales' && (
             <div className="space-y-3 animate-in fade-in duration-300">
                 {salesTx.map(t => <CardRow key={t.id} t={t} />)}
