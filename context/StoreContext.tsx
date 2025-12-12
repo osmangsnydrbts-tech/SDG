@@ -605,14 +605,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
              }).eq('id', empTreasury.id);
 
         } else if (walletType === 'exchange') {
-             // Logic was: SDG -> EGP Rate. Treasury + (EGP + Comm). Wallet - EGP.
-             // Reverse: Treasury - (EGP + Comm). Wallet + EGP.
+             // Logic was: Wallet - EGP, Treasury + SDG (Cash).
+             // Reverse: Wallet + EGP, Treasury - SDG (Cash).
              const rate = transaction.rate || 1;
              const egpValue = amount / rate; // This is the EGP value deducted from wallet
              
              await supabase.from('e_wallets').update({ balance: wallet.balance + egpValue }).eq('id', wallet.id);
              await supabase.from('treasuries').update({
-                 egp_balance: empTreasury.egp_balance - (egpValue + commission)
+                 sdg_balance: empTreasury.sdg_balance - amount
              }).eq('id', empTreasury.id);
         }
     } else {
@@ -842,7 +842,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             currency = 'EGP';
 
         } else if (type === 'exchange') {
-            // "Lo Sarf (Exchange)": SDG to EGP / Rate -> Add to Employee Treasury (EGP) + Commission
+            // "Lo Sarf (Exchange)": SDG to EGP / Rate.
+            // Wallet: Deduct EGP (because we send EGP to customer)
+            // Treasury: Add SDG (because customer gives cash SDG)
             // Input: Amount (SDG)
             
             const egpRate = rate.sd_to_eg_rate;
@@ -853,7 +855,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
             await supabase.from('e_wallets').update({ balance: wallet.balance - egpValue }).eq('id', walletId);
             await supabase.from('treasuries').update({
-                egp_balance: empTreasury.egp_balance + egpValue + commissionAmount
+                sdg_balance: empTreasury.sdg_balance + amount
             }).eq('id', empTreasury.id);
 
             description = `صرف ${amount} سوداني عبر ${wallet.provider}`;
