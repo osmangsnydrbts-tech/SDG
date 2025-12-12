@@ -68,7 +68,7 @@ export interface EWallet {
   company_id: number;
   employee_id: number;
   phone_number: string;
-  provider: string;
+  provider: string; // Vodafone, InstaPay, etc.
   balance: number;
   is_active: boolean;
 }
@@ -89,6 +89,7 @@ export interface Transaction {
   created_at: string;
   is_wholesale?: boolean;
   wallet_id?: number;
+  wallet_type?: 'withdraw' | 'deposit' | 'exchange';
 }
 
 export const DEFAULT_SUPER_ADMIN: User = {
