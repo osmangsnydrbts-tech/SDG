@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Transaction, Company, User } from '../types';
 import { X, Share2, Loader2 } from 'lucide-react';
@@ -23,24 +22,26 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     setIsSharing(true);
 
     try {
-      // Wait for UI to stabilize
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Small delay to ensure rendering
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
-        scale: 2,
+        scale: 2, // High resolution
         useCORS: true,
         logging: false,
         allowTaint: true,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: document.documentElement.offsetWidth,
-        windowHeight: document.documentElement.offsetHeight,
+        // Specific settings to prevent font glitches in Arabic
+        // letterRendering removed as it is not a valid property in current html2canvas types
         onclone: (clonedDoc: Document) => {
             const clonedElement = clonedDoc.getElementById('receipt-content');
             if (clonedElement) {
+                // Ensure explicit styles to prevent shifting
                 clonedElement.style.transform = 'none';
-                clonedElement.style.overflow = 'visible';
+                clonedElement.style.margin = '0';
+                clonedElement.style.width = '100%';
+                // Fix for Arabic font rendering spacing
+                clonedElement.style.letterSpacing = 'normal'; 
             }
         }
       });
@@ -83,22 +84,27 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     if (t.type === 'treasury_feed') return 'إيداع نقدي';
     if (t.type === 'treasury_withdraw') return 'سحب نقدي';
     if (t.type === 'expense') return 'منصرفات';
+    if (t.type === 'sale') return 'بيع منتج';
+    if (t.type === 'wallet_feed') return 'تغذية محفظة';
+    if (t.type === 'wallet_transfer') {
+         if (t.wallet_type === 'withdraw') return 'سحب من محفظة';
+         if (t.wallet_type === 'deposit') return 'إيداع في محفظة';
+         if (t.wallet_type === 'exchange') return 'صرف عبر محفظة';
+         return 'تحويل محفظة';
+    }
     return 'عملية مالية';
   };
 
   const formatAmount = (amount: number) => {
-    if (transaction.type === 'exchange') {
-      return amount.toLocaleString('en-US', { maximumFractionDigits: 0 });
-    }
-    return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return Math.round(amount).toLocaleString('en-US'); // No decimals
   };
 
   return (
     <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto">
       <div className="w-full max-w-md my-auto">
         
-        {/* Printable Area */}
-        <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative">
+        {/* Printable Area - Fixed Font Stack for Canvas Reliability */}
+        <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative" style={{ fontFamily: 'Tajawal, sans-serif' }}>
           
           {/* Header */}
           <div className="bg-gray-50 p-6 border-b border-gray-100 flex flex-col items-center justify-center text-center">
@@ -143,6 +149,13 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
                 </span>
               </div>
 
+              {transaction.product_name && (
+                   <div className="flex justify-between items-center px-2">
+                     <span className="text-gray-500">المنتج</span>
+                     <span className="font-bold text-gray-800">{transaction.product_name}</span>
+                   </div>
+              )}
+
               {transaction.type === 'expense' && transaction.description && (
                   <div className="bg-red-50 p-3 rounded-lg text-center text-red-700 font-bold text-sm">
                       {transaction.description}
@@ -173,7 +186,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
                 <span>الموظف المسؤول:</span>
                 <span className="font-bold text-gray-700">{employee?.full_name}</span>
               </div>
-              <div className="text-center text-xs text-gray-400 font-light">
+              <div className="text-center text-xs text-gray-400 font-light whitespace-pre-wrap">
                  {company.footer_message || 'شكراً لتعاملكم معنا'}
               </div>
             </div>
