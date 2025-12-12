@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Trash2, Key, Pencil, Share2, X, Loader2, FileText, Lock, Store, TrendingDown, Settings, Smartphone } from 'lucide-react';
+import { Landmark, UserPlus, Users, Trash2, Key, Pencil, Share2, X, Loader2, FileText, Lock, Store, TrendingDown, Smartphone } from 'lucide-react';
 import { User } from '../types';
 
 const AdminDashboard: React.FC = () => {
@@ -29,7 +29,6 @@ const AdminDashboard: React.FC = () => {
   const [egRate, setEgRate] = useState(rateData?.eg_to_sd_rate || 73);
   const [wholesale, setWholesale] = useState(rateData?.wholesale_rate || 72.5);
   const [threshold, setThreshold] = useState(rateData?.wholesale_threshold || 30000);
-  const [walletComm, setWalletComm] = useState(rateData?.ewallet_commission || 1);
 
   // Emp Add Form
   const [empName, setEmpName] = useState('');
@@ -52,8 +51,7 @@ const AdminDashboard: React.FC = () => {
             sd_to_eg_rate: sdRate,
             eg_to_sd_rate: egRate,
             wholesale_rate: wholesale,
-            wholesale_threshold: threshold,
-            ewallet_commission: walletComm
+            wholesale_threshold: threshold
         });
         setIsProcessing(false);
         setShowRateModal(false);
@@ -62,9 +60,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleShareRates = async () => {
     if (!rateData || !company) return;
-
     const footer = company.footer_message ? `\n\n${company.footer_message}` : (company.phone_numbers ? `\n📞 ${company.phone_numbers}` : '');
-
     const text = `
 *${company.name}*
 نشرة أسعار الصرف اليومية
@@ -81,21 +77,9 @@ ${footer}
     `.trim();
 
     if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'نشرة أسعار الصرف',
-          text: text,
-        });
-      } catch (error) {
-        console.log('Share cancelled');
-      }
+      try { await navigator.share({ title: 'نشرة أسعار الصرف', text: text }); } catch (error) {}
     } else {
-      try {
-        await navigator.clipboard.writeText(text);
-        alert('تم نسخ النشرة إلى الحافظة');
-      } catch (err) {
-        console.error('Failed to copy', err);
-      }
+      try { await navigator.clipboard.writeText(text); alert('تم نسخ النشرة إلى الحافظة'); } catch (err) {}
     }
   };
 
@@ -164,7 +148,6 @@ ${footer}
       }
   };
 
-  // Dashboard Button Component - Compact Version
   const DashboardBtn = ({ title, icon: Icon, color, onClick }: any) => (
     <button 
       onClick={onClick} 
@@ -180,15 +163,12 @@ ${footer}
   return (
     <div className="space-y-6">
       
-      {/* Header Card - Exchange Rates */}
+      {/* Header Card */}
       <div className="bg-blue-600 text-white p-5 rounded-3xl shadow-xl relative overflow-hidden mb-6">
         <div className="relative z-10">
            <div className="flex justify-between items-start mb-4">
                <h2 className="text-lg font-bold opacity-90">أسعار الصرف الحالية</h2>
                <div className="flex gap-2">
-                   <button onClick={() => navigate('/admin/settings')} className="bg-white/20 hover:bg-white/30 p-2 rounded-full transition">
-                       <Settings size={18} />
-                   </button>
                    <button onClick={() => setShowShareModal(true)} className="bg-white/20 hover:bg-white/30 p-2 rounded-full transition">
                        <Share2 size={18} />
                    </button>
@@ -207,63 +187,18 @@ ${footer}
               </div>
            </div>
         </div>
-        
-        {/* Decorative Background */}
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-blue-800/30 to-transparent"></div>
       </div>
 
       {/* Main Grid Actions */}
       <div className="grid grid-cols-3 gap-3">
-        
-        {/* Add Employee (Orange) */}
-        <DashboardBtn 
-            title="إضافة موظف" 
-            icon={UserPlus} 
-            color="bg-orange-500" 
-            onClick={() => setShowEmpModal(true)} 
-        />
-
-        {/* Update Rates (Dark Slate) */}
-        <DashboardBtn 
-            title="تحديث السعر" 
-            icon={Pencil} 
-            color="bg-slate-700" 
-            onClick={() => setShowRateModal(true)} 
-        />
-
-        {/* E-Wallets (Pink) - NEW */}
-        <DashboardBtn 
-            title="المحافظ" 
-            icon={Smartphone} 
-            color="bg-pink-600" 
-            onClick={() => navigate('/admin/ewallets')} 
-        />
-
-        {/* Manage Treasury (Teal) */}
-        <DashboardBtn 
-            title="الخزينة" 
-            icon={Landmark} 
-            color="bg-teal-600" 
-            onClick={() => navigate('/admin/treasury')} 
-        />
-
-        {/* Employees List (Purple) */}
-        <DashboardBtn 
-            title="الموظفين" 
-            icon={Users} 
-            color="bg-purple-600" 
-            onClick={() => setShowManageEmpModal(true)} 
-        />
-
-        {/* Merchants (Indigo) */}
-        <DashboardBtn 
-            title="التجار" 
-            icon={Store} 
-            color="bg-indigo-600" 
-            onClick={() => navigate('/admin/merchants')} 
-        />
-
+        <DashboardBtn title="إضافة موظف" icon={UserPlus} color="bg-orange-500" onClick={() => setShowEmpModal(true)} />
+        <DashboardBtn title="تحديث السعر" icon={Pencil} color="bg-slate-700" onClick={() => setShowRateModal(true)} />
+        <DashboardBtn title="المحافظ" icon={Smartphone} color="bg-pink-600" onClick={() => navigate('/admin/ewallets')} />
+        <DashboardBtn title="الخزينة" icon={Landmark} color="bg-teal-600" onClick={() => navigate('/admin/treasury')} />
+        <DashboardBtn title="الموظفين" icon={Users} color="bg-purple-600" onClick={() => setShowManageEmpModal(true)} />
+        <DashboardBtn title="التجار" icon={Store} color="bg-indigo-600" onClick={() => navigate('/admin/merchants')} />
       </div>
 
       {/* Share Modal */}
@@ -275,9 +210,7 @@ ${footer}
                         {company?.logo && <img src={company.logo} alt="Logo" className="h-16 w-16 mx-auto bg-white rounded-lg p-1 object-contain mb-3" crossOrigin="anonymous"/>}
                         <h2 className="text-2xl font-bold">{company?.name}</h2>
                         <p className="text-blue-200 text-sm mt-1">نشرة أسعار الصرف اليومية</p>
-                        {company?.phone_numbers && (
-                           <p className="text-blue-100 text-xs mt-2 font-mono" dir="ltr">{company.phone_numbers}</p>
-                        )}
+                        {company?.phone_numbers && <p className="text-blue-100 text-xs mt-2 font-mono" dir="ltr">{company.phone_numbers}</p>}
                     </div>
                     <div className="p-6 space-y-4">
                         <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
@@ -288,7 +221,6 @@ ${footer}
                             <span className="text-gray-500 font-medium">مصري {'->'} سوداني</span>
                             <span className="text-3xl font-bold text-gray-800">{rateData?.eg_to_sd_rate}</span>
                         </div>
-                        
                         <div className="border-t pt-4 mt-2">
                             <div className="flex justify-between text-sm mb-2">
                                 <span className="text-gray-500">سعر الجملة</span>
@@ -299,29 +231,12 @@ ${footer}
                                 <span className="font-bold text-gray-800">{rateData?.wholesale_threshold.toLocaleString()} EGP</span>
                             </div>
                         </div>
-                        
-                        {company?.footer_message && (
-                            <div className="bg-gray-50 p-3 rounded-lg text-xs text-gray-600 text-center whitespace-pre-wrap border border-gray-100">
-                                {company.footer_message}
-                            </div>
-                        )}
-
-                        <div className="text-center text-xs text-gray-400 mt-2 pt-2 border-t">
-                            {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                        </div>
+                        {company?.footer_message && <div className="bg-gray-50 p-3 rounded-lg text-xs text-gray-600 text-center whitespace-pre-wrap border border-gray-100">{company.footer_message}</div>}
                     </div>
                 </div>
-
                 <div className="mt-4 flex gap-3">
-                    <button onClick={() => setShowShareModal(false)} className="bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-50">
-                        <X size={24} />
-                    </button>
-                    <button 
-                        onClick={handleShareRates}
-                        className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg"
-                    >
-                        <Share2 size={20} /> مشاركة (نص)
-                    </button>
+                    <button onClick={() => setShowShareModal(false)} className="bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-50"><X size={24} /></button>
+                    <button onClick={handleShareRates} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg"><Share2 size={20} /> مشاركة (نص)</button>
                 </div>
             </div>
         </div>
@@ -332,7 +247,7 @@ ${footer}
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
-                     <h3 className="text-lg font-bold text-gray-800">تحديث الأسعار والإعدادات</h3>
+                     <h3 className="text-lg font-bold text-gray-800">تحديث الأسعار</h3>
                      <button onClick={() => setShowRateModal(false)} className="bg-gray-100 p-1 rounded-full"><X size={20} className="text-gray-500"/></button>
                 </div>
                 <form onSubmit={handleUpdateRates} className="space-y-4">
@@ -346,7 +261,6 @@ ${footer}
                             <input type="number" step="0.1" inputMode="decimal" value={egRate} onChange={e => setEgRate(parseFloat(e.target.value))} className="w-full p-2 border border-blue-200 rounded-lg font-bold text-lg text-center bg-white" />
                         </div>
                     </div>
-                    
                     <div className="pt-2 border-t">
                         <label className="text-xs text-gray-500 font-bold mb-1 block">سعر الجملة</label>
                         <input type="number" step="0.1" inputMode="decimal" value={wholesale} onChange={e => setWholesale(parseFloat(e.target.value))} className="w-full p-3 border rounded-lg font-bold" />
@@ -355,21 +269,6 @@ ${footer}
                         <label className="text-xs text-gray-500 font-bold mb-1 block">حد الجملة (EGP)</label>
                         <input type="number" inputMode="decimal" value={threshold} onChange={e => setThreshold(parseFloat(e.target.value))} className="w-full p-3 border rounded-lg font-bold" />
                     </div>
-
-                    <div className="bg-pink-50 p-3 rounded-xl border border-pink-100">
-                        <label className="text-xs text-pink-600 font-bold mb-1 block">عمولة التحويل الإلكتروني (%)</label>
-                        <input 
-                            type="number" 
-                            step="0.1" 
-                            inputMode="decimal" 
-                            value={walletComm} 
-                            onChange={e => setWalletComm(parseFloat(e.target.value))} 
-                            className="w-full p-3 border border-pink-200 rounded-lg font-bold text-center" 
-                            placeholder="%"
-                        />
-                        <p className="text-[10px] text-pink-500 mt-1 text-center">تضاف تلقائياً عند إجراء التحويلات</p>
-                    </div>
-
                     <button disabled={isProcessing} className="w-full bg-slate-800 text-white py-4 rounded-xl font-bold mt-2 flex items-center justify-center shadow-lg hover:bg-slate-900 transition">
                         {isProcessing ? <Loader2 className="animate-spin" size={20}/> : 'حفظ التغييرات'}
                     </button>
@@ -416,7 +315,6 @@ ${footer}
                     <h3 className="text-lg font-bold text-gray-800">إدارة الموظفين</h3>
                     <button onClick={() => setShowManageEmpModal(false)} className="bg-gray-100 p-2 rounded-full"><X size={20} className="text-gray-500"/></button>
                 </div>
-                
                 <div className="space-y-4">
                     {companyEmployees.map(emp => (
                         <div key={emp.id} className="border p-4 rounded-xl bg-gray-50 transition hover:border-blue-300">
@@ -430,25 +328,16 @@ ${footer}
                                        <label className="text-xs text-gray-400 block mb-1">اسم المستخدم</label>
                                        <input value={editUser} onChange={e => setEditUser(e.target.value)} className="w-full p-2 border rounded" />
                                     </div>
-                                    {error && <p className="text-red-500 text-xs">{error}</p>}
                                     <div className="flex gap-2 pt-2">
-                                        <button onClick={handleUpdateInfo} disabled={isProcessing} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1 flex-1 justify-center font-bold">
-                                            {isProcessing ? <Loader2 className="animate-spin" size={16}/> : 'حفظ'}
-                                        </button>
+                                        <button onClick={handleUpdateInfo} disabled={isProcessing} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1 flex-1 justify-center font-bold">حفظ</button>
                                         <button onClick={() => setEditInfoId(null)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg text-sm flex-1 font-bold">إلغاء</button>
                                     </div>
                                 </div>
                             ) : (
                                 <div className="flex justify-between items-center">
-                                    <div 
-                                        className="cursor-pointer flex-1" 
-                                        onClick={() => setSelectedEmpReport(emp)}
-                                        title="اضغط لعرض التقرير"
-                                    >
+                                    <div className="cursor-pointer flex-1" onClick={() => setSelectedEmpReport(emp)}>
                                         <div className="flex items-center gap-3">
-                                            <div className="bg-blue-100 p-2 rounded-full text-blue-600 font-bold w-10 h-10 flex items-center justify-center">
-                                                {emp.full_name.charAt(0)}
-                                            </div>
+                                            <div className="bg-blue-100 p-2 rounded-full text-blue-600 font-bold w-10 h-10 flex items-center justify-center">{emp.full_name.charAt(0)}</div>
                                             <div>
                                                 <p className="font-bold text-gray-800">{emp.full_name}</p>
                                                 <p className="text-xs text-gray-500">@{emp.username}</p>
@@ -456,32 +345,16 @@ ${footer}
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => openEditInfo(emp)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100" title="تعديل البيانات">
-                                            <Pencil size={18} />
-                                        </button>
-                                        <button onClick={() => setEditPassId(editPassId === emp.id ? null : emp.id)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100" title="تغيير كلمة المرور">
-                                            <Key size={18} />
-                                        </button>
-                                        <button onClick={() => initiateDeleteEmployee(emp.id)} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="حذف الموظف">
-                                            <Trash2 size={18} />
-                                        </button>
+                                        <button onClick={() => openEditInfo(emp)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Pencil size={18} /></button>
+                                        <button onClick={() => setEditPassId(editPassId === emp.id ? null : emp.id)} className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Key size={18} /></button>
+                                        <button onClick={() => initiateDeleteEmployee(emp.id)} className="p-2 bg-red-50 text-red-600 rounded-lg"><Trash2 size={18} /></button>
                                     </div>
                                 </div>
                             )}
-
                             {editPassId === emp.id && (
                                 <div className="mt-4 flex gap-2 border-t pt-3 bg-white p-2 rounded-lg border">
-                                    <input 
-                                        type="text" 
-                                        inputMode="numeric"
-                                        placeholder="كلمة المرور الجديدة" 
-                                        className="flex-1 p-2 border rounded-lg text-sm"
-                                        value={newPass}
-                                        onChange={e => setNewPass(e.target.value)}
-                                    />
-                                    <button onClick={() => handleChangePassword(emp.id)} disabled={isProcessing} className="bg-blue-600 text-white px-3 rounded-lg text-sm flex items-center min-w-[60px] justify-center font-bold">
-                                         {isProcessing ? <Loader2 className="animate-spin" size={16}/> : 'تغيير'}
-                                    </button>
+                                    <input type="text" placeholder="كلمة المرور الجديدة" className="flex-1 p-2 border rounded-lg text-sm" value={newPass} onChange={e => setNewPass(e.target.value)}/>
+                                    <button onClick={() => handleChangePassword(emp.id)} disabled={isProcessing} className="bg-blue-600 text-white px-3 rounded-lg text-sm font-bold">تغيير</button>
                                 </div>
                             )}
                         </div>
@@ -492,48 +365,27 @@ ${footer}
         </div>
       )}
 
-      {/* Employee Detail Report Modal */}
+      {/* Employee Report Modal */}
       {selectedEmpReport && (
           <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
                   <div className="bg-blue-600 p-4 text-white flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                          <FileText size={20} />
-                          <h3 className="font-bold">تقرير الموظف</h3>
-                      </div>
+                      <div className="flex items-center gap-2"><FileText size={20} /><h3 className="font-bold">تقرير الموظف</h3></div>
                       <button onClick={() => setSelectedEmpReport(null)} className="p-1 hover:bg-white/20 rounded-full"><X size={20}/></button>
                   </div>
-                  
                   <div className="p-5">
                       <div className="text-center mb-6">
-                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 text-blue-600 font-bold text-xl">
-                              {selectedEmpReport.full_name.charAt(0)}
-                          </div>
+                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 text-blue-600 font-bold text-xl">{selectedEmpReport.full_name.charAt(0)}</div>
                           <h4 className="font-bold text-lg text-gray-800">{selectedEmpReport.full_name}</h4>
-                          <p className="text-xs text-gray-500">@{selectedEmpReport.username}</p>
                       </div>
-
                       {(() => {
                           const empTreasury = treasuries.find(t => t.employee_id === selectedEmpReport.id);
-                          // Filter Today's Transactions
                           const today = new Date().toISOString().split('T')[0];
-                          const todayTxs = transactions.filter(t => 
-                              t.employee_id === selectedEmpReport.id && 
-                              t.created_at.startsWith(today)
-                          );
-
-                          // Calculate Daily Totals
-                          const expenseEGP = todayTxs.filter(t => t.type === 'expense' && t.from_currency === 'EGP').reduce((a, b) => a + b.from_amount, 0);
-                          const expenseSDG = todayTxs.filter(t => t.type === 'expense' && t.from_currency === 'SDG').reduce((a, b) => a + b.from_amount, 0);
-
-                          // Wallets Check
-                          const empWallets = eWallets.filter(w => w.employee_id === selectedEmpReport.id && w.is_active);
-                          const walletBalance = empWallets.reduce((acc, curr) => acc + curr.balance, 0);
-                          const walletTxs = todayTxs.filter(t => ['wallet_feed', 'wallet_transfer'].includes(t.type));
+                          const todayTxs = transactions.filter(t => t.employee_id === selectedEmpReport.id && t.created_at.startsWith(today) && !t.is_cancelled);
+                          const sales = todayTxs.filter(t => t.type === 'sale').reduce((a, b) => a + b.from_amount, 0);
 
                           return (
                               <div className="space-y-4">
-                                  {/* Current Balance */}
                                   <div className="grid grid-cols-2 gap-3">
                                       <div className="bg-gray-50 p-3 rounded-xl border text-center">
                                           <span className="text-xs text-gray-500 block">رصيد (EGP)</span>
@@ -544,51 +396,10 @@ ${footer}
                                           <span className="font-bold text-lg">{empTreasury?.sdg_balance.toLocaleString()}</span>
                                       </div>
                                   </div>
-
-                                  {walletBalance > 0 && (
-                                     <div className="bg-pink-50 p-3 rounded-xl border border-pink-100 text-center">
-                                         <span className="text-xs text-pink-500 block font-bold">رصيد المحافظ الإلكترونية</span>
-                                         <span className="font-bold text-lg text-pink-700">{walletBalance.toLocaleString()} EGP</span>
-                                         <p className="text-[10px] text-gray-400 mt-1">عدد المحافظ: {empWallets.length}</p>
-                                     </div>
-                                  )}
-
-                                  <div className="border-t pt-3">
-                                      <p className="text-xs font-bold text-gray-500 mb-2 text-center">حركة اليوم ({new Date().toLocaleDateString('ar-EG')})</p>
-                                      
-                                      <div className="space-y-2">
-                                          {/* Expenses */}
-                                          {expenseEGP > 0 || expenseSDG > 0 ? (
-                                            <div className="bg-red-50 p-3 rounded-xl flex items-center justify-between border border-red-100">
-                                                <div className="flex items-center gap-2 text-red-700 font-bold text-sm">
-                                                    <TrendingDown size={16} />
-                                                    <span>المنصرفات</span>
-                                                </div>
-                                                <div className="text-left text-xs font-bold text-red-800">
-                                                    <div>{expenseEGP.toLocaleString()} EGP</div>
-                                                    {expenseSDG > 0 && <div>{expenseSDG.toLocaleString()} SDG</div>}
-                                                </div>
-                                            </div>
-                                          ) : null}
-
-                                          {/* Wallet Activity */}
-                                          {walletTxs.length > 0 && (
-                                              <div className="bg-pink-50 p-3 rounded-xl flex items-center justify-between border border-pink-100">
-                                                  <div className="flex items-center gap-2 text-pink-700 font-bold text-sm">
-                                                      <Smartphone size={16} />
-                                                      <span>عمليات المحفظة</span>
-                                                  </div>
-                                                  <div className="text-left text-xs font-bold text-pink-800">
-                                                      <div>{walletTxs.length} عملية</div>
-                                                  </div>
-                                              </div>
-                                          )}
-                                          
-                                          {expenseEGP === 0 && expenseSDG === 0 && walletTxs.length === 0 && (
-                                              <p className="text-center text-xs text-gray-400">لا توجد حركات اليوم</p>
-                                          )}
-                                      </div>
-                                  </div>
+                                   <div className="bg-purple-50 p-3 rounded-xl border border-purple-100 text-center">
+                                      <span className="text-xs text-purple-600 block font-bold">مبيعات اليوم</span>
+                                      <span className="font-bold text-lg text-purple-700">{sales.toLocaleString()} EGP</span>
+                                   </div>
                               </div>
                           );
                       })()}
@@ -597,54 +408,25 @@ ${footer}
           </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation */}
       {empToDelete && (
           <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl w-full max-w-xs p-6 shadow-2xl">
                   <div className="text-center mb-4">
-                      <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                          <Lock size={24} className="text-red-600" />
-                      </div>
+                      <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"><Lock size={24} className="text-red-600" /></div>
                       <h3 className="font-bold text-gray-800">تأكيد الحذف</h3>
-                      <p className="text-xs text-gray-500 mt-1">لحذف الموظف، يرجى إدخال كلمة مرور المدير</p>
                   </div>
-                  
                   <form onSubmit={confirmDeleteEmployee}>
-                      <input 
-                          type="password" 
-                          autoFocus
-                          placeholder="كلمة مرور المدير" 
-                          className="w-full p-3 border rounded-lg mb-2 text-center"
-                          value={confirmPassword}
-                          onChange={e => setConfirmPassword(e.target.value)}
-                      />
+                      <input type="password" autoFocus placeholder="كلمة مرور المدير" className="w-full p-3 border rounded-lg mb-2 text-center" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}/>
                       {error && <p className="text-red-500 text-xs text-center mb-2">{error}</p>}
-                      
                       <div className="flex gap-2">
-                          <button 
-                              type="submit" 
-                              disabled={isProcessing}
-                              className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold flex justify-center"
-                          >
-                              {isProcessing ? <Loader2 className="animate-spin" size={16}/> : 'حذف نهائي'}
-                          </button>
-                          <button 
-                              type="button" 
-                              onClick={() => { setEmpToDelete(null); setConfirmPassword(''); }}
-                              className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg font-bold"
-                          >
-                              إلغاء
-                          </button>
+                          <button type="submit" disabled={isProcessing} className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold">حذف نهائي</button>
+                          <button type="button" onClick={() => { setEmpToDelete(null); setConfirmPassword(''); }} className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg font-bold">إلغاء</button>
                       </div>
                   </form>
               </div>
           </div>
       )}
-
-      {/* Subscription Info Footer */}
-      <div className="text-center text-xs text-gray-400 pt-4 pb-2">
-          ينتهي الاشتراك في: {company ? new Date(company.subscription_end).toLocaleDateString('ar-EG') : '-'}
-      </div>
     </div>
   );
 };
