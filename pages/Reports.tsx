@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart, Lock } from 'lucide-react';
+import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart, Ban } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
-type TabType = 'exchange' | 'treasury' | 'expenses' | 'wallet' | 'sales' | 'breakdown';
+type TabType = 'breakdown' | 'exchange' | 'treasury' | 'expenses' | 'wallet' | 'sales' | 'cancelled';
 
 const Reports: React.FC = () => {
   const { transactions, currentUser, users, companies, cancelTransaction, eWallets } = useStore();
@@ -63,7 +63,8 @@ const Reports: React.FC = () => {
   // Filter Logic
   const getFilteredTransactions = () => {
       return transactions.filter(t => {
-        if (t.is_cancelled) return false;
+        // NOTE: For the 'cancelled' tab, we want ONLY cancelled. For other tabs, we usually hide them.
+        // Logic handled in tab section below.
 
         let roleMatch = false;
         if (currentUser?.role === 'super_admin') roleMatch = true;
@@ -86,17 +87,22 @@ const Reports: React.FC = () => {
       });
   };
 
-  const filtered = getFilteredTransactions();
+  const allFiltered = getFilteredTransactions();
   
-  const exchangeTx = filtered.filter(t => t.type === 'exchange');
-  const treasuryTx = filtered.filter(t => ['treasury_feed', 'treasury_withdraw'].includes(t.type));
-  const expenseTx = filtered.filter(t => t.type === 'expense');
-  const salesTx = filtered.filter(t => t.type === 'sale');
-  const walletTx = filtered.filter(t => ['wallet_feed', 'wallet_transfer'].includes(t.type));
+  // Active Transactions (Not Cancelled)
+  const activeTx = allFiltered.filter(t => !t.is_cancelled);
+  
+  // Cancelled Transactions
+  const cancelledTx = allFiltered.filter(t => t.is_cancelled);
+
+  const exchangeTx = activeTx.filter(t => t.type === 'exchange');
+  const treasuryTx = activeTx.filter(t => ['treasury_feed', 'treasury_withdraw'].includes(t.type));
+  const expenseTx = activeTx.filter(t => t.type === 'expense');
+  const salesTx = activeTx.filter(t => t.type === 'sale');
+  const walletTx = activeTx.filter(t => ['wallet_feed', 'wallet_transfer'].includes(t.type));
 
   const stats = {
       receivedSdg: exchangeTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
-      // New: Incoming EGP from Exchange (Customer gave EGP, wanted SDG)
       receivedEgp: exchangeTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
       totalExpensesEgp: expenseTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
       totalExpensesSdg: expenseTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
@@ -108,15 +114,16 @@ const Reports: React.FC = () => {
 
   const CardRow = ({ t }: { t: Transaction }) => {
     const isWallet = ['wallet_feed', 'wallet_transfer'].includes(t.type);
+    const isCancelled = t.is_cancelled;
     
     return (
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3 relative overflow-hidden group">
+        <div className={`p-4 rounded-xl shadow-sm border flex flex-col gap-3 relative overflow-hidden group transition-all ${isCancelled ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
             <div className="flex justify-between items-start">
                 <div className="flex items-center gap-2 text-gray-500 text-xs">
-                    <span className="bg-gray-100 px-2 py-0.5 rounded-full">{new Date(t.created_at).toLocaleDateString('ar-EG')}</span>
+                    <span className="bg-white/50 px-2 py-0.5 rounded-full border border-gray-200">{new Date(t.created_at).toLocaleDateString('ar-EG')}</span>
                     <span>{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</span>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded-lg">
+                <div className="flex items-center gap-1 text-xs text-gray-500 bg-white/50 px-2 py-1 rounded-lg border border-gray-200">
                     <User size={12} />
                     <span>{getEmployeeName(t.employee_id)}</span>
                 </div>
@@ -124,7 +131,12 @@ const Reports: React.FC = () => {
 
             <div className="flex justify-between items-center">
                 <div>
-                     {t.type === 'expense' ? (
+                     {isCancelled ? (
+                         <div className="text-red-600 font-bold flex items-center gap-2">
+                             <Ban size={20} />
+                             <span>عملية ملغاة</span>
+                         </div>
+                     ) : t.type === 'expense' ? (
                         <div className="text-red-600">
                              <span className="text-xs font-bold block mb-1 flex items-center gap-1"><TrendingDown size={14}/> منصرف</span>
                              <span className="text-xl font-bold">{fmt(t.from_amount)} {t.from_currency}</span>
@@ -157,7 +169,7 @@ const Reports: React.FC = () => {
 
                 <div className="text-right">
                     {t.type === 'exchange' && t.to_amount && (
-                        <div className="text-red-500">
+                        <div className={isCancelled ? 'text-red-400 opacity-75' : 'text-red-500'}>
                             <span className="text-xs font-bold block mb-1 flex items-center justify-end gap-1">تسليم <ArrowUpRight size={14}/></span>
                             <span className="text-xl font-bold">{fmt(t.to_amount)} {t.to_currency}</span>
                         </div>
@@ -175,24 +187,33 @@ const Reports: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex justify-between items-center border-t border-gray-50 pt-3 mt-1">
+            <div className="flex justify-between items-center border-t border-gray-200/50 pt-3 mt-1">
                  <div className="text-xs font-mono text-gray-400">
                      #{t.receipt_number || t.id}
                  </div>
                  <div className="flex gap-2">
-                     <button onClick={() => setViewTransaction(t)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition" title="عرض الإيصال">
-                         <Eye size={16} />
-                     </button>
-                     {/* Allow Admin Only to Cancel */}
-                     {currentUser?.role === 'admin' && (
+                     {!isCancelled && (
+                         <button onClick={() => setViewTransaction(t)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition" title="عرض الإيصال">
+                             <Eye size={16} />
+                         </button>
+                     )}
+                     
+                     {/* Show Cancel Button ONLY if Not Cancelled AND User is Admin */}
+                     {!isCancelled && currentUser?.role === 'admin' && (
                         <button onClick={() => handleCancel(t.id)} className="p-2 text-orange-500 bg-orange-50 hover:bg-orange-100 rounded-lg transition" title="إلغاء العملية">
                             <XCircle size={16} />
                         </button>
                      )}
+
+                     {isCancelled && (
+                         <span className="text-xs text-red-500 font-bold bg-white px-2 py-1 rounded border border-red-200">
+                             تم الإلغاء
+                         </span>
+                     )}
                  </div>
             </div>
             
-            <div className={`absolute right-0 top-0 bottom-0 w-1 ${t.type === 'expense' ? 'bg-red-500' : t.type === 'sale' ? 'bg-purple-500' : t.type === 'exchange' ? 'bg-blue-500' : isWallet ? 'bg-pink-500' : 'bg-emerald-500'}`}></div>
+            <div className={`absolute right-0 top-0 bottom-0 w-1 ${isCancelled ? 'bg-red-600' : t.type === 'expense' ? 'bg-red-500' : t.type === 'sale' ? 'bg-purple-500' : t.type === 'exchange' ? 'bg-blue-500' : isWallet ? 'bg-pink-500' : 'bg-emerald-500'}`}></div>
         </div>
     );
   };
@@ -252,6 +273,9 @@ const Reports: React.FC = () => {
              <button onClick={() => setActiveTab('expenses')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'expenses' ? 'bg-red-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
                 <TrendingDown size={16}/> المنصرفات
             </button>
+            <button onClick={() => setActiveTab('cancelled')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'cancelled' ? 'bg-red-100 text-red-600 shadow-md border border-red-200' : 'text-gray-500 hover:bg-gray-50'}`}>
+                <Ban size={16}/> ملغاة
+            </button>
         </div>
 
         {activeTab === 'breakdown' && (
@@ -309,6 +333,13 @@ const Reports: React.FC = () => {
              <div className="space-y-3 animate-in fade-in duration-300">
                  {treasuryTx.map(t => <CardRow key={t.id} t={t} />)}
                  {treasuryTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد بيانات</div>}
+             </div>
+        )}
+
+        {activeTab === 'cancelled' && (
+             <div className="space-y-3 animate-in fade-in duration-300">
+                 {cancelledTx.map(t => <CardRow key={t.id} t={t} />)}
+                 {cancelledTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد عمليات ملغاة</div>}
              </div>
         )}
 
