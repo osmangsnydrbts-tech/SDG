@@ -168,12 +168,12 @@ ${footer}
   const DashboardBtn = ({ title, icon: Icon, color, onClick }: any) => (
     <button 
       onClick={onClick} 
-      className={`${color} text-white p-3 rounded-xl shadow-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition min-h-[100px]`}
+      className={`${color} text-white p-2 rounded-xl shadow-lg flex flex-col items-center justify-center gap-1 active:scale-95 transition min-h-[80px]`}
     >
-      <div className="bg-white/20 p-2 rounded-full">
-        <Icon size={24} />
+      <div className="bg-white/20 p-1.5 rounded-full">
+        <Icon size={20} />
       </div>
-      <span className="font-bold text-sm text-center leading-tight">{title}</span>
+      <span className="font-bold text-xs text-center leading-tight">{title}</span>
     </button>
   );
 
@@ -529,6 +529,7 @@ ${footer}
                           // Wallets Check
                           const empWallets = eWallets.filter(w => w.employee_id === selectedEmpReport.id && w.is_active);
                           const walletBalance = empWallets.reduce((acc, curr) => acc + curr.balance, 0);
+                          const walletTxs = todayTxs.filter(t => ['wallet_feed', 'wallet_transfer'].includes(t.type));
 
                           return (
                               <div className="space-y-4">
@@ -557,16 +558,35 @@ ${footer}
                                       
                                       <div className="space-y-2">
                                           {/* Expenses */}
-                                          <div className="bg-red-50 p-3 rounded-xl flex items-center justify-between border border-red-100">
-                                              <div className="flex items-center gap-2 text-red-700 font-bold text-sm">
-                                                  <TrendingDown size={16} />
-                                                  <span>المنصرفات</span>
+                                          {expenseEGP > 0 || expenseSDG > 0 ? (
+                                            <div className="bg-red-50 p-3 rounded-xl flex items-center justify-between border border-red-100">
+                                                <div className="flex items-center gap-2 text-red-700 font-bold text-sm">
+                                                    <TrendingDown size={16} />
+                                                    <span>المنصرفات</span>
+                                                </div>
+                                                <div className="text-left text-xs font-bold text-red-800">
+                                                    <div>{expenseEGP.toLocaleString()} EGP</div>
+                                                    {expenseSDG > 0 && <div>{expenseSDG.toLocaleString()} SDG</div>}
+                                                </div>
+                                            </div>
+                                          ) : null}
+
+                                          {/* Wallet Activity */}
+                                          {walletTxs.length > 0 && (
+                                              <div className="bg-pink-50 p-3 rounded-xl flex items-center justify-between border border-pink-100">
+                                                  <div className="flex items-center gap-2 text-pink-700 font-bold text-sm">
+                                                      <Smartphone size={16} />
+                                                      <span>عمليات المحفظة</span>
+                                                  </div>
+                                                  <div className="text-left text-xs font-bold text-pink-800">
+                                                      <div>{walletTxs.length} عملية</div>
+                                                  </div>
                                               </div>
-                                              <div className="text-left text-xs font-bold text-red-800">
-                                                  <div>{expenseEGP.toLocaleString()} EGP</div>
-                                                  {expenseSDG > 0 && <div>{expenseSDG.toLocaleString()} SDG</div>}
-                                              </div>
-                                          </div>
+                                          )}
+                                          
+                                          {expenseEGP === 0 && expenseSDG === 0 && walletTxs.length === 0 && (
+                                              <p className="text-center text-xs text-gray-400">لا توجد حركات اليوم</p>
+                                          )}
                                       </div>
                                   </div>
                               </div>
