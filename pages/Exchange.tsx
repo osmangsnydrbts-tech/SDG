@@ -22,13 +22,16 @@ const Exchange: React.FC = () => {
   const company = companies.find(c => c.id === currentUser?.company_id);
 
   // Helper to remove commas and get number
-  const getRawAmount = (val: string) => parseFloat(val.replace(/,/g, ''));
+  const getRawAmount = (val: string) => {
+    const parsed = parseFloat(val.replace(/,/g, ''));
+    return isNaN(parsed) ? 0 : Math.round(parsed); // Ensure integer input
+  };
 
   // Helper to format with commas
   const formatInput = (val: string) => {
     const raw = val.replace(/,/g, '');
     if (isNaN(Number(raw))) return val; 
-    return Number(raw).toLocaleString();
+    return Math.round(Number(raw)).toLocaleString();
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,7 +39,7 @@ const Exchange: React.FC = () => {
       if (val === '') { setAmount(''); return; }
       const raw = val.replace(/,/g, '');
       if (!isNaN(Number(raw))) {
-          setAmount(Number(raw).toLocaleString());
+          setAmount(Math.round(Number(raw)).toLocaleString());
       }
   };
 
@@ -48,7 +51,10 @@ const Exchange: React.FC = () => {
     }
 
     const numAmount = getRawAmount(amount);
-    if (isNaN(numAmount)) return;
+    if (isNaN(numAmount) || numAmount === 0) {
+        setResult(0);
+        return;
+    }
 
     if (direction === 'SDG_TO_EGP') {
       let finalRate = rates.sd_to_eg_rate;
@@ -61,10 +67,10 @@ const Exchange: React.FC = () => {
       } else {
         setIsWholesale(false);
       }
-      setResult(calculatedEgp);
+      setResult(Math.round(calculatedEgp));
     } else {
       setIsWholesale(false);
-      setResult(numAmount * rates.eg_to_sd_rate);
+      setResult(Math.round(numAmount * rates.eg_to_sd_rate));
     }
   }, [amount, direction, rates]);
 
@@ -77,6 +83,11 @@ const Exchange: React.FC = () => {
     setIsLoading(true);
 
     const rawAmount = getRawAmount(amount);
+    if (rawAmount <= 0) {
+        setErrorMsg('الرجاء إدخال مبلغ صحيح');
+        setIsLoading(false);
+        return;
+    }
 
     try {
       const res = await performExchange(
@@ -166,7 +177,7 @@ const Exchange: React.FC = () => {
               <Calculator size={20} />
               <span className="font-medium">الصافي للعميل</span>
             </div>
-            <span className="text-2xl font-bold">{result.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+            <span className="text-2xl font-bold">{result.toLocaleString()}</span>
           </div>
 
           <div>
