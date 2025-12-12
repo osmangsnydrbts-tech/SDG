@@ -167,25 +167,35 @@ NOTIFY pgrst, 'reload schema';
                 </div>
             )}
 
-            {/* Always show SQL Repair Helper in a collapsed state or visible if needed */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-6">
-                <h3 className="flex items-center gap-2 font-bold text-yellow-800 mb-2">
-                    <Database size={20}/> إصلاح مشاكل قاعدة البيانات
-                </h3>
-                <p className="text-sm text-yellow-700 mb-4">
-                    إذا واجهت مشاكل "Failed to fetch" أو "Column does not exist"، يرجى نسخ الكود التالي وتشغيله في <strong>SQL Editor</strong> في لوحة تحكم Supabase.
-                </p>
-                <div className="relative">
-                    <pre className="bg-gray-800 text-gray-100 p-4 rounded-lg text-xs overflow-x-auto font-mono text-left" dir="ltr">
+            {/* Database Repair Helper - High Visibility */}
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 mb-8 shadow-sm">
+                <div className="flex items-start gap-3">
+                    <div className="bg-red-100 p-2 rounded-full text-red-600">
+                        <Database size={24}/>
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="font-bold text-red-800 text-lg mb-1">
+                            تحديث قاعدة البيانات مطلوب (هام جداً)
+                        </h3>
+                        <p className="text-sm text-red-700 mb-3 leading-relaxed">
+                            لتفعيل المحافظ الإلكترونية ومنع الأخطاء، يجب تشغيل الكود التالي في لوحة تحكم Supabase (SQL Editor).
+                        </p>
+                        
+                        <div className="relative group">
+                            <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto font-mono text-left shadow-inner" dir="ltr">
 {SQL_FIX_CODE}
-                    </pre>
-                    <button 
-                        onClick={copySql}
-                        className="absolute top-2 right-2 bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition"
-                        title="نسخ الكود"
-                    >
-                        <Copy size={16} />
-                    </button>
+                            </pre>
+                            <button 
+                                onClick={copySql}
+                                className="absolute top-2 right-2 bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition flex items-center gap-2 text-xs font-bold backdrop-blur-sm"
+                            >
+                                <Copy size={14} /> نسخ الكود
+                            </button>
+                        </div>
+                        <p className="text-xs text-red-500 mt-2 font-bold">
+                            * انسخ الكود ثم الصقه في Supabase -> SQL Editor -> Run
+                        </p>
+                    </div>
                 </div>
             </div>
 
