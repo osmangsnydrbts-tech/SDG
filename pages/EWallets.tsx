@@ -12,6 +12,7 @@ const EWallets: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [provider, setProvider] = useState('Vodafone');
+  const [commission, setCommission] = useState('0'); // New State
 
   const [amount, setAmount] = useState('');
   const [msg, setMsg] = useState('');
@@ -27,10 +28,10 @@ const EWallets: React.FC = () => {
       e.preventDefault();
       if (currentUser?.company_id && employeeId) {
           setIsLoading(true);
-          await addEWallet(currentUser.company_id, parseInt(employeeId), phone, provider);
+          await addEWallet(currentUser.company_id, parseInt(employeeId), phone, provider, parseFloat(commission));
           setIsLoading(false);
           setShowAddModal(false);
-          setPhone(''); setEmployeeId('');
+          setPhone(''); setEmployeeId(''); setCommission('0');
       }
   };
 
@@ -79,6 +80,7 @@ const EWallets: React.FC = () => {
                          <div>
                              <span className="text-xs text-gray-500 block">الرصيد الحالي</span>
                              <span className="font-bold text-lg">{w.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP</span>
+                             <span className="text-[10px] text-gray-400 block mt-1">عمولة: {w.commission}%</span>
                          </div>
                          <button 
                             onClick={() => setShowFeedModal(w.id)}
@@ -128,6 +130,20 @@ const EWallets: React.FC = () => {
                             <option value="Orange">Orange Cash</option>
                             <option value="We">We Pay</option>
                         </select>
+                        
+                        <div>
+                             <label className="text-xs text-gray-500 font-bold mb-1 block">نسبة العمولة (%)</label>
+                             <input 
+                                type="number" 
+                                step="0.1"
+                                placeholder="0" 
+                                value={commission} 
+                                onChange={e => setCommission(e.target.value)} 
+                                className="w-full p-3 border rounded-lg" 
+                                required 
+                            />
+                        </div>
+
                         <button disabled={isLoading} className="w-full bg-pink-600 text-white py-3 rounded-lg font-bold mt-2 flex items-center justify-center">
                             {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'حفظ'}
                         </button>
