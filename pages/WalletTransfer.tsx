@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Send, Smartphone, CheckCircle, Loader2, ArrowUpCircle, ArrowDownCircle, Coins } from 'lucide-react';
@@ -15,7 +16,6 @@ const WalletTransfer: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  // Receipt State
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
 
   const myWallets = eWallets.filter(w => 
@@ -28,6 +28,17 @@ const WalletTransfer: React.FC = () => {
   const selectedWallet = myWallets.find(w => w.id === Number(selectedWalletId));
   const commissionRate = selectedWallet?.commission || 0;
   const company = companies.find(c => c.id === currentUser?.company_id);
+
+  // Input Formatting
+  const formatInput = (val: string) => {
+    const raw = val.replace(/,/g, '');
+    if (isNaN(Number(raw))) return val;
+    return Number(raw).toLocaleString();
+  };
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setAmount(formatInput(e.target.value));
+  };
 
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,11 +54,18 @@ const WalletTransfer: React.FC = () => {
         return;
     }
 
+    const rawAmount = parseFloat(amount.replace(/,/g, ''));
+    if (isNaN(rawAmount) || rawAmount <= 0) {
+        setError('يرجى إدخال مبلغ صحيح');
+        setIsLoading(false);
+        return;
+    }
+
     try {
         const res = await performEWalletTransfer(
             parseInt(selectedWalletId),
             transferType,
-            parseFloat(amount),
+            rawAmount,
             phone,
             receipt
         );
@@ -70,9 +88,8 @@ const WalletTransfer: React.FC = () => {
     }
   };
 
-  // Helper Calculations
   const getCalculatedValues = () => {
-      const val = parseFloat(amount);
+      const val = parseFloat(amount.replace(/,/g, ''));
       if (isNaN(val)) return { commission: 0, total: 0, egpEquivalent: 0 };
 
       if (transferType === 'exchange') {
@@ -116,7 +133,7 @@ const WalletTransfer: React.FC = () => {
                             <option value="">-- اختر المحفظة --</option>
                             {myWallets.map(w => (
                                 <option key={w.id} value={w.id}>
-                                    {w.phone_number} ({w.provider}) - الرصيد: {w.balance.toLocaleString()}
+                                    {w.phone_number} ({w.provider}) - الرصيد: {Math.round(w.balance).toLocaleString()}
                                 </option>
                             ))}
                         </select>
@@ -176,12 +193,12 @@ const WalletTransfer: React.FC = () => {
                             {transferType === 'exchange' ? 'المبلغ المستلم (SDG)' : 'المبلغ (EGP)'}
                         </label>
                         <input 
-                            type="number" 
+                            type="text" 
                             inputMode="decimal"
                             value={amount}
-                            onChange={e => setAmount(e.target.value)}
+                            onChange={handleAmountChange}
                             className="w-full p-3 border rounded-xl text-lg font-bold"
-                            placeholder="0.00"
+                            placeholder="0"
                             required
                         />
                     </div>
@@ -204,7 +221,7 @@ const WalletTransfer: React.FC = () => {
                                     </div>
                                     <div className="flex justify-between items-center text-lg text-green-700 mt-1">
                                         <span className="font-bold">يضاف للخزينة (SDG):</span>
-                                        <span className="font-extrabold">{parseFloat(amount || '0').toLocaleString(undefined, {maximumFractionDigits: 0})} SDG</span>
+                                        <span className="font-extrabold">{parseFloat(amount.replace(/,/g, '') || '0').toLocaleString(undefined, {maximumFractionDigits: 0})} SDG</span>
                                     </div>
                                     <div className="flex justify-between items-center text-xs text-green-600 mt-1">
                                         <span>يضاف للخزينة (EGP) ربح:</span>
@@ -234,18 +251,18 @@ const WalletTransfer: React.FC = () => {
                                             </div>
                                             <div className="flex justify-between items-center text-lg text-green-700">
                                                 <span className="font-bold">يضاف إلى خزينتك:</span>
-                                                <span className="font-extrabold">{(parseFloat(amount || '0') + calc.commission).toFixed(2)} EGP</span>
+                                                <span className="font-extrabold">{(parseFloat(amount.replace(/,/g, '') || '0') + calc.commission).toFixed(2)} EGP</span>
                                             </div>
                                         </>
                                     ) : (
                                         <>
                                             <div className="flex justify-between items-center text-sm text-red-600 mb-1">
                                                 <span>يخصم من خزينتك:</span>
-                                                <span className="font-bold">{(parseFloat(amount || '0') - calc.commission).toFixed(2)} EGP</span>
+                                                <span className="font-bold">{(parseFloat(amount.replace(/,/g, '') || '0') - calc.commission).toFixed(2)} EGP</span>
                                             </div>
                                              <div className="flex justify-between items-center text-lg text-green-700">
                                                 <span className="font-bold">يضاف إلى المحفظة:</span>
-                                                <span className="font-extrabold">{parseFloat(amount || '0').toFixed(2)} EGP</span>
+                                                <span className="font-extrabold">{parseFloat(amount.replace(/,/g, '') || '0').toFixed(2)} EGP</span>
                                             </div>
                                         </>
                                     )}
@@ -289,7 +306,6 @@ const WalletTransfer: React.FC = () => {
             )}
         </div>
 
-        {/* Receipt Modal */}
         {lastTransaction && (
             <ReceiptModal 
                 transaction={lastTransaction} 
