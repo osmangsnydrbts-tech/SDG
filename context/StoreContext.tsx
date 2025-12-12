@@ -59,18 +59,6 @@ interface StoreData {
   addMerchant: (companyId: number, name: string, phone: string) => Promise<void>;
   deleteMerchant: (merchantId: number) => Promise<void>;
   addMerchantEntry: (merchantId: number, type: 'credit' | 'debit', currency: 'EGP' | 'SDG', amount: number) => Promise<void>;
-  addEWallet: (companyId: number, employeeId: number, phone: string, provider: string) => Promise<void>;
-  deleteEWallet: (id: number) => Promise<void>;
-  feedEWallet: (walletId: number, amount: number) => Promise<{ success: boolean; message: string }>;
-  
-  performEWalletTransfer: (
-      walletId: number, 
-      type: 'deposit' | 'withdraw',
-      amount: number, 
-      recipientPhone: string, 
-      receipt: string,
-      currency?: 'EGP' | 'SDG'
-  ) => Promise<{ success: boolean; message: string; transaction?: Transaction }>;
   
   manageTreasury: (
     type: 'feed' | 'withdraw', 
@@ -79,6 +67,19 @@ interface StoreData {
     currency: 'EGP' | 'SDG', 
     amount: number,
     employeeId?: number
+  ) => Promise<{ success: boolean; message: string; transaction?: Transaction }>;
+
+  // E-Wallets
+  addEWallet: (companyId: number, employeeId: number, phoneNumber: string, provider: string) => Promise<{ success: boolean; message: string }>;
+  deleteEWallet: (walletId: number) => Promise<void>;
+  feedEWallet: (walletId: number, amount: number) => Promise<{ success: boolean; message: string }>;
+  performEWalletTransfer: (
+    walletId: number,
+    type: 'withdraw' | 'deposit',
+    amount: number,
+    phone: string,
+    receipt: string,
+    currency: 'EGP' | 'SDG'
   ) => Promise<{ success: boolean; message: string; transaction?: Transaction }>;
 
   // Database Management
@@ -551,8 +552,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!transaction) return { success: false, message: 'العملية غير موجودة' };
 
     const empTreasury = treasuries.find(t => t.employee_id === transaction.employee_id);
-    const mainTreasury = treasuries.find(t => t.company_id === transaction.company_id && !t.employee_id);
-    const wallet = transaction.e_wallet_id ? eWallets.find(w => w.id === transaction.e_wallet_id) : null;
 
     if (transaction.type === 'exchange') {
         if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
@@ -579,53 +578,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await supabase.from('treasuries').update({
             [balanceKey]: empTreasury[balanceKey] + amount
         }).eq('id', empTreasury.id);
-    } else if (transaction.type === 'wallet_feed') {
-        // Reverse Feed: Deduct from Wallet, Add to Main Treasury
-        if (!wallet || !mainTreasury) return { success: false, message: 'بيانات المحفظة أو الخزينة غير متوفرة' };
-        if (wallet.balance < transaction.from_amount) return { success: false, message: 'رصيد المحفظة الحالي لا يسمح بإلغاء التغذية' };
-
-        await supabase.from('e_wallets').update({ balance: wallet.balance - transaction.from_amount }).eq('id', wallet.id);
-        await supabase.from('treasuries').update({ egp_balance: mainTreasury.egp_balance + transaction.from_amount }).eq('id', mainTreasury.id);
-
-    } else if (transaction.type === 'wallet_deposit') {
-        // Reverse Deposit: Deduct (Amount + Commission) from Wallet
-        // Logic: Wallet was credited with (Amount + Commission). We reverse that.
-        // Employee treasury was NOT touched.
-        if (!wallet) return { success: false, message: 'المحفظة غير موجودة' };
-        const totalAdded = transaction.to_amount || transaction.from_amount; // amount + commission
-
-        if (wallet.balance < totalAdded) return { success: false, message: 'رصيد المحفظة لا يسمح بإلغاء الإيداع' };
-
-        await supabase.from('e_wallets').update({ balance: wallet.balance - totalAdded }).eq('id', wallet.id);
-
-    } else if (transaction.type === 'wallet_withdrawal') {
-        // Reverse Withdrawal: Add Amount to Wallet, Deduct from Employee Treasury
-        // Note: Logic depends on currency used in withdrawal
-        if (!wallet || !empTreasury) return { success: false, message: 'بيانات المحفظة أو الموظف غير متوفرة' };
-        
-        const deductedFromWallet = transaction.to_amount || 0; // The EGP amount deducted from wallet
-        const addedToTreasury = transaction.from_amount; // The amount added to treasury (could be EGP or SDG)
-        
-        // Restore Wallet Balance (EGP)
-        await supabase.from('e_wallets').update({ balance: wallet.balance + deductedFromWallet }).eq('id', wallet.id);
-        
-        // Deduct from Treasury
-        if (transaction.from_currency === 'SDG') {
-             if (empTreasury.sdg_balance < addedToTreasury) return { success: false, message: 'رصيد السوداني لا يسمح بإلغاء السحب' };
-             await supabase.from('treasuries').update({ sdg_balance: empTreasury.sdg_balance - addedToTreasury }).eq('id', empTreasury.id);
-        } else {
-             // Default EGP
-             const totalEgpAdded = transaction.to_amount ? (transaction.to_amount + (transaction.commission || 0)) : transaction.from_amount;
-             // Logic check: in standard withdraw, we add Amount + Commission to Treasury? 
-             // Let's re-read performEWalletTransfer logic. 
-             // Standard EGP Withdraw: Treasury += (amount + commission). Wallet -= amount.
-             // SDG Withdraw: Treasury(SDG) += amount. Wallet(EGP) -= calculatedEgp.
-             
-             if (transaction.from_currency === 'EGP' || !transaction.from_currency) {
-                 if (empTreasury.egp_balance < addedToTreasury) return { success: false, message: 'رصيد المصري لا يسمح بإلغاء السحب' };
-                 await supabase.from('treasuries').update({ egp_balance: empTreasury.egp_balance - addedToTreasury }).eq('id', empTreasury.id);
-             }
-        }
     } else {
         // Handle other types if necessary or block
         return { success: false, message: 'لا يمكن حذف هذا النوع من العمليات حالياً' };
@@ -679,196 +631,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           await fetchData();
           showToast('تم تسجيل القيد', 'success');
       }
-  };
-
-  const addEWallet = async (companyId: number, employeeId: number, phone: string, provider: string) => {
-      await supabase.from('e_wallets').insert({
-          company_id: companyId,
-          employee_id: employeeId,
-          phone_number: phone,
-          provider,
-          balance: 0,
-          is_active: true
-      });
-      await fetchData();
-      showToast('تم إضافة المحفظة', 'success');
-  };
-
-  const deleteEWallet = async (id: number) => {
-      await supabase.from('e_wallets').update({ is_active: false }).eq('id', id);
-      await fetchData();
-      showToast('تم حذف المحفظة', 'success');
-  };
-
-  const feedEWallet = async (walletId: number, amount: number) => {
-    const wallet = eWallets.find(w => w.id === walletId);
-    if (!wallet) return { success: false, message: 'المحفظة غير موجودة' };
-
-    const mainTreasury = treasuries.find(t => t.company_id === wallet.company_id && !t.employee_id);
-    if (!mainTreasury || mainTreasury.egp_balance < amount) {
-        return { success: false, message: 'رصيد الخزينة الرئيسية غير كافي' };
-    }
-
-    await supabase.from('treasuries').update({
-        egp_balance: mainTreasury.egp_balance - amount
-    }).eq('id', mainTreasury.id);
-
-    await supabase.from('e_wallets').update({
-        balance: wallet.balance + amount
-    }).eq('id', walletId);
-
-    await supabase.from('transactions').insert({
-        company_id: wallet.company_id,
-        type: 'wallet_feed',
-        from_amount: amount,
-        from_currency: 'EGP',
-        description: `تغذية محفظة ${wallet.phone_number}`,
-        e_wallet_id: walletId,
-        created_at: new Date().toISOString()
-    });
-
-    await fetchData();
-    showToast('تم تغذية المحفظة بنجاح', 'success');
-    return { success: true, message: 'تم تغذية المحفظة بنجاح' };
-  };
-
-  const performEWalletTransfer = async (
-    walletId: number, 
-    type: 'deposit' | 'withdraw',
-    amount: number, 
-    recipientPhone: string, 
-    receipt: string,
-    currency: 'EGP' | 'SDG' = 'EGP'
-  ) => {
-      const wallet = eWallets.find(w => w.id === walletId);
-      if (!wallet) return { success: false, message: 'Wallet not found' };
-      
-      const user = users.find(u => u.id === wallet.employee_id);
-      if (!user) return { success: false, message: 'User not found' };
-
-      const empTreasury = treasuries.find(t => t.employee_id === user.id);
-      if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
-
-      // 1. DUPLICATE CHECK
-      if (receipt) {
-        const duplicate = transactions.find(t => 
-            t.company_id === user.company_id && 
-            t.receipt_number === receipt && 
-            t.from_amount === amount &&
-            (t.type === 'wallet_deposit' || t.type === 'wallet_withdrawal')
-        );
-        if (duplicate) {
-            return { success: false, message: 'عفواً، العملية مكررة! يوجد إشعار سابق بنفس الرقم والمبلغ.' };
-        }
-      }
-
-      const rates = exchangeRates.find(r => r.company_id === wallet.company_id);
-      const commissionRate = rates?.ewallet_commission || 1; 
-
-      const transactionType = type === 'withdraw' ? 'wallet_withdrawal' : 'wallet_deposit';
-      let calculatedCommission = 0;
-      let toAmount = 0; // Amount recorded in 'to_amount' field of transaction
-      let fromCurrency = currency;
-      let toCurrency = 'EGP';
-
-      if (type === 'withdraw') {
-          // WITHDRAW: Shop sends money from Wallet to Customer. Customer pays Cash.
-          
-          if (currency === 'SDG') {
-               // New Feature: SDG -> Wallet
-               // 1. Calculate EGP equivalent
-               if (!rates) return { success: false, message: 'أسعار الصرف غير محددة' };
-               const rate = rates.sd_to_eg_rate;
-               const egpAmount = amount / rate; // The Base EGP amount
-               
-               // 2. Check Wallet Balance
-               if (wallet.balance < egpAmount) {
-                   return { success: false, message: `رصيد المحفظة غير كافي (${wallet.balance.toFixed(0)} < ${egpAmount.toFixed(0)})` };
-               }
-               
-               // 3. Calculate Commission (on the EGP amount)
-               calculatedCommission = egpAmount * (commissionRate / 100);
-
-               // 4. Update Balances
-               // Deduct EGP from Wallet
-               await supabase.from('e_wallets').update({
-                   balance: wallet.balance - egpAmount
-               }).eq('id', walletId);
-
-               // Add SDG to Treasury
-               await supabase.from('treasuries').update({
-                   sdg_balance: empTreasury.sdg_balance + amount
-               }).eq('id', empTreasury.id);
-               
-               toAmount = egpAmount; // The amount sent to wallet
-
-          } else {
-               // Standard EGP -> Wallet (Customer pays EGP Cash)
-               calculatedCommission = amount * (commissionRate / 100);
-               
-               if (wallet.balance < amount) {
-                  return { success: false, message: `رصيد المحفظة غير كافي للسحب` };
-               }
-
-               // Deduct Amount from Wallet
-               await supabase.from('e_wallets').update({
-                  balance: wallet.balance - amount
-               }).eq('id', walletId);
-
-               // Add Amount + Commission to Employee Cash (Treasury)
-               const totalToAdd = amount + calculatedCommission;
-               await supabase.from('treasuries').update({
-                  egp_balance: empTreasury.egp_balance + totalToAdd
-               }).eq('id', empTreasury.id);
-
-               toAmount = amount; // The EGP amount deducted
-               toCurrency = 'EGP'; // Explicitly set
-          }
-
-      } else {
-          // DEPOSIT: Shop receives money in Wallet from Customer. Customer gets Cash.
-          // Currently only supports EGP Cash out?
-          if (currency === 'SDG') {
-              return { success: false, message: 'الإيداع بالسوداني غير مدعوم حالياً' };
-          }
-
-          calculatedCommission = amount * (commissionRate / 100);
-          
-          // Deposit: Add Amount + Commission to Wallet
-          const totalToAdd = amount + calculatedCommission;
-
-          // 1. Update Wallet (Add funds to wallet)
-          await supabase.from('e_wallets').update({
-            balance: wallet.balance + totalToAdd
-          }).eq('id', walletId);
-
-          // 2. DO NOT Update Employee Treasury for Deposits (User Request - Cash provided by Shop?)
-          // Usually implies Shop pays Cash to customer. But previously requested not to touch treasury.
-          
-          toAmount = amount + calculatedCommission;
-      }
-
-      const { data: newTx, error } = await supabase.from('transactions').insert({
-          company_id: user.company_id!,
-          employee_id: wallet.employee_id,
-          type: transactionType,
-          from_currency: fromCurrency,
-          to_currency: toCurrency,
-          from_amount: amount, // Input Amount (Could be SDG or EGP)
-          to_amount: toAmount, // Converted/Processed Amount
-          commission: calculatedCommission,
-          receipt_number: receipt,
-          description: `${type === 'withdraw' ? 'سحب' : 'إيداع'} - ${recipientPhone} via ${wallet.provider}`,
-          created_at: new Date().toISOString(),
-          e_wallet_id: walletId,
-          rate: currency === 'SDG' ? rates?.sd_to_eg_rate : undefined
-      }).select().single();
-
-      if (error) return { success: false, message: error.message };
-
-      await fetchData();
-      showToast('تمت العملية بنجاح', 'success');
-      return { success: true, message: 'تمت العملية بنجاح', transaction: newTx };
   };
 
   const manageTreasury = async (
@@ -936,6 +698,128 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { success: true, message: 'تم تنفيذ العملية بنجاح', transaction: newTx };
   };
 
+  // --- E-WALLETS ---
+
+  const addEWallet = async (companyId: number, employeeId: number, phoneNumber: string, provider: string) => {
+    const exists = eWallets.some(w => w.phone_number === phoneNumber && w.is_active);
+    if (exists) return { success: false, message: 'رقم المحفظة مسجل مسبقاً' };
+
+    await supabase.from('e_wallets').insert({
+        company_id: companyId,
+        employee_id: employeeId,
+        phone_number: phoneNumber,
+        provider,
+        balance: 0,
+        is_active: true
+    });
+    await fetchData();
+    return { success: true, message: 'تم إضافة المحفظة' };
+  };
+
+  const deleteEWallet = async (walletId: number) => {
+    await supabase.from('e_wallets').update({ is_active: false }).eq('id', walletId);
+    await fetchData();
+    showToast('تم حذف المحفظة', 'success');
+  };
+
+  const feedEWallet = async (walletId: number, amount: number) => {
+    const wallet = eWallets.find(w => w.id === walletId);
+    if (!wallet) return { success: false, message: 'المحفظة غير موجودة' };
+    
+    const treasury = treasuries.find(t => t.company_id === wallet.company_id && !t.employee_id);
+    if (!treasury) return { success: false, message: 'الخزينة الرئيسية غير موجودة' };
+
+    if (treasury.egp_balance < amount) return { success: false, message: 'رصيد الخزينة غير كافي' };
+
+    await supabase.from('treasuries').update({ egp_balance: treasury.egp_balance - amount }).eq('id', treasury.id);
+    await supabase.from('e_wallets').update({ balance: wallet.balance + amount }).eq('id', walletId);
+    
+    await supabase.from('transactions').insert({
+        company_id: wallet.company_id,
+        type: 'wallet_feed',
+        from_amount: amount,
+        from_currency: 'EGP',
+        wallet_id: walletId,
+        description: `تغذية محفظة ${wallet.phone_number}`,
+        created_at: new Date().toISOString()
+    });
+
+    await fetchData();
+    return { success: true, message: 'تمت التغذية بنجاح' };
+  };
+
+  const performEWalletTransfer = async (
+    walletId: number,
+    type: 'withdraw' | 'deposit',
+    amount: number,
+    phone: string,
+    receipt: string,
+    currency: 'EGP' | 'SDG'
+  ) => {
+    const wallet = eWallets.find(w => w.id === walletId);
+    if (!wallet) return { success: false, message: 'المحفظة غير موجودة' };
+
+    const rate = exchangeRates.find(r => r.company_id === wallet.company_id);
+    if (!rate) return { success: false, message: 'أسعار الصرف غير محددة' };
+
+    const empTreasury = treasuries.find(t => t.employee_id === wallet.employee_id);
+    if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+
+    const commissionRate = rate.ewallet_commission || 0;
+    let walletChange = 0;
+    let treasuryEgpChange = 0;
+    let treasurySdgChange = 0;
+    let commissionAmount = 0;
+    let description = '';
+
+    if (type === 'withdraw') { // Send to Customer
+        if (currency === 'EGP') {
+            commissionAmount = amount * (commissionRate / 100);
+            if (wallet.balance < amount) return { success: false, message: 'رصيد المحفظة غير كافي' };
+            walletChange = -amount;
+            treasuryEgpChange = amount + commissionAmount;
+            description = `سحب فودافون كاش (إرسال) للرقم ${phone}`;
+        } else { // SDG
+            const egpEquivalent = amount / rate.sd_to_eg_rate;
+            if (wallet.balance < egpEquivalent) return { success: false, message: 'رصيد المحفظة غير كافي' };
+            walletChange = -egpEquivalent;
+            treasurySdgChange = amount;
+            description = `سحب (إرسال) سوداني للرقم ${phone}`;
+        }
+    } else { // Deposit (Receive from Customer)
+        commissionAmount = amount * (commissionRate / 100);
+        const totalAdd = amount + commissionAmount;
+        if (empTreasury.egp_balance < amount) return { success: false, message: 'رصيد الخزينة (النقدية) غير كافي' };
+        walletChange = totalAdd;
+        treasuryEgpChange = -amount;
+        description = `إيداع فودافون كاش (استلام) من ${phone}`;
+    }
+
+    await supabase.from('e_wallets').update({ balance: wallet.balance + walletChange }).eq('id', walletId);
+    await supabase.from('treasuries').update({
+        egp_balance: empTreasury.egp_balance + treasuryEgpChange,
+        sdg_balance: empTreasury.sdg_balance + treasurySdgChange
+    }).eq('id', empTreasury.id);
+
+    const { data: tx, error } = await supabase.from('transactions').insert({
+        company_id: wallet.company_id,
+        employee_id: wallet.employee_id,
+        type: 'wallet_transfer',
+        from_amount: amount,
+        from_currency: currency,
+        wallet_id: walletId,
+        commission: commissionAmount,
+        receipt_number: receipt,
+        description,
+        created_at: new Date().toISOString()
+    }).select().single();
+
+    if (error) return { success: false, message: 'فشل تسجيل العملية' };
+
+    await fetchData();
+    return { success: true, message: 'تمت العملية بنجاح', transaction: tx };
+  };
+
   const exportDatabase = () => {
     const data = {
         companies, users, treasuries, exchangeRates, transactions, merchants, merchantEntries, eWallets
@@ -963,7 +847,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       toast, showToast, hideToast,
       login, logout, addCompany, updateCompany, renewSubscription, deleteCompany, toggleCompanyStatus, updateExchangeRate, 
       addEmployee, updateEmployee, updateEmployeePassword, deleteEmployee,
-      performExchange, recordExpense, deleteTransaction, addMerchant, deleteMerchant, addMerchantEntry, addEWallet, deleteEWallet, performEWalletTransfer, manageTreasury, feedEWallet,
+      performExchange, recordExpense, deleteTransaction, addMerchant, deleteMerchant, addMerchantEntry, manageTreasury,
+      addEWallet, deleteEWallet, feedEWallet, performEWalletTransfer,
       exportDatabase, importDatabase
     }}>
       {children}
