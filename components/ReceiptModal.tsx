@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Transaction, Company, User } from '../types';
 import { X, Share2, Loader2 } from 'lucide-react';
@@ -27,21 +28,18 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
 
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
-        scale: 2, // High resolution
+        scale: 2, // Ensure High Res
         useCORS: true,
         logging: false,
         allowTaint: true,
-        // Specific settings to prevent font glitches in Arabic
-        // letterRendering removed as it is not a valid property in current html2canvas types
+        // Removed `letterRendering` as it causes Arabic font glitches
+        // Explicitly width set in onclone to prevent responsive shifts
         onclone: (clonedDoc: Document) => {
             const clonedElement = clonedDoc.getElementById('receipt-content');
             if (clonedElement) {
-                // Ensure explicit styles to prevent shifting
+                clonedElement.style.width = '400px'; 
+                clonedElement.style.margin = '0 auto';
                 clonedElement.style.transform = 'none';
-                clonedElement.style.margin = '0';
-                clonedElement.style.width = '100%';
-                // Fix for Arabic font rendering spacing
-                clonedElement.style.letterSpacing = 'normal'; 
             }
         }
       });
@@ -95,16 +93,24 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     return 'عملية مالية';
   };
 
+  // Ensure no decimals are shown
   const formatAmount = (amount: number) => {
-    return Math.round(amount).toLocaleString('en-US'); // No decimals
+    return Math.round(amount).toLocaleString('en-US');
   };
 
   return (
     <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto">
       <div className="w-full max-w-md my-auto">
         
-        {/* Printable Area - Fixed Font Stack for Canvas Reliability */}
-        <div id="receipt-content" className="bg-white rounded-2xl shadow-2xl overflow-hidden relative" style={{ fontFamily: 'Tajawal, sans-serif' }}>
+        {/* Printable Area - Fixed Font Stack & Ligatures for Canvas Reliability */}
+        <div 
+          id="receipt-content" 
+          className="bg-white rounded-2xl shadow-2xl overflow-hidden relative" 
+          style={{ 
+            fontFamily: 'Tajawal, sans-serif',
+            fontVariantLigatures: 'none' 
+          }}
+        >
           
           {/* Header */}
           <div className="bg-gray-50 p-6 border-b border-gray-100 flex flex-col items-center justify-center text-center">
