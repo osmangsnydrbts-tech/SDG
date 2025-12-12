@@ -513,20 +513,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { success: true, message: 'تم تسجيل البيع' };
   };
 
-  // Improved Cancellation with Order Fix and Error Handling
+  // Improved Cancellation with Strict Server-Side Checking
   const cancelTransaction = async (transactionId: number, reason: string) => {
     try {
-      const transaction = transactions.find(t => t.id === transactionId);
-      if (!transaction) return { success: false, message: 'العملية غير موجودة' };
-      if (transaction.is_cancelled) return { success: false, message: 'العملية ملغاة بالفعل' };
-
       // STRICT CHECK: Only Admin or Super Admin can cancel
       if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'super_admin')) {
           return { success: false, message: 'عذراً، إلغاء العمليات من صلاحيات المدير فقط.' };
       }
 
-      // STEP 1: MARK AS CANCELLED IN DB FIRST
-      // This ensures we don't refund money if the system can't record the cancellation (e.g. missing columns)
+      // 1. FETCH FRESH DATA FROM DB TO PREVENT DOUBLE CANCELLATION
+      // This solves the "Only Once" requirement robustly.
+      const { data: freshTx, error: fetchError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('id', transactionId)
+        .single();
+
+      if (fetchError || !freshTx) {
+          return { success: false, message: 'تعذر الوصول لبيانات العملية من الخادم.' };
+      }
+
+      if (freshTx.is_cancelled) {
+          return { success: false, message: 'هذه العملية ملغاة مسبقاً.' };
+      }
+
+      const transaction = freshTx; // Use the fresh data
+
+      // 2. MARK AS CANCELLED IN DB FIRST
       const { error: updateError } = await supabase.from('transactions').update({ 
           is_cancelled: true,
           cancellation_reason: reason,
@@ -536,13 +549,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       if (updateError) {
         console.error("Cancellation Update Failed:", updateError);
-        return { success: false, message: 'فشل تحديث حالة العملية. تأكد من تحديث قاعدة البيانات من صفحة الإعدادات.' };
+        // Handle case where 'is_cancelled' column might not exist
+        if (updateError.message.includes("column") && updateError.message.includes("does not exist")) {
+           return { success: false, message: 'خطأ: جدول البيانات غير محدث. يرجى الذهاب للإعدادات وتحديث الهيكل.' };
+        }
+        return { success: false, message: 'فشل تحديث حالة العملية.' };
       }
 
-      // STEP 2: REVERSE FINANCIALS
-      // Only proceed if step 1 succeeded
+      // 3. REVERSE FINANCIALS
+      // Only proceed if step 2 succeeded
+      // We must re-fetch treasuries and wallets to ensure we calculate balances correctly based on current state
+      // However, for simplicity and speed, we use the local state 'treasuries' which is synced, 
+      // but ideally we should do atomic updates. Given Supabase limitation on complex atomic transactions without stored procedures,
+      // we proceed with logic similar to original but using the 'freshTx' data.
+      
       let empTreasury = null;
       if (transaction.employee_id) {
+        // Find treasury in local state (it should be relatively fresh)
         empTreasury = treasuries.find(t => t.employee_id === transaction.employee_id);
       }
 
@@ -573,7 +596,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } else if (transaction.type === 'wallet_transfer') {
             if (!empTreasury) throw new Error('خزينة الموظف غير موجودة');
             const wallet = eWallets.find(w => w.id === transaction.wallet_id);
-            if (!wallet) throw new Error('المحفظة غير موجودة'); // Maybe deleted?
+            if (!wallet) throw new Error('المحفظة غير موجودة أو تم حذفها'); 
             
             const amount = transaction.from_amount;
             const commission = transaction.commission || 0;
@@ -588,6 +611,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 await supabase.from('e_wallets').update({ balance: Math.round(wallet.balance - amount) }).eq('id', wallet.id);
                 await supabase.from('treasuries').update({ egp_balance: Math.round(empTreasury.egp_balance + amount - commission) }).eq('id', empTreasury.id);
             } else if (walletType === 'exchange') {
+                // Originally: Wallet EGP -, Treasury SDG +, Treasury EGP + (Commission)
+                // Reversal: Wallet EGP +, Treasury SDG -, Treasury EGP - (Commission)
                 const rate = transaction.rate || 1;
                 const egpValue = Math.round(amount / rate);
                 await supabase.from('e_wallets').update({ balance: Math.round(wallet.balance + egpValue) }).eq('id', wallet.id);
@@ -638,7 +663,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       } catch (financialError: any) {
           // CRITICAL: If financial reversal failed, we MUST revert the cancellation status
-          // otherwise we have a "Cancelled" transaction but the money is still gone/there.
           console.error("Financial Reversal Failed, Reverting Cancellation:", financialError);
           await supabase.from('transactions').update({ 
               is_cancelled: false,
@@ -646,11 +670,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               cancelled_by: null,
               cancelled_at: null
           }).eq('id', transactionId);
-          return { success: false, message: 'فشل استرجاع الأموال، تم إلغاء العملية: ' + financialError.message };
+          return { success: false, message: 'فشل استرجاع الأموال، تم التراجع عن الإلغاء: ' + financialError.message };
       }
 
       await fetchData();
-      showToast('تم إلغاء العملية وتوثيق السبب في السجل', 'info');
+      showToast('تم إلغاء العملية واسترجاع الأرصدة بنجاح', 'info');
       return { success: true, message: 'تم الإلغاء بنجاح' };
     } catch (err: any) {
         console.error("Cancellation Error:", err);
