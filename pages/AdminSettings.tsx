@@ -18,30 +18,24 @@ const AdminSettings: React.FC = () => {
   const [phoneNumbers, setPhoneNumbers] = useState('');
 
   const SQL_FIX_CODE = `
-/* 1. هيكل المبيعات (Sales Structure) */
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS product_name text;
+/* 1. إضافة الأعمدة المطلوبة للإلغاء والمبيعات (Columns) */
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS is_cancelled boolean DEFAULT false;
-
-/* 2. تسجيل العمليات الملغاة (Cancelled Transactions Audit) */
-/* هام: هذا الكود يضيف أعمدة لتوثيق سبب الإلغاء ومن قام به ووقت الإلغاء */
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS cancellation_reason text;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS cancelled_by bigint;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS cancelled_at timestamptz;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS product_name text;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_id bigint;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_type text;
 
-/* 3. رصيد المبيعات في الخزينة (Sales Balance) */
 ALTER TABLE public.treasuries ADD COLUMN IF NOT EXISTS sales_balance float8 DEFAULT 0;
 
-/* 4. إعدادات الشركة (Company Settings) */
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS logo text;
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS phone_numbers text;
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS footer_message text;
 
-/* 5. المحافظ الإلكترونية (E-Wallets) */
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_id bigint;
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_type text;
 ALTER TABLE public.e_wallets ADD COLUMN IF NOT EXISTS commission float8 DEFAULT 0;
 
-/* 6. تحديث الكاش (Refresh Cache) */
+/* 2. تحديث الكاش */
 NOTIFY pgrst, 'reload schema';
   `.trim();
 
