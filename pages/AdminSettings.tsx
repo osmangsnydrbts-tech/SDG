@@ -183,7 +183,7 @@ NOTIFY pgrst, 'reload schema';
                         
                         <div className="relative group">
                             <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto font-mono text-left shadow-inner" dir="ltr">
-{SQL_FIX_CODE}
+                                {SQL_FIX_CODE}
                             </pre>
                             <button 
                                 onClick={copySql}
@@ -193,7 +193,7 @@ NOTIFY pgrst, 'reload schema';
                             </button>
                         </div>
                         <p className="text-xs text-red-500 mt-2 font-bold">
-                            * انسخ الكود ثم الصقه في Supabase -> SQL Editor -> Run
+                            * انسخ الكود ثم الصقه في Supabase -&gt; SQL Editor -&gt; Run
                         </p>
                     </div>
                 </div>
