@@ -10,7 +10,7 @@ export interface Company {
   is_active: boolean;
   logo?: string; // Base64 string
   phone_numbers?: string;
-  footer_message?: string; // New field for shared message footer (address, emails, etc)
+  footer_message?: string;
 }
 
 export interface User {
@@ -30,7 +30,6 @@ export interface ExchangeRate {
   eg_to_sd_rate: number;
   wholesale_rate: number;
   wholesale_threshold: number;
-  ewallet_commission: number;
   updated_at: string;
 }
 
@@ -40,6 +39,7 @@ export interface Treasury {
   employee_id?: number;
   egp_balance: number;
   sdg_balance: number;
+  sales_balance: number; // New separate treasury for sales
 }
 
 export interface Merchant {
@@ -70,6 +70,7 @@ export interface EWallet {
   phone_number: string;
   provider: string; // Vodafone, InstaPay, etc.
   balance: number;
+  commission: number; // Commission percentage per wallet
   is_active: boolean;
 }
 
@@ -77,7 +78,7 @@ export interface Transaction {
   id: number;
   company_id: number;
   employee_id?: number;
-  type: 'exchange' | 'treasury_feed' | 'treasury_withdraw' | 'merchant_entry' | 'expense' | 'wallet_feed' | 'wallet_transfer';
+  type: 'exchange' | 'treasury_feed' | 'treasury_withdraw' | 'merchant_entry' | 'expense' | 'wallet_feed' | 'wallet_transfer' | 'sale';
   from_currency?: string;
   to_currency?: string;
   from_amount: number;
@@ -90,6 +91,8 @@ export interface Transaction {
   is_wholesale?: boolean;
   wallet_id?: number;
   wallet_type?: 'withdraw' | 'deposit' | 'exchange';
+  product_name?: string; // For sales
+  is_cancelled?: boolean; // New flag for cancellation
 }
 
 export const DEFAULT_SUPER_ADMIN: User = {
