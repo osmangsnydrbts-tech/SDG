@@ -4,7 +4,6 @@ import { useStore } from '../context/StoreContext';
 import { ArrowLeftRight, CheckCircle, Calculator, Loader2 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
-import FormattedInput from '../components/FormattedInput';
 
 const Exchange: React.FC = () => {
   const { currentUser, performExchange, exchangeRates, companies } = useStore();
@@ -17,11 +16,29 @@ const Exchange: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  // Receipt Modal State
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
 
   const rates = exchangeRates.find(r => r.company_id === currentUser?.company_id);
   const company = companies.find(c => c.id === currentUser?.company_id);
+
+  // Helper to remove commas and get number
+  const getRawAmount = (val: string) => parseFloat(val.replace(/,/g, ''));
+
+  // Helper to format with commas
+  const formatInput = (val: string) => {
+    const raw = val.replace(/,/g, '');
+    if (isNaN(Number(raw))) return val; 
+    return Number(raw).toLocaleString();
+  };
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      if (val === '') { setAmount(''); return; }
+      const raw = val.replace(/,/g, '');
+      if (!isNaN(Number(raw))) {
+          setAmount(Number(raw).toLocaleString());
+      }
+  };
 
   useEffect(() => {
     if (!rates || !amount) {
@@ -30,23 +47,24 @@ const Exchange: React.FC = () => {
       return;
     }
 
-    // Round input logic to match Store logic
-    const numAmount = Math.round(parseFloat(amount));
+    const numAmount = getRawAmount(amount);
     if (isNaN(numAmount)) return;
 
     if (direction === 'SDG_TO_EGP') {
-      const potentialWholesaleResult = numAmount / rates.wholesale_rate;
-      
-      if (potentialWholesaleResult >= rates.wholesale_threshold) {
+      let finalRate = rates.sd_to_eg_rate;
+      let calculatedEgp = numAmount / finalRate;
+
+      if (calculatedEgp >= rates.wholesale_threshold) {
         setIsWholesale(true);
-        setResult(Math.round(potentialWholesaleResult));
+        finalRate = rates.wholesale_rate;
+        calculatedEgp = numAmount / finalRate;
       } else {
         setIsWholesale(false);
-        setResult(Math.round(numAmount / rates.sd_to_eg_rate));
       }
+      setResult(calculatedEgp);
     } else {
       setIsWholesale(false);
-      setResult(Math.round(numAmount * rates.eg_to_sd_rate));
+      setResult(numAmount * rates.eg_to_sd_rate);
     }
   }, [amount, direction, rates]);
 
@@ -58,12 +76,14 @@ const Exchange: React.FC = () => {
     setErrorMsg('');
     setIsLoading(true);
 
+    const rawAmount = getRawAmount(amount);
+
     try {
       const res = await performExchange(
         currentUser.id,
         currentUser.company_id,
         direction === 'SDG_TO_EGP' ? 'SDG' : 'EGP',
-        parseFloat(amount), // Store will round this
+        rawAmount,
         receipt
       );
 
@@ -130,11 +150,13 @@ const Exchange: React.FC = () => {
         <form onSubmit={handleExchange} className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">المبلغ المراد صرفه</label>
-            <FormattedInput
+            <input 
+              type="text" 
+              inputMode="decimal"
               value={amount}
-              onChange={setAmount}
+              onChange={handleAmountChange}
               className="w-full p-4 text-lg font-bold border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              placeholder="0.00"
+              placeholder="0"
               required
             />
           </div>
@@ -180,7 +202,6 @@ const Exchange: React.FC = () => {
         </form>
       </div>
 
-      {/* Receipt Modal */}
       {lastTransaction && (
           <ReceiptModal 
             transaction={lastTransaction} 
