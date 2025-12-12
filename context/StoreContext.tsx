@@ -886,14 +886,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             created_at: new Date().toISOString()
         }).select().single();
 
-        if (error) return { success: false, message: 'فشل تسجيل العملية' };
+        if (error) {
+            console.error("Wallet Transfer Error:", error);
+            // Return specific error to help debugging
+            return { success: false, message: `فشل تسجيل العملية: ${error.message}` };
+        }
 
         await fetchData();
         return { success: true, message: 'تمت العملية بنجاح', transaction: tx };
 
-    } catch (err) {
+    } catch (err: any) {
         console.error(err);
-        return { success: false, message: 'حدث خطأ أثناء التنفيذ' };
+        return { success: false, message: `حدث خطأ أثناء التنفيذ: ${err.message || ''}` };
     }
   };
 
