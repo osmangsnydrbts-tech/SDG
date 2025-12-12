@@ -12,7 +12,7 @@ const EWallets: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [provider, setProvider] = useState('Vodafone');
-  const [commission, setCommission] = useState('0'); // New State
+  const [commission, setCommission] = useState('0');
 
   const [amount, setAmount] = useState('');
   const [msg, setMsg] = useState('');
@@ -22,6 +22,17 @@ const EWallets: React.FC = () => {
 
   const getEmpName = (id: number) => {
       return companyEmployees.find(e => e.id === id)?.full_name || 'Unknown';
+  };
+
+  // Helper to format input with commas
+  const formatInput = (val: string) => {
+    const raw = val.replace(/,/g, '');
+    if (isNaN(Number(raw))) return val;
+    return Number(raw).toLocaleString();
+  };
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setAmount(formatInput(e.target.value));
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -38,9 +49,12 @@ const EWallets: React.FC = () => {
   const handleFeed = async (e: React.FormEvent) => {
       e.preventDefault();
       if (showFeedModal && !isLoading) {
+          const rawAmount = parseFloat(amount.replace(/,/g, ''));
+          if (isNaN(rawAmount) || rawAmount <= 0) return;
+
           setIsLoading(true);
           try {
-            const res = await feedEWallet(showFeedModal, parseFloat(amount));
+            const res = await feedEWallet(showFeedModal, rawAmount);
             if (res.success) {
                 setMsg('تمت التغذية بنجاح');
                 setTimeout(() => { setShowFeedModal(null); setMsg(''); setAmount(''); }, 1000);
@@ -79,7 +93,8 @@ const EWallets: React.FC = () => {
                     <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
                          <div>
                              <span className="text-xs text-gray-500 block">الرصيد الحالي</span>
-                             <span className="font-bold text-lg">{w.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP</span>
+                             {/* Round to whole number */}
+                             <span className="font-bold text-lg">{Math.round(w.balance).toLocaleString()} EGP</span>
                              <span className="text-[10px] text-gray-400 block mt-1">عمولة: {w.commission}%</span>
                          </div>
                          <button 
@@ -161,11 +176,11 @@ const EWallets: React.FC = () => {
                     <p className="text-xs text-gray-500 mb-4">سيتم خصم المبلغ من الخزينة الرئيسية (EGP)</p>
                     <form onSubmit={handleFeed} className="space-y-3">
                         <input 
-                            type="number" 
+                            type="text" 
                             inputMode="decimal"
                             placeholder="المبلغ (EGP)" 
                             value={amount} 
-                            onChange={e => setAmount(e.target.value)} 
+                            onChange={handleAmountChange} 
                             className="w-full p-3 border rounded-lg font-bold text-lg" 
                             required 
                         />
@@ -178,7 +193,7 @@ const EWallets: React.FC = () => {
                             {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'تأكيد التغذية'}
                         </button>
                         
-                        <button type="button" onClick={() => {setShowFeedModal(null); setMsg('');}} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
+                        <button type="button" onClick={() => {setShowFeedModal(null); setMsg(''); setAmount('');}} className="w-full bg-gray-100 py-2 rounded-lg text-sm">إلغاء</button>
                     </form>
                 </div>
             </div>
