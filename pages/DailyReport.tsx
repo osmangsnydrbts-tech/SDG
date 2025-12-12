@@ -87,6 +87,10 @@ const DailyReport: React.FC = () => {
         }
     });
 
+    // Round everything at the end just in case
+    stats.treasuryEGP = Math.round(stats.treasuryEGP);
+    stats.treasurySDG = Math.round(stats.treasurySDG);
+
     return stats;
 
   }, [transactions, currentUser, today, eWallets, selectedEmpId]);
