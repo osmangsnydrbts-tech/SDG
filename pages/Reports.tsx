@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart, Ban } from 'lucide-react';
+import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart, Ban, Info } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -132,9 +132,17 @@ const Reports: React.FC = () => {
             <div className="flex justify-between items-center">
                 <div>
                      {isCancelled ? (
-                         <div className="text-red-600 font-bold flex items-center gap-2">
-                             <Ban size={20} />
-                             <span>عملية ملغاة</span>
+                         <div className="text-red-600 font-bold">
+                             <div className="flex items-center gap-2 mb-1">
+                                <Ban size={20} />
+                                <span>عملية ملغاة</span>
+                             </div>
+                             {t.cancellation_reason && (
+                                 <div className="text-xs font-normal bg-red-100 p-2 rounded-lg flex items-start gap-1 max-w-[200px]">
+                                     <Info size={14} className="mt-0.5 shrink-0"/>
+                                     <span>السبب: {t.cancellation_reason}</span>
+                                 </div>
+                             )}
                          </div>
                      ) : t.type === 'expense' ? (
                         <div className="text-red-600">
@@ -174,6 +182,7 @@ const Reports: React.FC = () => {
                             <span className="text-xl font-bold">{fmt(t.to_amount)} {t.to_currency}</span>
                         </div>
                     )}
+                    {/* Show original type info even if cancelled for context */}
                     {(t.type === 'expense' || t.type.includes('treasury')) && (
                         <div className="text-gray-400 text-xs max-w-[150px] truncate">
                             {t.description || '-'}
@@ -182,6 +191,13 @@ const Reports: React.FC = () => {
                     {isWallet && t.commission && t.commission > 0 && (
                          <div className="text-green-600 text-xs font-bold mt-1">
                             + {fmt(t.commission)} عمولة
+                        </div>
+                    )}
+                    
+                    {/* Cancellation Metadata */}
+                    {isCancelled && t.cancelled_at && (
+                        <div className="text-[10px] text-red-500 mt-2">
+                            ألغيت في: {new Date(t.cancelled_at).toLocaleTimeString('ar-EG')}
                         </div>
                     )}
                 </div>
@@ -206,8 +222,8 @@ const Reports: React.FC = () => {
                      )}
 
                      {isCancelled && (
-                         <span className="text-xs text-red-500 font-bold bg-white px-2 py-1 rounded border border-red-200">
-                             تم الإلغاء
+                         <span className="text-xs text-red-500 font-bold bg-white px-2 py-1 rounded border border-red-200 flex items-center gap-1">
+                             <Ban size={12}/> تم الإلغاء
                          </span>
                      )}
                  </div>
