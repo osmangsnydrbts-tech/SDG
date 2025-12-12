@@ -93,6 +93,9 @@ export interface Transaction {
   wallet_type?: 'withdraw' | 'deposit' | 'exchange';
   product_name?: string; // For sales
   is_cancelled?: boolean; // New flag for cancellation
+  cancellation_reason?: string;
+  cancelled_by?: number;
+  cancelled_at?: string;
 }
 
 export const DEFAULT_SUPER_ADMIN: User = {
