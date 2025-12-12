@@ -2,11 +2,11 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Trash2, Key, Pencil, Share2, X, Loader2, FileText, Lock, Store, TrendingDown, Settings } from 'lucide-react';
+import { Landmark, UserPlus, Users, Trash2, Key, Pencil, Share2, X, Loader2, FileText, Lock, Store, TrendingDown, Settings, Smartphone } from 'lucide-react';
 import { User } from '../types';
 
 const AdminDashboard: React.FC = () => {
-  const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies, treasuries, transactions } = useStore();
+  const { currentUser, exchangeRates, updateExchangeRate, addEmployee, updateEmployee, users, updateEmployeePassword, deleteEmployee, companies, treasuries, transactions, eWallets } = useStore();
   const navigate = useNavigate();
   const rateData = exchangeRates.find(r => r.company_id === currentUser?.company_id);
   const company = companies.find(c => c.id === currentUser?.company_id);
@@ -29,6 +29,7 @@ const AdminDashboard: React.FC = () => {
   const [egRate, setEgRate] = useState(rateData?.eg_to_sd_rate || 73);
   const [wholesale, setWholesale] = useState(rateData?.wholesale_rate || 72.5);
   const [threshold, setThreshold] = useState(rateData?.wholesale_threshold || 30000);
+  const [walletComm, setWalletComm] = useState(rateData?.ewallet_commission || 1);
 
   // Emp Add Form
   const [empName, setEmpName] = useState('');
@@ -51,7 +52,8 @@ const AdminDashboard: React.FC = () => {
             sd_to_eg_rate: sdRate,
             eg_to_sd_rate: egRate,
             wholesale_rate: wholesale,
-            wholesale_threshold: threshold
+            wholesale_threshold: threshold,
+            ewallet_commission: walletComm
         });
         setIsProcessing(false);
         setShowRateModal(false);
@@ -162,16 +164,16 @@ ${footer}
       }
   };
 
-  // Dashboard Button Component
+  // Dashboard Button Component - Compact Version
   const DashboardBtn = ({ title, icon: Icon, color, onClick }: any) => (
     <button 
       onClick={onClick} 
-      className={`${color} text-white p-4 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-3 active:scale-95 transition min-h-[140px]`}
+      className={`${color} text-white p-3 rounded-xl shadow-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition min-h-[100px]`}
     >
-      <div className="bg-white/20 p-3 rounded-full">
-        <Icon size={32} />
+      <div className="bg-white/20 p-2 rounded-full">
+        <Icon size={24} />
       </div>
-      <span className="font-bold text-lg">{title}</span>
+      <span className="font-bold text-sm text-center leading-tight">{title}</span>
     </button>
   );
 
@@ -179,24 +181,29 @@ ${footer}
     <div className="space-y-6">
       
       {/* Header Card - Exchange Rates */}
-      <div className="bg-blue-600 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden mb-8">
+      <div className="bg-blue-600 text-white p-5 rounded-3xl shadow-xl relative overflow-hidden mb-6">
         <div className="relative z-10">
-           <div className="flex justify-between items-start mb-6">
-               <h2 className="text-xl font-bold opacity-90">أسعار الصرف الحالية</h2>
-               <button onClick={() => setShowShareModal(true)} className="bg-white/20 hover:bg-white/30 p-2 rounded-full transition">
-                   <Share2 size={20} />
-               </button>
+           <div className="flex justify-between items-start mb-4">
+               <h2 className="text-lg font-bold opacity-90">أسعار الصرف الحالية</h2>
+               <div className="flex gap-2">
+                   <button onClick={() => navigate('/admin/settings')} className="bg-white/20 hover:bg-white/30 p-2 rounded-full transition">
+                       <Settings size={18} />
+                   </button>
+                   <button onClick={() => setShowShareModal(true)} className="bg-white/20 hover:bg-white/30 p-2 rounded-full transition">
+                       <Share2 size={18} />
+                   </button>
+               </div>
            </div>
            
            <div className="flex justify-between items-center text-center">
               <div onClick={() => setShowRateModal(true)} className="flex-1 cursor-pointer active:scale-95 transition">
-                 <span className="text-5xl font-bold block mb-1">{rateData?.sd_to_eg_rate}</span>
-                 <span className="text-blue-200 text-sm font-medium">مصري {'->'} سوداني</span>
+                 <span className="text-4xl font-bold block mb-1">{rateData?.sd_to_eg_rate}</span>
+                 <span className="text-blue-200 text-xs font-medium">مصري {'->'} سوداني</span>
               </div>
-              <div className="h-12 w-px bg-blue-400/50 mx-4"></div>
+              <div className="h-10 w-px bg-blue-400/50 mx-4"></div>
               <div onClick={() => setShowRateModal(true)} className="flex-1 cursor-pointer active:scale-95 transition">
-                 <span className="text-5xl font-bold block mb-1">{rateData?.eg_to_sd_rate}</span>
-                 <span className="text-blue-200 text-sm font-medium">سوداني {'->'} مصري</span>
+                 <span className="text-4xl font-bold block mb-1">{rateData?.eg_to_sd_rate}</span>
+                 <span className="text-blue-200 text-xs font-medium">سوداني {'->'} مصري</span>
               </div>
            </div>
         </div>
@@ -207,7 +214,7 @@ ${footer}
       </div>
 
       {/* Main Grid Actions */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-3">
         
         {/* Add Employee (Orange) */}
         <DashboardBtn 
@@ -219,15 +226,23 @@ ${footer}
 
         {/* Update Rates (Dark Slate) */}
         <DashboardBtn 
-            title="تحديث الأسعار" 
-            icon={Settings} 
+            title="تحديث السعر" 
+            icon={Pencil} 
             color="bg-slate-700" 
             onClick={() => setShowRateModal(true)} 
         />
 
+        {/* E-Wallets (Pink) - NEW */}
+        <DashboardBtn 
+            title="المحافظ" 
+            icon={Smartphone} 
+            color="bg-pink-600" 
+            onClick={() => navigate('/admin/ewallets')} 
+        />
+
         {/* Manage Treasury (Teal) */}
         <DashboardBtn 
-            title="إدارة الخزينة" 
+            title="الخزينة" 
             icon={Landmark} 
             color="bg-teal-600" 
             onClick={() => navigate('/admin/treasury')} 
@@ -235,7 +250,7 @@ ${footer}
 
         {/* Employees List (Purple) */}
         <DashboardBtn 
-            title="قائمة الموظفين" 
+            title="الموظفين" 
             icon={Users} 
             color="bg-purple-600" 
             onClick={() => setShowManageEmpModal(true)} 
@@ -243,7 +258,7 @@ ${footer}
 
         {/* Merchants (Indigo) */}
         <DashboardBtn 
-            title="إدارة التجار" 
+            title="التجار" 
             icon={Store} 
             color="bg-indigo-600" 
             onClick={() => navigate('/admin/merchants')} 
@@ -315,7 +330,7 @@ ${footer}
       {/* Rate Update Modal */}
       {showRateModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
                      <h3 className="text-lg font-bold text-gray-800">تحديث الأسعار والإعدادات</h3>
                      <button onClick={() => setShowRateModal(false)} className="bg-gray-100 p-1 rounded-full"><X size={20} className="text-gray-500"/></button>
@@ -339,6 +354,20 @@ ${footer}
                     <div>
                         <label className="text-xs text-gray-500 font-bold mb-1 block">حد الجملة (EGP)</label>
                         <input type="number" inputMode="decimal" value={threshold} onChange={e => setThreshold(parseFloat(e.target.value))} className="w-full p-3 border rounded-lg font-bold" />
+                    </div>
+
+                    <div className="bg-pink-50 p-3 rounded-xl border border-pink-100">
+                        <label className="text-xs text-pink-600 font-bold mb-1 block">عمولة التحويل الإلكتروني (%)</label>
+                        <input 
+                            type="number" 
+                            step="0.1" 
+                            inputMode="decimal" 
+                            value={walletComm} 
+                            onChange={e => setWalletComm(parseFloat(e.target.value))} 
+                            className="w-full p-3 border border-pink-200 rounded-lg font-bold text-center" 
+                            placeholder="%"
+                        />
+                        <p className="text-[10px] text-pink-500 mt-1 text-center">تضاف تلقائياً عند إجراء التحويلات</p>
                     </div>
 
                     <button disabled={isProcessing} className="w-full bg-slate-800 text-white py-4 rounded-xl font-bold mt-2 flex items-center justify-center shadow-lg hover:bg-slate-900 transition">
@@ -486,7 +515,6 @@ ${footer}
 
                       {(() => {
                           const empTreasury = treasuries.find(t => t.employee_id === selectedEmpReport.id);
-                          
                           // Filter Today's Transactions
                           const today = new Date().toISOString().split('T')[0];
                           const todayTxs = transactions.filter(t => 
@@ -497,6 +525,10 @@ ${footer}
                           // Calculate Daily Totals
                           const expenseEGP = todayTxs.filter(t => t.type === 'expense' && t.from_currency === 'EGP').reduce((a, b) => a + b.from_amount, 0);
                           const expenseSDG = todayTxs.filter(t => t.type === 'expense' && t.from_currency === 'SDG').reduce((a, b) => a + b.from_amount, 0);
+
+                          // Wallets Check
+                          const empWallets = eWallets.filter(w => w.employee_id === selectedEmpReport.id && w.is_active);
+                          const walletBalance = empWallets.reduce((acc, curr) => acc + curr.balance, 0);
 
                           return (
                               <div className="space-y-4">
@@ -511,6 +543,14 @@ ${footer}
                                           <span className="font-bold text-lg">{empTreasury?.sdg_balance.toLocaleString()}</span>
                                       </div>
                                   </div>
+
+                                  {walletBalance > 0 && (
+                                     <div className="bg-pink-50 p-3 rounded-xl border border-pink-100 text-center">
+                                         <span className="text-xs text-pink-500 block font-bold">رصيد المحافظ الإلكترونية</span>
+                                         <span className="font-bold text-lg text-pink-700">{walletBalance.toLocaleString()} EGP</span>
+                                         <p className="text-[10px] text-gray-400 mt-1">عدد المحافظ: {empWallets.length}</p>
+                                     </div>
+                                  )}
 
                                   <div className="border-t pt-3">
                                       <p className="text-xs font-bold text-gray-500 mb-2 text-center">حركة اليوم ({new Date().toLocaleDateString('ar-EG')})</p>
