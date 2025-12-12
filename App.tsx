@@ -12,6 +12,7 @@ import Exchange from './pages/Exchange';
 import Treasury from './pages/Treasury';
 import Merchants from './pages/Merchants';
 import Reports from './pages/Reports';
+import DailyReport from './pages/DailyReport';
 import EWallets from './pages/EWallets';
 import WalletTransfer from './pages/WalletTransfer';
 
@@ -21,7 +22,6 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode, allowedRoles?: strin
   if (!currentUser) return <Navigate to="/login" replace />;
   
   if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
-    // Redirect based on role
     if (currentUser.role === 'super_admin') return <Navigate to="/super-admin" replace />;
     if (currentUser.role === 'admin') return <Navigate to="/admin" replace />;
     return <Navigate to="/employee" replace />;
@@ -114,6 +114,14 @@ const AppRoutes = () => {
         <ProtectedRoute>
           <Layout title="التقارير">
             <Reports />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/daily-report" element={
+        <ProtectedRoute>
+          <Layout title="تقرير اليوم">
+             <DailyReport />
           </Layout>
         </ProtectedRoute>
       } />
