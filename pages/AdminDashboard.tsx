@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, UserPlus, Users, Wallet, Trash2, Key, Percent, Pencil, Share2, X, Loader2, FileText, Lock, Store, TrendingDown, ArrowDownCircle, ArrowUpCircle, Settings } from 'lucide-react';
+import { Landmark, UserPlus, Users, Trash2, Key, Pencil, Share2, X, Loader2, FileText, Lock, Store, TrendingDown, Settings } from 'lucide-react';
 import { User } from '../types';
 
 const AdminDashboard: React.FC = () => {
@@ -29,7 +29,6 @@ const AdminDashboard: React.FC = () => {
   const [egRate, setEgRate] = useState(rateData?.eg_to_sd_rate || 73);
   const [wholesale, setWholesale] = useState(rateData?.wholesale_rate || 72.5);
   const [threshold, setThreshold] = useState(rateData?.wholesale_threshold || 30000);
-  const [commission, setCommission] = useState(rateData?.ewallet_commission || 1);
 
   // Emp Add Form
   const [empName, setEmpName] = useState('');
@@ -52,8 +51,7 @@ const AdminDashboard: React.FC = () => {
             sd_to_eg_rate: sdRate,
             eg_to_sd_rate: egRate,
             wholesale_rate: wholesale,
-            wholesale_threshold: threshold,
-            ewallet_commission: commission
+            wholesale_threshold: threshold
         });
         setIsProcessing(false);
         setShowRateModal(false);
@@ -243,14 +241,6 @@ ${footer}
             onClick={() => setShowManageEmpModal(true)} 
         />
 
-        {/* Electronic Wallets (Pink) */}
-        <DashboardBtn 
-            title="المحافظ الإلكترونية" 
-            icon={Wallet} 
-            color="bg-pink-600" 
-            onClick={() => navigate('/admin/ewallets')} 
-        />
-
         {/* Merchants (Indigo) */}
         <DashboardBtn 
             title="إدارة التجار" 
@@ -349,11 +339,6 @@ ${footer}
                     <div>
                         <label className="text-xs text-gray-500 font-bold mb-1 block">حد الجملة (EGP)</label>
                         <input type="number" inputMode="decimal" value={threshold} onChange={e => setThreshold(parseFloat(e.target.value))} className="w-full p-3 border rounded-lg font-bold" />
-                    </div>
-
-                    <div className="pt-2 border-t">
-                        <label className="text-xs text-pink-600 font-bold flex items-center gap-1 mb-1"><Percent size={12}/> عمولة المحفظة (%)</label>
-                        <input type="number" step="0.1" inputMode="decimal" value={commission} onChange={e => setCommission(parseFloat(e.target.value))} className="w-full p-3 border rounded-lg font-bold" placeholder="مثال: 1.0" />
                     </div>
 
                     <button disabled={isProcessing} className="w-full bg-slate-800 text-white py-4 rounded-xl font-bold mt-2 flex items-center justify-center shadow-lg hover:bg-slate-900 transition">
@@ -512,8 +497,6 @@ ${footer}
                           // Calculate Daily Totals
                           const expenseEGP = todayTxs.filter(t => t.type === 'expense' && t.from_currency === 'EGP').reduce((a, b) => a + b.from_amount, 0);
                           const expenseSDG = todayTxs.filter(t => t.type === 'expense' && t.from_currency === 'SDG').reduce((a, b) => a + b.from_amount, 0);
-                          const walletIncome = todayTxs.filter(t => t.type === 'wallet_deposit').reduce((a, b) => a + b.from_amount, 0);
-                          const walletWithdraw = todayTxs.filter(t => t.type === 'wallet_withdrawal').reduce((a, b) => a + b.from_amount, 0);
 
                           return (
                               <div className="space-y-4">
@@ -543,24 +526,6 @@ ${footer}
                                                   <div>{expenseEGP.toLocaleString()} EGP</div>
                                                   {expenseSDG > 0 && <div>{expenseSDG.toLocaleString()} SDG</div>}
                                               </div>
-                                          </div>
-
-                                          {/* Wallet Income (Deposit) */}
-                                          <div className="bg-green-50 p-3 rounded-xl flex items-center justify-between border border-green-100">
-                                              <div className="flex items-center gap-2 text-green-700 font-bold text-sm">
-                                                  <ArrowDownCircle size={16} />
-                                                  <span>إيداع محافظ</span>
-                                              </div>
-                                              <span className="text-green-800 font-bold">{walletIncome.toLocaleString()} EGP</span>
-                                          </div>
-
-                                          {/* Wallet Withdraw */}
-                                          <div className="bg-orange-50 p-3 rounded-xl flex items-center justify-between border border-orange-100">
-                                              <div className="flex items-center gap-2 text-orange-700 font-bold text-sm">
-                                                  <ArrowUpCircle size={16} />
-                                                  <span>سحب محافظ</span>
-                                              </div>
-                                              <span className="text-orange-800 font-bold">{walletWithdraw.toLocaleString()} EGP</span>
                                           </div>
                                       </div>
                                   </div>
