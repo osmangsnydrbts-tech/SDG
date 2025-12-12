@@ -1,14 +1,14 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Download, Filter, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, ArrowRightLeft, Landmark, Clock, User, ArrowUpRight, ArrowDownLeft, Smartphone } from 'lucide-react';
+import { FileText, Download, Filter, Search, Eye, Trash2, Calendar, ListFilter, TrendingDown, ArrowRightLeft, Landmark, Clock, User, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
-type TabType = 'exchange' | 'treasury' | 'expenses' | 'wallet' | 'breakdown';
+type TabType = 'exchange' | 'treasury' | 'expenses' | 'breakdown';
 
 const Reports: React.FC = () => {
-  const { transactions, currentUser, users, companies, deleteTransaction, eWallets } = useStore();
+  const { transactions, currentUser, users, companies, deleteTransaction } = useStore();
   const [activeTab, setActiveTab] = useState<TabType>('breakdown');
   
   // Filtering States
@@ -87,11 +87,6 @@ const Reports: React.FC = () => {
         if (selectedType !== 'all') {
             if (selectedType === 'exchange' && t.type !== 'exchange') return false;
             if (selectedType === 'expense' && t.type !== 'expense') return false;
-            
-            if (selectedType === 'e_wallet') {
-                if (!['wallet_deposit', 'wallet_withdrawal', 'wallet_feed', 'e_wallet'].includes(t.type)) return false;
-            }
-
             if (selectedType === 'treasury' && !['treasury_feed', 'treasury_withdraw'].includes(t.type)) return false;
         }
 
@@ -105,28 +100,24 @@ const Reports: React.FC = () => {
   const exchangeTx = filtered.filter(t => t.type === 'exchange');
   const treasuryTx = filtered.filter(t => ['treasury_feed', 'treasury_withdraw'].includes(t.type));
   const expenseTx = filtered.filter(t => t.type === 'expense');
-  const walletTx = filtered.filter(t => ['wallet_deposit', 'wallet_withdrawal', 'wallet_feed', 'e_wallet'].includes(t.type));
 
   // --- STATS CALCULATION ---
   const stats = {
       exchangeCount: exchangeTx.length,
       receivedSdg: exchangeTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
       receivedEgp: exchangeTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
-      // Wallet commission: sum commission fields
-      walletCommission: filtered.reduce((sum, t) => sum + (t.commission || 0), 0),
       totalExpensesEgp: expenseTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0),
       totalExpensesSdg: expenseTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0),
   };
 
   const handleExport = () => {
-    const headers = ["ID", "التاريخ", "الموظف", "النوع", "من", "المبلغ", "إلى", "المبلغ", "السعر", "العمولة", "رقم الإشعار"];
+    const headers = ["ID", "التاريخ", "الموظف", "النوع", "من", "المبلغ", "إلى", "المبلغ", "السعر", "رقم الإشعار"];
     
     // Export based on active tab or all filtered
     let dataToExport = filtered;
     if (activeTab === 'exchange') dataToExport = exchangeTx;
     if (activeTab === 'treasury') dataToExport = treasuryTx;
     if (activeTab === 'expenses') dataToExport = expenseTx;
-    if (activeTab === 'wallet') dataToExport = walletTx;
 
     const rows = dataToExport.map(t => [
         t.id,
@@ -138,7 +129,6 @@ const Reports: React.FC = () => {
         t.to_currency || '-',
         t.to_amount || '-',
         t.rate || '-',
-        t.commission || 0,
         t.receipt_number || '-'
     ]);
 
@@ -157,19 +147,10 @@ const Reports: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const CardRow = ({ t, type }: { t: Transaction, type: 'exchange' | 'expense' | 'treasury' | 'wallet' }) => {
+  const CardRow = ({ t, type }: { t: Transaction, type: 'exchange' | 'expense' | 'treasury' }) => {
     const isExchange = type === 'exchange';
     const isExpense = type === 'expense';
-    const isWallet = type === 'wallet';
     
-    // Determine wallet operation color
-    let walletColorClass = 'bg-gray-500'; // default
-    if (isWallet) {
-        if (t.type === 'wallet_deposit') walletColorClass = 'bg-green-500';
-        else if (t.type === 'wallet_withdrawal') walletColorClass = 'bg-red-500';
-        else walletColorClass = 'bg-blue-500'; // feed
-    }
-
     return (
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3 relative overflow-hidden group">
             {/* Header: Date & User */}
@@ -199,13 +180,6 @@ const Reports: React.FC = () => {
                              <span className="text-xs font-bold block mb-1 flex items-center gap-1"><ArrowDownLeft size={14}/> استلام</span>
                              <span className="text-xl font-bold">{t.from_amount.toLocaleString()} {t.from_currency}</span>
                          </div>
-                     ) : isWallet ? (
-                         <div className={t.type === 'wallet_deposit' ? 'text-green-600' : t.type === 'wallet_withdrawal' ? 'text-red-600' : 'text-blue-600'}>
-                             <span className="text-xs font-bold block mb-1">
-                                {t.type === 'wallet_deposit' ? 'إيداع محفظة' : t.type === 'wallet_withdrawal' ? 'سحب محفظة' : 'تغذية محفظة'}
-                             </span>
-                             <span className="text-xl font-bold">{t.from_amount.toLocaleString()} EGP</span>
-                         </div>
                      ) : (
                          <div className={t.type === 'treasury_feed' ? 'text-green-600' : 'text-red-600'}>
                              <span className="text-xs font-bold block mb-1">{t.type === 'treasury_feed' ? 'إيداع خزينة' : 'سحب خزينة'}</span>
@@ -222,18 +196,6 @@ const Reports: React.FC = () => {
                             <span className="text-xl font-bold">{t.to_amount.toLocaleString()} {t.to_currency}</span>
                         </div>
                     )}
-                    {isWallet && (
-                         <div className="flex flex-col items-end">
-                            {t.commission ? (
-                                <span className="text-green-600 text-xs font-bold bg-green-50 px-2 py-0.5 rounded">
-                                    ربح: {t.commission} EGP
-                                </span>
-                            ) : null}
-                            <div className="text-gray-500 text-xs mt-1 max-w-[150px] truncate">
-                                {t.description}
-                            </div>
-                         </div>
-                    )}
                     {(isExpense || type === 'treasury') && (
                         <div className="text-gray-400 text-xs max-w-[150px] truncate">
                             {t.description || '-'}
@@ -248,7 +210,7 @@ const Reports: React.FC = () => {
                      #{t.receipt_number || t.id}
                  </div>
                  <div className="flex gap-2">
-                     {(isExchange || isWallet) && (
+                     {isExchange && (
                          <button onClick={() => setViewTransaction(t)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition" title="عرض الإيصال">
                              <Eye size={16} />
                          </button>
@@ -262,7 +224,7 @@ const Reports: React.FC = () => {
             </div>
             
             {/* Side Indicator Stripe */}
-            <div className={`absolute right-0 top-0 bottom-0 w-1 ${isExpense ? 'bg-red-500' : isExchange ? 'bg-blue-500' : isWallet ? walletColorClass : 'bg-emerald-500'}`}></div>
+            <div className={`absolute right-0 top-0 bottom-0 w-1 ${isExpense ? 'bg-red-500' : isExchange ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
         </div>
     );
   };
@@ -343,7 +305,6 @@ const Reports: React.FC = () => {
                         <option value="all">كل العمليات</option>
                         <option value="exchange">صرف عملة</option>
                         <option value="expense">منصرفات</option>
-                        <option value="e_wallet">محفظة إلكترونية</option>
                         <option value="treasury">حركة خزينة</option>
                     </select>
                 </div>
@@ -358,9 +319,6 @@ const Reports: React.FC = () => {
             <button onClick={() => setActiveTab('exchange')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'exchange' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
                 <ArrowRightLeft size={16}/> الصرف
             </button>
-            <button onClick={() => setActiveTab('wallet')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'wallet' ? 'bg-pink-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
-                <Smartphone size={16}/> المحافظ
-            </button>
             <button onClick={() => setActiveTab('treasury')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'treasury' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
                 <Landmark size={16}/> الخزينة
             </button>
@@ -373,7 +331,7 @@ const Reports: React.FC = () => {
         {activeTab === 'breakdown' && (
              <div className="space-y-4 animate-in fade-in duration-300">
                  
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                      {/* SDG Income */}
                      <div className="bg-white p-5 rounded-xl shadow-sm border-r-4 border-r-orange-500">
                          <h4 className="text-xs text-gray-500 mb-1 font-bold">مقبوضات سوداني (SDG)</h4>
@@ -384,12 +342,6 @@ const Reports: React.FC = () => {
                      <div className="bg-white p-5 rounded-xl shadow-sm border-r-4 border-r-blue-500">
                          <h4 className="text-xs text-gray-500 mb-1 font-bold">مقبوضات مصري (EGP)</h4>
                          <p className="text-2xl font-bold text-gray-800">{stats.receivedEgp.toLocaleString()}</p>
-                     </div>
-
-                     {/* Commissions */}
-                     <div className="bg-white p-5 rounded-xl shadow-sm border-r-4 border-r-green-500">
-                         <h4 className="text-xs text-gray-500 mb-1 font-bold">أرباح العمولات (EGP)</h4>
-                         <p className="text-2xl font-bold text-green-700">{stats.walletCommission.toLocaleString()}</p>
                      </div>
 
                      {/* Expenses */}
@@ -431,19 +383,6 @@ const Reports: React.FC = () => {
                     <CardRow key={t.id} t={t} type="exchange" />
                 ))}
                 {exchangeTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد بيانات</div>}
-            </div>
-        )}
-
-        {/* Wallet Log - Card View */}
-        {activeTab === 'wallet' && (
-            <div className="space-y-3 animate-in fade-in duration-300">
-                <div className="flex items-center justify-between text-sm text-gray-500 px-1">
-                     <span>عدد العمليات: {walletTx.length}</span>
-                </div>
-                {walletTx.map((t) => (
-                    <CardRow key={t.id} t={t} type="wallet" />
-                ))}
-                {walletTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد بيانات</div>}
             </div>
         )}
 
