@@ -597,9 +597,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
              }).eq('id', empTreasury.id);
 
         } else if (walletType === 'deposit') {
-             // Logic was: Treasury - Amount, Wallet + Amount (Commission added separately to treasury? No, commission added to Employee Treasury)
-             // Let's look at performEWalletTransfer logic:
-             // Deposit: Treasury - Amount, Treasury + Comm, Wallet + Amount. Net Treasury = -Amount + Comm.
+             // Logic was: Treasury - Amount, Treasury + Comm, Wallet + Amount. Net Treasury = -Amount + Comm.
              // Reverse: Treasury + Amount - Comm, Wallet - Amount.
              await supabase.from('e_wallets').update({ balance: wallet.balance - amount }).eq('id', wallet.id);
              await supabase.from('treasuries').update({
@@ -829,11 +827,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } else if (type === 'deposit') {
             // "Lo Edaa (Deposit)": Deduct from Employee Treasury (EGP) -> Add Commission -> Add to Wallet
             // Input: Amount (EGP) to be added to wallet
-            // Logic Interpretation: 
-            // 1. Employee gives Cash (Treasury - Amount)
-            // 2. Employee gets Commission (Treasury + Comm) 
-            // 3. Wallet gets Amount (Wallet + Amount)
-            // Net Treasury Change: -Amount + Commission
             
             commissionAmount = amount * (commissionRate / 100);
             
@@ -851,10 +844,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } else if (type === 'exchange') {
             // "Lo Sarf (Exchange)": SDG to EGP / Rate -> Add to Employee Treasury (EGP) + Commission
             // Input: Amount (SDG)
-            // Logic Interpretation:
-            // 1. Calculate EGP Value = SDG / Rate
-            // 2. Deduct EGP Value from Wallet? (Assuming agent gives EGP via Wallet for SDG Cash)
-            // 3. Add EGP Value + Commission to Employee Treasury (Assuming receiving Cash + Comm)
             
             const egpRate = rate.sd_to_eg_rate;
             const egpValue = amount / egpRate;
@@ -888,7 +877,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         if (error) {
             console.error("Wallet Transfer Error:", error);
-            // Return specific error to help debugging
+            // Check for specific schema error
+            if (error.message.includes('Could not find') && error.message.includes('wallet_id')) {
+                 return { 
+                     success: false, 
+                     message: 'نظام خطأ: قاعدة البيانات غير محدثة. يرجى إبلاغ المدير لتشغيل كود الإصلاح من الإعدادات.' 
+                 };
+            }
             return { success: false, message: `فشل تسجيل العملية: ${error.message}` };
         }
 
