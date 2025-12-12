@@ -418,10 +418,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
        }
        toAmount = Math.round(calcAmount); // Round to avoid fractions
        
-       // Note: We don't check empTreasury.egp_balance for availability here because this is INCOMING transaction
-       // We only need to check if they have enough source currency if it was OUTGOING, but here customer GIVES money.
-       // The employee RECEIVES 'fromCurrency' and GIVES 'toCurrency'
-       
        if (empTreasury.egp_balance < toAmount) return { success: false, message: `رصيد المصري في عهدتك غير كافي لتسليم العميل` };
        
        await supabase.from('treasuries').update({
@@ -519,81 +515,143 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Improved Cancellation with Audit Trail (Reason + User)
   const cancelTransaction = async (transactionId: number, reason: string) => {
-    const transaction = transactions.find(t => t.id === transactionId);
-    if (!transaction) return { success: false, message: 'العملية غير موجودة' };
-    if (transaction.is_cancelled) return { success: false, message: 'العملية ملغاة بالفعل' };
+    try {
+      const transaction = transactions.find(t => t.id === transactionId);
+      if (!transaction) return { success: false, message: 'العملية غير موجودة' };
+      if (transaction.is_cancelled) return { success: false, message: 'العملية ملغاة بالفعل' };
 
-    // STRICT CHECK: Only Admin or Super Admin can cancel
-    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'super_admin')) {
-        return { success: false, message: 'عذراً، إلغاء العمليات من صلاحيات المدير فقط.' };
+      // STRICT CHECK: Only Admin or Super Admin can cancel
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'super_admin')) {
+          return { success: false, message: 'عذراً، إلغاء العمليات من صلاحيات المدير فقط.' };
+      }
+
+      let empTreasury = null;
+      if (transaction.employee_id) {
+        empTreasury = treasuries.find(t => t.employee_id === transaction.employee_id);
+      }
+
+      // Reverse logic with rounding
+      if (transaction.type === 'exchange') {
+          if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+          if (transaction.from_currency === 'SDG') {
+              await supabase.from('treasuries').update({
+                  sdg_balance: Math.round(empTreasury.sdg_balance - transaction.from_amount),
+                  egp_balance: Math.round(empTreasury.egp_balance + (transaction.to_amount || 0))
+              }).eq('id', empTreasury.id);
+          } else {
+              await supabase.from('treasuries').update({
+                  egp_balance: Math.round(empTreasury.egp_balance - transaction.from_amount),
+                  sdg_balance: Math.round(empTreasury.sdg_balance + (transaction.to_amount || 0))
+              }).eq('id', empTreasury.id);
+          }
+      } else if (transaction.type === 'sale') {
+          if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+          await supabase.from('treasuries').update({
+              sales_balance: Math.round((empTreasury.sales_balance || 0) - transaction.from_amount)
+          }).eq('id', empTreasury.id);
+      } else if (transaction.type === 'expense') {
+          if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+          const currency = transaction.from_currency as 'EGP' | 'SDG';
+          const balanceKey = currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
+          await supabase.from('treasuries').update({ [balanceKey]: Math.round(empTreasury[balanceKey] + transaction.from_amount) }).eq('id', empTreasury.id);
+      } else if (transaction.type === 'wallet_transfer') {
+          if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+          const wallet = eWallets.find(w => w.id === transaction.wallet_id);
+          if (!wallet) return { success: false, message: 'المحفظة غير موجودة' };
+          
+          const amount = transaction.from_amount;
+          const commission = transaction.commission || 0;
+          const walletType = transaction.wallet_type || 'withdraw';
+
+          if (walletType === 'withdraw') {
+               // Original: Employee Cash Up (Collected from customer), Wallet Down (Sent out) -> Wait, logic in performEWalletTransfer says:
+               // if type == withdraw: wallet - amount, treasury + (amount + commission). 
+               // Meaning: Employee got cash. Wallet sent money.
+               
+               // Reversal: Wallet Up, Treasury Down
+               await supabase.from('e_wallets').update({ balance: Math.round(wallet.balance + amount) }).eq('id', wallet.id);
+               await supabase.from('treasuries').update({ egp_balance: Math.round(empTreasury.egp_balance - (amount + commission)) }).eq('id', empTreasury.id);
+          } else if (walletType === 'deposit') {
+               // Original: Deposit. Wallet Up (Received money). Employee Cash Down (Gave cash to customer?).
+               // performEWalletTransfer logic: treasury - amount + comm. wallet + amount.
+               
+               // Reversal: Wallet Down. Treasury Up.
+               await supabase.from('e_wallets').update({ balance: Math.round(wallet.balance - amount) }).eq('id', wallet.id);
+               await supabase.from('treasuries').update({ egp_balance: Math.round(empTreasury.egp_balance + amount - commission) }).eq('id', empTreasury.id);
+          } else if (walletType === 'exchange') {
+               const rate = transaction.rate || 1;
+               const egpValue = Math.round(amount / rate);
+               await supabase.from('e_wallets').update({ balance: Math.round(wallet.balance + egpValue) }).eq('id', wallet.id);
+               await supabase.from('treasuries').update({
+                   sdg_balance: Math.round(empTreasury.sdg_balance - amount),
+                   egp_balance: Math.round(empTreasury.egp_balance - commission)
+               }).eq('id', empTreasury.id);
+          }
+      } else if (transaction.type === 'wallet_feed') {
+          // Reversal for Wallet Feed
+          const wallet = eWallets.find(w => w.id === transaction.wallet_id);
+          const mainTreasury = treasuries.find(t => t.company_id === transaction.company_id && !t.employee_id);
+          if (!wallet || !mainTreasury) return { success: false, message: 'المحفظة أو الخزينة غير موجودة' };
+          
+          // Original: Main -Amount, Wallet +Amount
+          // Reversal: Main +Amount, Wallet -Amount
+          await supabase.from('treasuries').update({ egp_balance: Math.round(mainTreasury.egp_balance + transaction.from_amount) }).eq('id', mainTreasury.id);
+          await supabase.from('e_wallets').update({ balance: Math.round(wallet.balance - transaction.from_amount) }).eq('id', wallet.id);
+      } else if (transaction.type === 'treasury_feed' || transaction.type === 'treasury_withdraw') {
+          const currency = transaction.from_currency as 'EGP' | 'SDG';
+          const balanceKey = currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
+          const mainTreasury = treasuries.find(t => t.company_id === transaction.company_id && !t.employee_id);
+
+          if (!mainTreasury) return { success: false, message: 'الخزينة الرئيسية غير موجودة' };
+
+          if (transaction.employee_id) {
+             // Internal Transfer (Main <-> Employee)
+             if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+
+             if (transaction.type === 'treasury_feed') {
+                 // Original: Main -Amount, Employee +Amount (Main gave to Employee)
+                 // Reversal: Main +Amount, Employee -Amount
+                 await supabase.from('treasuries').update({ [balanceKey]: Math.round(mainTreasury[balanceKey] + transaction.from_amount) }).eq('id', mainTreasury.id);
+                 await supabase.from('treasuries').update({ [balanceKey]: Math.round(empTreasury[balanceKey] - transaction.from_amount) }).eq('id', empTreasury.id);
+             } else {
+                 // Original: Employee -Amount, Main +Amount (Employee returned to Main)
+                 // Reversal: Employee +Amount, Main -Amount
+                 await supabase.from('treasuries').update({ [balanceKey]: Math.round(mainTreasury[balanceKey] - transaction.from_amount) }).eq('id', mainTreasury.id);
+                 await supabase.from('treasuries').update({ [balanceKey]: Math.round(empTreasury[balanceKey] + transaction.from_amount) }).eq('id', empTreasury.id);
+             }
+          } else {
+              // External
+              if (transaction.type === 'treasury_feed') {
+                  // Original: Main +Amount
+                  // Reversal: Main -Amount
+                  await supabase.from('treasuries').update({ [balanceKey]: Math.round(mainTreasury[balanceKey] - transaction.from_amount) }).eq('id', mainTreasury.id);
+              } else {
+                  // Original: Main -Amount
+                  // Reversal: Main +Amount
+                  await supabase.from('treasuries').update({ [balanceKey]: Math.round(mainTreasury[balanceKey] + transaction.from_amount) }).eq('id', mainTreasury.id);
+              }
+          }
+      }
+
+      // Mark as cancelled with Audit Data
+      const { error: updateError } = await supabase.from('transactions').update({ 
+          is_cancelled: true,
+          cancellation_reason: reason,
+          cancelled_by: currentUser.id,
+          cancelled_at: new Date().toISOString()
+      }).eq('id', transactionId);
+      
+      if (updateError) {
+        throw new Error('فشل تحديث حالة العملية: ' + updateError.message);
+      }
+
+      await fetchData();
+      showToast('تم إلغاء العملية وتوثيق السبب في السجل', 'info');
+      return { success: true, message: 'تم الإلغاء بنجاح' };
+    } catch (err: any) {
+        console.error("Cancellation Error:", err);
+        return { success: false, message: 'فشل الإلغاء: ' + (err.message || 'خطأ غير معروف') };
     }
-
-    const empTreasury = treasuries.find(t => t.employee_id === transaction.employee_id);
-
-    // Reverse logic with rounding
-    if (transaction.type === 'exchange') {
-        if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
-        if (transaction.from_currency === 'SDG') {
-            await supabase.from('treasuries').update({
-                sdg_balance: Math.round(empTreasury.sdg_balance - transaction.from_amount),
-                egp_balance: Math.round(empTreasury.egp_balance + (transaction.to_amount || 0))
-            }).eq('id', empTreasury.id);
-        } else {
-            await supabase.from('treasuries').update({
-                egp_balance: Math.round(empTreasury.egp_balance - transaction.from_amount),
-                sdg_balance: Math.round(empTreasury.sdg_balance + (transaction.to_amount || 0))
-            }).eq('id', empTreasury.id);
-        }
-    } else if (transaction.type === 'sale') {
-        if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
-        await supabase.from('treasuries').update({
-            sales_balance: Math.round((empTreasury.sales_balance || 0) - transaction.from_amount)
-        }).eq('id', empTreasury.id);
-    } else if (transaction.type === 'expense') {
-        if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
-        const currency = transaction.from_currency as 'EGP' | 'SDG';
-        const balanceKey = currency === 'EGP' ? 'egp_balance' : 'sdg_balance';
-        await supabase.from('treasuries').update({ [balanceKey]: Math.round(empTreasury[balanceKey] + transaction.from_amount) }).eq('id', empTreasury.id);
-    } else if (transaction.type === 'wallet_transfer') {
-        if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
-        const wallet = eWallets.find(w => w.id === transaction.wallet_id);
-        if (!wallet) return { success: false, message: 'المحفظة غير موجودة' };
-        
-        const amount = transaction.from_amount;
-        const commission = transaction.commission || 0;
-        const walletType = transaction.wallet_type || 'withdraw';
-
-        if (walletType === 'withdraw') {
-             // User withdrew cash from wallet -> We reverse: Deduct cash from user treasury, Add back to Wallet
-             await supabase.from('e_wallets').update({ balance: Math.round(wallet.balance + amount) }).eq('id', wallet.id);
-             await supabase.from('treasuries').update({ egp_balance: Math.round(empTreasury.egp_balance - (amount + commission)) }).eq('id', empTreasury.id);
-        } else if (walletType === 'deposit') {
-             // User deposited cash -> We reverse: Add cash to user treasury, Deduct from Wallet
-             await supabase.from('e_wallets').update({ balance: Math.round(wallet.balance - amount) }).eq('id', wallet.id);
-             await supabase.from('treasuries').update({ egp_balance: Math.round(empTreasury.egp_balance + amount - commission) }).eq('id', empTreasury.id);
-        } else if (walletType === 'exchange') {
-             // SDG -> Wallet EGP
-             const rate = transaction.rate || 1;
-             const egpValue = Math.round(amount / rate);
-             await supabase.from('e_wallets').update({ balance: Math.round(wallet.balance + egpValue) }).eq('id', wallet.id);
-             await supabase.from('treasuries').update({
-                 sdg_balance: Math.round(empTreasury.sdg_balance - amount),
-                 egp_balance: Math.round(empTreasury.egp_balance - commission)
-             }).eq('id', empTreasury.id);
-        }
-    }
-
-    // Mark as cancelled with Audit Data
-    await supabase.from('transactions').update({ 
-        is_cancelled: true,
-        cancellation_reason: reason,
-        cancelled_by: currentUser.id,
-        cancelled_at: new Date().toISOString()
-    }).eq('id', transactionId);
-    
-    await fetchData();
-    showToast('تم إلغاء العملية وتوثيق السبب في السجل', 'info');
-    return { success: true, message: 'تم الإلغاء بنجاح' };
   };
 
   const addMerchant = async (companyId: number, name: string, phone: string) => {
