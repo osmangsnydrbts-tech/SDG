@@ -33,7 +33,7 @@ const WalletTransfer: React.FC = () => {
   const formatInput = (val: string) => {
     const raw = val.replace(/,/g, '');
     if (isNaN(Number(raw))) return val;
-    return Number(raw).toLocaleString();
+    return Math.round(Number(raw)).toLocaleString();
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +65,7 @@ const WalletTransfer: React.FC = () => {
         const res = await performEWalletTransfer(
             parseInt(selectedWalletId),
             transferType,
-            rawAmount,
+            Math.round(rawAmount),
             phone,
             receipt
         );
@@ -92,18 +92,21 @@ const WalletTransfer: React.FC = () => {
       const val = parseFloat(amount.replace(/,/g, ''));
       if (isNaN(val)) return { commission: 0, total: 0, egpEquivalent: 0 };
 
+      // Round base values
+      const roundedVal = Math.round(val);
+
       if (transferType === 'exchange') {
           // SDG -> Wallet (EGP)
           const rate = rates?.sd_to_eg_rate || 1;
-          const egpEquivalent = val / rate;
-          const commission = egpEquivalent * (commissionRate / 100);
+          const egpEquivalent = Math.round(roundedVal / rate);
+          const commission = Math.round(egpEquivalent * (commissionRate / 100));
           return { commission, total: 0, egpEquivalent }; 
       }
 
       // EGP -> Wallet (Deposit/Withdraw)
-      const commission = val * (commissionRate / 100);
-      const total = val + commission; // For Withdraw (User gets cash + comm)
-      return { commission, total, egpEquivalent: val };
+      const commission = Math.round(roundedVal * (commissionRate / 100));
+      const total = roundedVal + commission; // For Withdraw (User gets cash + comm)
+      return { commission, total, egpEquivalent: roundedVal };
   };
 
   const calc = getCalculatedValues();
@@ -208,24 +211,24 @@ const WalletTransfer: React.FC = () => {
                             <>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-500">القيمة المعادلة:</span>
-                                    <span className="font-bold">{calc.egpEquivalent.toLocaleString(undefined, {maximumFractionDigits: 0})} EGP</span>
+                                    <span className="font-bold">{calc.egpEquivalent.toLocaleString()} EGP</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-500">العمولة ({commissionRate}%):</span>
-                                    <span className="font-bold text-green-600">{calc.commission.toLocaleString(undefined, {maximumFractionDigits: 1})} EGP</span>
+                                    <span className="font-bold text-green-600">{calc.commission.toLocaleString()} EGP</span>
                                 </div>
                                 <div className="border-t pt-2 mt-2">
                                     <div className="flex justify-between items-center text-sm text-red-600">
                                         <span>يخصم من المحفظة:</span>
-                                        <span className="font-bold">{calc.egpEquivalent.toLocaleString(undefined, {maximumFractionDigits: 0})} EGP</span>
+                                        <span className="font-bold">{calc.egpEquivalent.toLocaleString()} EGP</span>
                                     </div>
                                     <div className="flex justify-between items-center text-lg text-green-700 mt-1">
                                         <span className="font-bold">يضاف للخزينة (SDG):</span>
-                                        <span className="font-extrabold">{parseFloat(amount.replace(/,/g, '') || '0').toLocaleString(undefined, {maximumFractionDigits: 0})} SDG</span>
+                                        <span className="font-extrabold">{Math.round(parseFloat(amount.replace(/,/g, '') || '0')).toLocaleString()} SDG</span>
                                     </div>
                                     <div className="flex justify-between items-center text-xs text-green-600 mt-1">
                                         <span>يضاف للخزينة (EGP) ربح:</span>
-                                        <span className="font-bold">{calc.commission.toLocaleString(undefined, {maximumFractionDigits: 1})} EGP</span>
+                                        <span className="font-bold">{calc.commission.toLocaleString()} EGP</span>
                                     </div>
                                 </div>
                             </>
@@ -238,7 +241,7 @@ const WalletTransfer: React.FC = () => {
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-500">العمولة ({commissionRate}%):</span>
                                     <span className="font-bold text-green-600">
-                                        {calc.commission.toFixed(2)} EGP
+                                        {calc.commission.toLocaleString()} EGP
                                     </span>
                                 </div>
                                 
@@ -251,18 +254,18 @@ const WalletTransfer: React.FC = () => {
                                             </div>
                                             <div className="flex justify-between items-center text-lg text-green-700">
                                                 <span className="font-bold">يضاف إلى خزينتك:</span>
-                                                <span className="font-extrabold">{(parseFloat(amount.replace(/,/g, '') || '0') + calc.commission).toFixed(2)} EGP</span>
+                                                <span className="font-extrabold">{(Math.round(parseFloat(amount.replace(/,/g, '') || '0')) + calc.commission).toLocaleString()} EGP</span>
                                             </div>
                                         </>
                                     ) : (
                                         <>
                                             <div className="flex justify-between items-center text-sm text-red-600 mb-1">
                                                 <span>يخصم من خزينتك:</span>
-                                                <span className="font-bold">{(parseFloat(amount.replace(/,/g, '') || '0') - calc.commission).toFixed(2)} EGP</span>
+                                                <span className="font-bold">{(Math.round(parseFloat(amount.replace(/,/g, '') || '0')) - calc.commission).toLocaleString()} EGP</span>
                                             </div>
                                              <div className="flex justify-between items-center text-lg text-green-700">
                                                 <span className="font-bold">يضاف إلى المحفظة:</span>
-                                                <span className="font-extrabold">{parseFloat(amount.replace(/,/g, '') || '0').toFixed(2)} EGP</span>
+                                                <span className="font-extrabold">{Math.round(parseFloat(amount.replace(/,/g, '') || '0')).toLocaleString()} EGP</span>
                                             </div>
                                         </>
                                     )}
