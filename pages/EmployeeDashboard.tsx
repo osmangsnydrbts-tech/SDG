@@ -2,12 +2,12 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRightLeft, Wallet, ArrowUpRight, ArrowDownLeft, Smartphone, Share2, TrendingDown, CheckCircle, Loader2, X } from 'lucide-react';
+import { ArrowRightLeft, ArrowUpRight, ArrowDownLeft, Share2, TrendingDown, CheckCircle, Loader2, X } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
 const EmployeeDashboard: React.FC = () => {
-  const { currentUser, treasuries, transactions, companies, users, eWallets, exchangeRates, recordExpense } = useStore();
+  const { currentUser, treasuries, transactions, companies, users, exchangeRates, recordExpense } = useStore();
   const navigate = useNavigate();
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -28,15 +28,11 @@ const EmployeeDashboard: React.FC = () => {
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 5);
 
-  const myWalletsBalance = eWallets
-    .filter(w => w.employee_id === currentUser?.id && w.is_active)
-    .reduce((sum, w) => sum + w.balance, 0);
-
   const getCompany = (companyId: number) => companies.find(c => c.id === companyId);
   const getEmployee = (empId?: number) => users.find(u => u.id === empId);
 
   const getTransactionIcon = (type: string) => {
-      if (type === 'exchange' || type === 'e_wallet' || type === 'treasury_withdraw' || type === 'wallet_withdrawal' || type === 'expense') {
+      if (type === 'exchange' || type === 'treasury_withdraw' || type === 'expense') {
           return { icon: <ArrowUpRight size={16} />, bg: 'bg-red-100', text: 'text-red-600' };
       } else {
           return { icon: <ArrowDownLeft size={16} />, bg: 'bg-green-100', text: 'text-green-600' };
@@ -46,11 +42,7 @@ const EmployeeDashboard: React.FC = () => {
   const getTransactionLabel = (type: string) => {
       switch(type) {
           case 'exchange': return 'صرف عملة';
-          case 'e_wallet': return 'تحويل قديم'; // Legacy
-          case 'wallet_deposit': return 'إيداع محفظة';
-          case 'wallet_withdrawal': return 'سحب محفظة';
           case 'treasury_feed': return 'تغذية خزينة';
-          case 'wallet_feed': return 'تغذية محفظة';
           case 'expense': return 'منصرفات';
           default: return 'سحب رصيد';
       }
@@ -150,7 +142,7 @@ ${footer}
       {/* Treasury Cards */}
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
         <h3 className="text-sm text-gray-500 mb-3 flex items-center gap-2">
-            <Wallet size={16} /> رصيد عهدتي
+            <TrendingDown size={16} /> رصيد عهدتي
         </h3>
         <div className="grid grid-cols-2 gap-4">
             <div className="p-3 bg-blue-50 rounded-xl">
@@ -160,22 +152,6 @@ ${footer}
             <div className="p-3 bg-emerald-50 rounded-xl">
                 <p className="text-xs text-emerald-400 mb-1">سوداني (SDG)</p>
                 <p className="text-xl font-bold text-emerald-700">{myTreasury?.sdg_balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-            </div>
-        </div>
-        
-        {/* Wallet Balance Section */}
-        <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="p-3 bg-pink-50 rounded-xl flex justify-between items-center">
-                <div>
-                    <p className="text-xs text-pink-400 mb-1 flex items-center gap-1"><Smartphone size={12}/> رصيد المحافظ</p>
-                    <p className="text-xl font-bold text-pink-700">{myWalletsBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} EGP</p>
-                </div>
-                <button 
-                    onClick={() => navigate('/wallet-transfer')}
-                    className="text-xs bg-white text-pink-600 px-3 py-1 rounded-lg shadow-sm font-bold border border-pink-100 hover:bg-pink-50"
-                >
-                    تحويل
-                </button>
             </div>
         </div>
       </div>
