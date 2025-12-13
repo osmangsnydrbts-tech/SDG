@@ -32,15 +32,12 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
         useCORS: true,
         logging: false,
         allowTaint: true,
-        // Removed `letterRendering` as it causes Arabic font glitches
-        // Explicitly width set in onclone to prevent responsive shifts
         onclone: (clonedDoc: Document) => {
             const clonedElement = clonedDoc.getElementById('receipt-content');
             if (clonedElement) {
                 clonedElement.style.width = '400px'; 
                 clonedElement.style.margin = '0 auto';
                 clonedElement.style.transform = 'none';
-                // Force font settings on clone to ensure Arabic joins correctly
                 clonedElement.style.fontVariantLigatures = 'normal';
                 clonedElement.style.letterSpacing = 'normal';
             }
@@ -94,6 +91,13 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
          return 'تحويل محفظة';
     }
     return 'عملية مالية';
+  };
+
+  const getAmountLabel = (t: Transaction) => {
+      if (t.type === 'exchange') return 'المبلغ المستلم من العميل';
+      if (t.type === 'expense') return 'المبلغ المخصوم';
+      if (t.type === 'sale') return 'سعر المنتج';
+      return 'المبلغ';
   };
 
   // Ensure no decimals are shown
@@ -152,7 +156,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             <div className="space-y-3 text-sm">
               <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span className="text-gray-600 font-medium">
-                    {transaction.type === 'expense' ? 'المبلغ المخصوم' : 'المبلغ'}
+                    {getAmountLabel(transaction)}
                 </span>
                 <span className="font-bold text-gray-900 text-lg" dir="ltr">
                   {formatAmount(transaction.from_amount)} {transaction.from_currency}
@@ -182,7 +186,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
               {transaction.to_amount && (
                 <div className="flex justify-between items-center p-4 bg-blue-600 rounded-lg shadow-sm text-white">
                   <span className="text-blue-100 font-bold">
-                     المبلغ المستلم
+                     {transaction.type === 'exchange' ? 'المبلغ المسلم للعميل' : 'المبلغ المستلم'}
                   </span>
                   <span className="font-extrabold text-2xl" dir="ltr">
                     {formatAmount(transaction.to_amount)} {transaction.to_currency}
@@ -192,12 +196,9 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
             </div>
 
             <div className="pt-6 mt-2 border-t border-gray-100">
-              <div className="flex justify-between items-center text-xs text-gray-500 mb-4">
+              <div className="flex justify-between items-center text-xs text-gray-500">
                 <span>الموظف المسؤول:</span>
                 <span className="font-bold text-gray-700">{employee?.full_name}</span>
-              </div>
-              <div className="text-center text-xs text-gray-400 font-light whitespace-pre-wrap">
-                 {company.footer_message || 'شكراً لتعاملكم معنا'}
               </div>
             </div>
           </div>
