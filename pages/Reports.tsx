@@ -1,24 +1,25 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart, Ban, Info, Loader2 } from 'lucide-react';
+import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart, Ban, Info, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
 type TabType = 'breakdown' | 'exchange' | 'treasury' | 'expenses' | 'wallet' | 'sales' | 'cancelled';
 
 const Reports: React.FC = () => {
-  const { transactions, currentUser, users, companies, cancelTransaction, eWallets } = useStore();
+  const { transactions, currentUser, users, companies, cancelTransaction, eWallets, showToast } = useStore();
   const [activeTab, setActiveTab] = useState<TabType>('breakdown');
   
   // Filters
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedEmp, setSelectedEmp] = useState<string>('all');
-  const [cancellingId, setCancellingId] = useState<number | null>(null);
   
-  // Modal
+  // Modals
   const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState<number | null>(null); // Holds ID of tx to cancel
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const getEmployeeName = (empId?: number) => users.find(u => u.id === empId)?.full_name || '-';
   const getCompany = (companyId: number) => companies.find(c => c.id === companyId);
@@ -29,24 +30,30 @@ const Reports: React.FC = () => {
       return w ? `${w.provider} (${w.phone_number})` : 'محفظة محذوفة';
   };
 
-  const handleCancel = async (id: number) => {
-      if (cancellingId) return; // Prevent double click
+  const handleCancelClick = (id: number) => {
+      setShowCancelModal(id);
+      setCancelReason('');
+  };
 
-      const reason = window.prompt('الرجاء إدخال سبب الإلغاء (مطلوب):');
-      
-      if (reason === null) return;
-      if (reason.trim() === '') {
-          alert('يجب كتابة سبب للإلغاء!');
+  const submitCancellation = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!showCancelModal) return;
+
+      if (!cancelReason.trim()) {
+          showToast('يجب كتابة سبب للإلغاء', 'error');
           return;
       }
 
-      if (window.confirm('هل أنت متأكد من إلغاء العملية؟ سيتم عكس المبالغ المالية وتوثيق الإجراء في السجل.')) {
-          setCancellingId(id);
-          const res = await cancelTransaction(id, reason);
-          setCancellingId(null);
-          if (!res.success) {
-              alert(res.message);
-          }
+      setIsCancelling(true);
+      const res = await cancelTransaction(showCancelModal, cancelReason);
+      setIsCancelling(false);
+      
+      if (res.success) {
+          setShowCancelModal(null);
+          setCancelReason('');
+          showToast(res.message, 'success');
+      } else {
+          showToast(res.message, 'error');
       }
   };
 
@@ -119,7 +126,6 @@ const Reports: React.FC = () => {
   const CardRow = ({ t }: { t: Transaction }) => {
     const isWallet = ['wallet_feed', 'wallet_transfer'].includes(t.type);
     const isCancelled = t.is_cancelled === true;
-    const isProcessing = cancellingId === t.id;
     
     return (
         <div className={`p-4 rounded-xl shadow-sm border flex flex-col gap-3 relative overflow-hidden group transition-all ${isCancelled ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
@@ -222,12 +228,11 @@ const Reports: React.FC = () => {
                      {/* Show Cancel Button ONLY if Not Cancelled AND User is Admin */}
                      {!isCancelled && currentUser?.role === 'admin' && (
                         <button 
-                            onClick={() => handleCancel(t.id)} 
-                            disabled={isProcessing}
-                            className={`p-2 rounded-lg transition flex items-center gap-1 ${isProcessing ? 'bg-gray-100 text-gray-400 cursor-wait' : 'text-orange-500 bg-orange-50 hover:bg-orange-100'}`}
+                            onClick={() => handleCancelClick(t.id)} 
+                            className="p-2 rounded-lg transition flex items-center gap-1 text-orange-500 bg-orange-50 hover:bg-orange-100"
                             title="إلغاء العملية"
                         >
-                            {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
+                            <XCircle size={16} />
                         </button>
                      )}
 
@@ -376,6 +381,53 @@ const Reports: React.FC = () => {
                 employee={getEmployee(viewTransaction.employee_id)} 
                 onClose={() => setViewTransaction(null)} 
             />
+        )}
+
+        {/* Custom Cancellation Modal */}
+        {showCancelModal && (
+            <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+                    <div className="text-center mb-6">
+                        <div className="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <AlertTriangle size={32} className="text-red-500" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800">إلغاء العملية</h3>
+                        <p className="text-sm text-gray-500 mt-2">هل أنت متأكد من رغبتك في إلغاء هذه العملية؟ سيتم عكس المبالغ المالية فوراً.</p>
+                    </div>
+
+                    <form onSubmit={submitCancellation}>
+                        <div className="mb-4">
+                            <label className="block text-xs font-bold text-gray-700 mb-1">سبب الإلغاء (مطلوب)</label>
+                            <input 
+                                type="text" 
+                                autoFocus
+                                value={cancelReason}
+                                onChange={e => setCancelReason(e.target.value)}
+                                className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition"
+                                placeholder="مثال: خطأ في المبلغ، إرجاع..."
+                                required
+                            />
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button 
+                                type="submit" 
+                                disabled={isCancelling}
+                                className="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-red-700 flex items-center justify-center gap-2"
+                            >
+                                {isCancelling ? <Loader2 size={18} className="animate-spin" /> : 'تأكيد الإلغاء'}
+                            </button>
+                            <button 
+                                type="button" 
+                                onClick={() => { setShowCancelModal(null); setCancelReason(''); }}
+                                className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200"
+                            >
+                                تراجع
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         )}
     </div>
   );
