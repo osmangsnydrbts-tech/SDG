@@ -40,6 +40,9 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
                 clonedElement.style.width = '400px'; 
                 clonedElement.style.margin = '0 auto';
                 clonedElement.style.transform = 'none';
+                // Force font settings on clone to ensure Arabic joins correctly
+                clonedElement.style.fontVariantLigatures = 'normal';
+                clonedElement.style.letterSpacing = 'normal';
             }
         }
       });
@@ -108,7 +111,8 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
           className="bg-white rounded-2xl shadow-2xl overflow-hidden relative" 
           style={{ 
             fontFamily: 'Tajawal, sans-serif',
-            fontVariantLigatures: 'none' 
+            letterSpacing: 'normal',
+            direction: 'rtl'
           }}
         >
           
