@@ -23,8 +23,8 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
     setIsSharing(true);
 
     try {
-      // Small delay to ensure rendering
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Small delay to ensure rendering and font loading
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
@@ -38,8 +38,21 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, company, emplo
                 clonedElement.style.width = '400px'; 
                 clonedElement.style.margin = '0 auto';
                 clonedElement.style.transform = 'none';
-                clonedElement.style.fontVariantLigatures = 'normal';
-                clonedElement.style.letterSpacing = 'normal';
+                
+                // Fixes for Arabic disjointed letters
+                clonedElement.style.direction = 'rtl';
+                clonedElement.style.fontFeatureSettings = '"liga" 1, "dlig" 1';
+                clonedElement.style.fontVariantLigatures = 'common-ligatures';
+                clonedElement.style.letterSpacing = '0px';
+
+                // Force styling on all text elements within the receipt
+                const allText = clonedElement.querySelectorAll('h2, h3, p, span, div');
+                allText.forEach((el) => {
+                    const htmlEl = el as HTMLElement;
+                    htmlEl.style.letterSpacing = '0px';
+                    htmlEl.style.fontVariantLigatures = 'common-ligatures';
+                    htmlEl.style.fontFeatureSettings = '"liga" 1';
+                });
             }
         }
       });
