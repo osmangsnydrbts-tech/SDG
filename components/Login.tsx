@@ -131,7 +131,7 @@ const Login: React.FC = () => {
               </div>
               
               <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">من نحن</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">نظام الصرافة</h3>
                 <p className="text-gray-600 font-medium">حقوق الملكية لصالح عثمان بابكر الشريف</p>
               </div>
 
