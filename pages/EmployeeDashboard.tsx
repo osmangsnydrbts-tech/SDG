@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRightLeft, ShoppingCart, Share2, TrendingDown, CheckCircle, Loader2, X, Smartphone, DollarSign } from 'lucide-react';
+import { ArrowRightLeft, ShoppingCart, Share2, TrendingDown, CheckCircle, Loader2, X, Smartphone, DollarSign, ArrowUp, ArrowDown } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -136,6 +136,29 @@ ${footer}
 
   const fmt = (n?: number) => n ? Math.round(n).toLocaleString() : '0';
 
+  // Helper for Transaction Styling
+  const getTxInfo = (t: Transaction) => {
+    let typeLabel = '';
+    let isPositive = false; // Green/Down, False = Red/Up
+
+    switch(t.type) {
+        case 'treasury_feed': typeLabel = 'إيداع خزينة'; isPositive = true; break;
+        case 'treasury_withdraw': typeLabel = 'سحب خزينة'; isPositive = false; break;
+        case 'expense': typeLabel = 'منصرف'; isPositive = false; break;
+        case 'sale': typeLabel = 'بيع منتج'; isPositive = true; break;
+        case 'wallet_feed': typeLabel = 'تغذية محفظة'; isPositive = false; break;
+        case 'wallet_transfer':
+             if (t.wallet_type === 'deposit') { typeLabel = 'إيداع محفظة'; isPositive = true; }
+             else if (t.wallet_type === 'withdraw') { typeLabel = 'سحب محفظة'; isPositive = false; }
+             else { typeLabel = 'صرف محفظة'; isPositive = true; }
+             break;
+        case 'exchange': typeLabel = 'صرف'; isPositive = true; break;
+        default: typeLabel = 'عملية'; isPositive = true;
+    }
+
+    return { label: typeLabel, isPositive };
+  };
+
   return (
     <div className="space-y-6">
       
@@ -245,30 +268,31 @@ ${footer}
       <div>
           <h3 className="font-bold text-gray-800 mb-3">آخر العمليات</h3>
           <div className="space-y-3">
-              {myTransactions.map(t => (
-                  <div 
+              {myTransactions.map(t => {
+                  const info = getTxInfo(t);
+                  return (
+                    <div 
                         key={t.id} 
                         onClick={() => setViewTransaction(t)}
                         className="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center cursor-pointer hover:bg-gray-50 transition active:scale-95 border border-gray-100"
                     >
                         <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-full bg-gray-100 text-gray-600">
-                                {t.type === 'exchange' ? <ArrowRightLeft size={16}/> : 
-                                 t.type === 'sale' ? <ShoppingCart size={16} /> :
-                                 t.type === 'expense' ? <TrendingDown size={16} /> : <Smartphone size={16} />}
+                            <div className={`p-2 rounded-full ${info.isPositive ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                {info.isPositive ? <ArrowDown size={16}/> : <ArrowUp size={16}/>}
                             </div>
                             <div>
                                 <p className="text-sm font-bold">
-                                    {t.type === 'exchange' ? 'صرف' : t.type === 'sale' ? 'بيع منتج' : t.type === 'expense' ? 'منصرف' : 'تحويل'}
+                                    {info.label}
                                 </p>
                                 <p className="text-xs text-gray-400">{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</p>
                             </div>
                         </div>
-                        <div className="text-right">
+                        <div className={`text-right ${info.isPositive ? 'text-green-600' : 'text-red-600'}`}>
                             <p className="text-sm font-bold">{fmt(t.from_amount)} <span className="text-xs">{t.from_currency}</span></p>
                         </div>
                     </div>
-              ))}
+                  );
+              })}
               {myTransactions.length === 0 && <p className="text-center text-gray-400 text-sm">لا توجد عمليات اليوم</p>}
           </div>
       </div>
