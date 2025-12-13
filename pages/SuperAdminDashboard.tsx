@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Plus, Power, Calendar, Building, UploadCloud, Activity, Trash2, Pencil, Database, Download, Loader2, Copy, AlertTriangle } from 'lucide-react';
@@ -127,9 +126,15 @@ const SuperAdminDashboard: React.FC = () => {
   };
 
   const SQL_FIX = `
-/* 1. SALES TABLE STRUCTURE (INSIDE TRANSACTIONS) */
+/* 1. SALES & CANCELLATION TABLE STRUCTURE */
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS product_name text;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS is_cancelled boolean DEFAULT false;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS cancellation_reason text;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS cancelled_by bigint;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS cancelled_at timestamptz;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_id bigint;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_type text;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS commission float8 DEFAULT 0;
 
 /* 2. SALES TREASURY BALANCE */
 ALTER TABLE public.treasuries ADD COLUMN IF NOT EXISTS sales_balance float8 DEFAULT 0;
@@ -140,8 +145,6 @@ ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS phone_numbers text;
 ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS footer_message text;
 
 /* 4. E-WALLETS STRUCTURE */
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_id bigint;
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS wallet_type text;
 ALTER TABLE public.e_wallets ADD COLUMN IF NOT EXISTS commission float8 DEFAULT 0;
 
 /* 5. REFRESH CACHE */
@@ -161,11 +164,11 @@ NOTIFY pgrst, 'reload schema';
         <div className="flex justify-between items-start">
              <div>
                 <h3 className="flex items-center gap-2 font-bold text-yellow-800 text-sm mb-1">
-                    <AlertTriangle size={16}/> إنشاء جداول المبيعات وتحديث الهيكل
+                    <AlertTriangle size={16}/> تحديث هيكل قاعدة البيانات
                 </h3>
                 <p className="text-xs text-yellow-700 leading-relaxed mb-2">
-                    لتفعيل نظام المبيعات والمحافظ، انسخ الكود التالي وضعه في Supabase SQL Editor.
-                    هذا الكود يقوم بإنشاء الأعمدة المطلوبة في جدول العمليات (Transactions) وجدول الخزينة.
+                    لتفعيل المبيعات، الإلغاء، والمحافظ، انسخ هذا الكود وضعه في Supabase SQL Editor.
+                    هذا سيضيف الأعمدة الناقصة مثل سبب الإلغاء والعمولات.
                 </p>
              </div>
              <button onClick={copySql} className="text-yellow-700 bg-yellow-100 hover:bg-yellow-200 p-2 rounded-lg text-xs font-bold flex items-center gap-1">
