@@ -1,12 +1,15 @@
-
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { WalletCards, Banknote, ShoppingCart, Share2, User, Smartphone, TrendingDown, ChevronLeft, X, Clock } from 'lucide-react';
+import { ShoppingCart, Share2, User, Smartphone, TrendingDown, ChevronLeft, X, Clock, Calendar, Filter, Banknote } from 'lucide-react';
 import { Transaction } from '../types';
 
 const DailyReport: React.FC = () => {
   const { currentUser, treasuries, eWallets, users, companies, transactions } = useStore();
   const [selectedEmpId, setSelectedEmpId] = useState<string>('all');
+  
+  // Date Filters
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   // Modal States
   const [detailsModalType, setDetailsModalType] = useState<'sales' | 'expenses' | null>(null);
@@ -19,6 +22,12 @@ const DailyReport: React.FC = () => {
       ? currentUser.id 
       : (selectedEmpId === 'all' ? null : parseInt(selectedEmpId));
 
+  const setFilterToday = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setStartDate(today);
+    setEndDate(today);
+  };
+
   const reportData = useMemo(() => {
     if (!targetEmployeeId) return null;
 
@@ -26,28 +35,33 @@ const DailyReport: React.FC = () => {
     const wallets = eWallets.filter(w => w.employee_id === targetEmployeeId && w.is_active);
     const employee = users.find(u => u.id === targetEmployeeId);
 
-    // Calculate Daily Stats based on Transactions for "Today"
-    const today = new Date().toISOString().split('T')[0];
+    // Date Logic
+    const start = new Date(startDate).setHours(0,0,0,0);
+    const end = new Date(endDate).setHours(23,59,59,999);
     
-    const todayTx = transactions.filter(t => 
-        t.employee_id === targetEmployeeId && 
-        !t.is_cancelled && 
-        t.created_at.startsWith(today)
-    );
+    const filteredTx = transactions.filter(t => {
+        const txDate = new Date(t.created_at).getTime();
+        return t.employee_id === targetEmployeeId && 
+               !t.is_cancelled && 
+               txDate >= start && 
+               txDate <= end;
+    });
 
-    const salesTx = todayTx.filter(t => t.type === 'sale');
-    const expensesTx = todayTx.filter(t => t.type === 'expense');
+    const salesTx = filteredTx.filter(t => t.type === 'sale');
+    const expensesTx = filteredTx.filter(t => t.type === 'expense');
 
-    const totalSalesToday = salesTx.reduce((sum, t) => sum + t.from_amount, 0);
-    const totalExpensesToday = expensesTx.reduce((sum, t) => sum + t.from_amount, 0);
+    const totalSalesPeriod = salesTx.reduce((sum, t) => sum + t.from_amount, 0);
+    const totalExpensesPeriod = expensesTx.reduce((sum, t) => sum + t.from_amount, 0);
 
     return {
         employeeName: employee?.full_name || '',
+        // Current Balances (Snapshot)
         egpBalance: Math.round(treasury?.egp_balance || 0),
         sdgBalance: Math.round(treasury?.sdg_balance || 0),
         salesBalance: Math.round(treasury?.sales_balance || 0),
-        totalSalesToday,
-        totalExpensesToday,
+        // Period Stats
+        totalSalesPeriod,
+        totalExpensesPeriod,
         salesTx,
         expensesTx,
         wallets: wallets.map(w => ({
@@ -56,7 +70,7 @@ const DailyReport: React.FC = () => {
             balance: Math.round(w.balance)
         }))
     };
-  }, [targetEmployeeId, treasuries, eWallets, users, transactions]);
+  }, [targetEmployeeId, treasuries, eWallets, users, transactions, startDate, endDate]);
 
   // Helper for formatting
   const fmt = (num: number) => Math.round(num).toLocaleString('en-US');
@@ -64,22 +78,22 @@ const DailyReport: React.FC = () => {
   const handleShare = async () => {
       if (!reportData) return;
       
-      const date = new Date().toLocaleDateString('ar-EG');
-      let text = `*تقرير اليومية - ${date}*\n`;
+      const dateStr = startDate === endDate ? startDate : `${startDate} إلى ${endDate}`;
+      let text = `*تقرير فترة - ${dateStr}*\n`;
       text += `الموظف: ${reportData.employeeName}\n`;
       text += `------------------\n`;
-      text += `💰 *الخزينة النقدية:*\n`;
+      text += `💰 *الخزينة النقدية (الحالية):*\n`;
       text += `مصري: ${fmt(reportData.egpBalance)} EGP\n`;
       text += `سوداني: ${fmt(reportData.sdgBalance)} SDG\n\n`;
       
       text += `🛒 *خزينة المبيعات:*\n`;
       text += `الرصيد الكلي: ${fmt(reportData.salesBalance)} EGP\n`;
-      text += `مبيعات اليوم: ${fmt(reportData.totalSalesToday)} EGP\n\n`;
+      text += `مبيعات الفترة: ${fmt(reportData.totalSalesPeriod)} EGP\n\n`;
 
-      text += `📉 *المنصرفات اليومية:*\n`;
-      text += `القيمة: ${fmt(reportData.totalExpensesToday)} EGP\n\n`;
+      text += `📉 *المنصرفات:*\n`;
+      text += `منصرفات الفترة: ${fmt(reportData.totalExpensesPeriod)} EGP\n\n`;
       
-      text += `📱 *المحافظ الإلكترونية:*\n`;
+      text += `📱 *المحافظ الإلكترونية (الحالية):*\n`;
       if (reportData.wallets.length > 0) {
           reportData.wallets.forEach((w) => {
               text += `- ${w.provider} (${w.phone}): ${fmt(w.balance)}\n`;
@@ -110,7 +124,7 @@ const DailyReport: React.FC = () => {
       if (!detailsModalType || !reportData) return null;
 
       const isSales = detailsModalType === 'sales';
-      const title = isSales ? 'تفاصيل مبيعات اليوم' : 'تفاصيل منصرفات اليوم';
+      const title = isSales ? 'تفاصيل المبيعات' : 'تفاصيل المنصرفات';
       const list = isSales ? reportData.salesTx : reportData.expensesTx;
       const colorClass = isSales ? 'text-purple-600' : 'text-red-600';
       const bgClass = isSales ? 'bg-purple-50' : 'bg-red-50';
@@ -137,7 +151,7 @@ const DailyReport: React.FC = () => {
                                   </p>
                                   <p className="text-xs text-gray-400 flex items-center gap-1">
                                       <Clock size={10}/>
-                                      {new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
+                                      {new Date(t.created_at).toLocaleDateString('ar-EG')} - {new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
                                   </p>
                               </div>
                               <span className={`font-bold text-lg ${colorClass}`}>
@@ -145,14 +159,14 @@ const DailyReport: React.FC = () => {
                               </span>
                           </div>
                       )) : (
-                          <div className="text-center py-10 text-gray-400">لا توجد بيانات اليوم</div>
+                          <div className="text-center py-10 text-gray-400">لا توجد بيانات في هذه الفترة</div>
                       )}
                   </div>
 
                   <div className={`p-4 border-t font-bold flex justify-between items-center rounded-b-2xl ${bgClass}`}>
                       <span>الإجمالي</span>
                       <span className="text-xl">
-                          {fmt(isSales ? reportData.totalSalesToday : reportData.totalExpensesToday)}
+                          {fmt(isSales ? reportData.totalSalesPeriod : reportData.totalExpensesPeriod)}
                       </span>
                   </div>
               </div>
@@ -165,8 +179,7 @@ const DailyReport: React.FC = () => {
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-start mb-4">
                 <div>
-                    <h2 className="text-xl font-bold text-gray-800">تقرير اليوم</h2>
-                    <p className="text-gray-500 text-sm">{new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    <h2 className="text-xl font-bold text-gray-800">التقرير التفصيلي</h2>
                 </div>
                 
                 {/* Admin Employee Selector */}
@@ -186,6 +199,23 @@ const DailyReport: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Date Filters */}
+            <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 mb-4">
+                 <div className="flex items-center justify-between mb-2">
+                     <label className="text-xs font-bold text-gray-500 flex items-center gap-1"><Filter size={14}/> تحديد الفترة</label>
+                     <button onClick={setFilterToday} className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded font-bold hover:bg-blue-200 transition">اليوم</button>
+                 </div>
+                 <div className="flex gap-2 items-center">
+                    <div className="flex-1 relative">
+                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2 pl-2 text-sm border rounded-lg font-bold" />
+                    </div>
+                    <span className="text-gray-400 font-bold">:</span>
+                    <div className="flex-1 relative">
+                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2 pl-2 text-sm border rounded-lg font-bold" />
+                    </div>
+                 </div>
+            </div>
             
             {!targetEmployeeId && (
                 <div className="text-center p-8 bg-gray-50 rounded-xl text-gray-500 font-bold">
@@ -201,13 +231,13 @@ const DailyReport: React.FC = () => {
                         onClick={handleShare}
                         className="w-full bg-blue-600 text-white p-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-blue-700 active:scale-95 transition"
                     >
-                        <Share2 size={20} /> مشاركة التقرير اليومي
+                        <Share2 size={20} /> مشاركة التقرير
                     </button>
 
                     {/* Cash Treasury */}
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                         <h3 className="text-gray-500 font-bold text-sm mb-3 flex items-center gap-2">
-                            <Banknote size={18} className="text-green-600"/> الخزينة النقدية (العهدة)
+                            <Banknote size={18} className="text-green-600"/> الخزينة النقدية (الرصيد الحالي)
                         </h3>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-green-50 p-3 rounded-lg text-center border border-green-100">
@@ -235,11 +265,11 @@ const DailyReport: React.FC = () => {
                         
                         <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
                             <div className="flex justify-between items-center mb-1">
-                                <span className="text-purple-700 font-bold">رصيد المبيعات الحالي</span>
+                                <span className="text-purple-700 font-bold">الرصيد الكلي</span>
                                 <span className="text-2xl font-extrabold text-purple-900">{fmt(reportData.salesBalance)} <span className="text-sm">EGP</span></span>
                             </div>
                             <div className="text-xs text-purple-400 font-bold text-right mt-1">
-                                مبيعات اليوم: {fmt(reportData.totalSalesToday)} EGP
+                                مبيعات الفترة: {fmt(reportData.totalSalesPeriod)} EGP
                             </div>
                         </div>
                     </div>
@@ -251,21 +281,21 @@ const DailyReport: React.FC = () => {
                     >
                         <div className="flex justify-between items-center mb-3">
                              <h3 className="text-gray-500 font-bold text-sm flex items-center gap-2">
-                                <TrendingDown size={18} className="text-red-600"/> منصرفات اليوم
+                                <TrendingDown size={18} className="text-red-600"/> المنصرفات
                             </h3>
                             <ChevronLeft size={16} className="text-gray-300 group-hover:text-red-500 transition"/>
                         </div>
                         
                         <div className="bg-red-50 p-4 rounded-lg border border-red-100 flex justify-between items-center">
-                            <span className="text-red-700 font-bold">إجمالي المنصرفات</span>
-                            <span className="text-2xl font-extrabold text-red-900">{fmt(reportData.totalExpensesToday)} <span className="text-sm">EGP</span></span>
+                            <span className="text-red-700 font-bold">منصرفات الفترة</span>
+                            <span className="text-2xl font-extrabold text-red-900">{fmt(reportData.totalExpensesPeriod)} <span className="text-sm">EGP</span></span>
                         </div>
                     </div>
 
                     {/* E-Wallets */}
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                         <h3 className="text-gray-500 font-bold text-sm mb-3 flex items-center gap-2">
-                            <Smartphone size={18} className="text-pink-600"/> المحافظ الإلكترونية
+                            <Smartphone size={18} className="text-pink-600"/> المحافظ الإلكترونية (الرصيد الحالي)
                         </h3>
                         {reportData.wallets.length > 0 ? (
                             <div className="space-y-2">
