@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUpRight, ArrowDownLeft, Smartphone, ShoppingCart, Ban, Info, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { FileText, Filter, Eye, XCircle, Calendar, ListFilter, TrendingDown, ArrowRightLeft, User, ArrowUp, ArrowDown, Smartphone, ShoppingCart, Ban, Info, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { Transaction } from '../types';
 
@@ -123,110 +124,148 @@ const Reports: React.FC = () => {
   
   stats.totalCurrencies = stats.receivedSdg + stats.receivedEgp;
 
+  // Visual Logic Helper
+  const getTxStyle = (t: Transaction) => {
+    let typeLabel = '';
+    let isPositive = false; // Green (In/Down), False = Red (Out/Up)
+
+    switch(t.type) {
+        case 'treasury_feed':
+            typeLabel = 'إيداع خزينة';
+            isPositive = true;
+            break;
+        case 'treasury_withdraw':
+            typeLabel = 'سحب خزينة';
+            isPositive = false;
+            break;
+        case 'expense':
+            typeLabel = 'منصرف';
+            isPositive = false;
+            break;
+        case 'sale':
+            typeLabel = `بيع: ${t.product_name}`;
+            isPositive = true;
+            break;
+        case 'wallet_feed':
+            typeLabel = 'تغذية محفظة';
+            isPositive = false; // Money leaving treasury
+            break;
+        case 'wallet_transfer':
+            if (t.wallet_type === 'deposit') {
+                typeLabel = 'إيداع في محفظة';
+                isPositive = true; // Customer gave money -> Treasury Up
+            } else if (t.wallet_type === 'withdraw') {
+                typeLabel = 'سحب من محفظة';
+                isPositive = false; // We gave money -> Treasury Down
+            } else {
+                typeLabel = 'صرف عبر محفظة';
+                isPositive = true; // Exchange implies we took money to swap
+            }
+            break;
+        case 'exchange':
+            typeLabel = 'صرف عملة';
+            isPositive = true; // Default to green for exchange entry
+            break;
+        default:
+            typeLabel = 'عملية';
+            isPositive = true;
+    }
+
+    return {
+        label: typeLabel,
+        colorClass: isPositive ? 'text-green-600' : 'text-red-600',
+        bgClass: isPositive ? 'bg-green-50' : 'bg-red-50',
+        Icon: isPositive ? ArrowDown : ArrowUp,
+        borderColor: isPositive ? 'border-green-200' : 'border-red-200',
+        stripe: isPositive ? 'bg-green-500' : 'bg-red-500'
+    };
+  };
+
   const CardRow = ({ t }: { t: Transaction }) => {
-    const isWallet = ['wallet_feed', 'wallet_transfer'].includes(t.type);
     const isCancelled = t.is_cancelled === true;
+    const style = getTxStyle(t);
+    const TxIcon = style.Icon;
+
+    if (isCancelled) {
+        return (
+            <div className="p-4 rounded-xl shadow-sm border border-red-200 bg-red-50 flex flex-col gap-3 relative overflow-hidden">
+                <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2 text-gray-500 text-xs">
+                        <span>{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</span>
+                        <div className="flex items-center gap-1 bg-white/50 px-2 py-1 rounded-lg">
+                            <User size={12} />
+                            <span>{getEmployeeName(t.employee_id)}</span>
+                        </div>
+                    </div>
+                    <span className="text-xs text-red-500 font-bold bg-white px-2 py-1 rounded border border-red-200 flex items-center gap-1">
+                         <Ban size={12}/> تم الإلغاء
+                    </span>
+                </div>
+                <div className="text-red-700 font-bold">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span>{style.label}</span>
+                    </div>
+                    {t.cancellation_reason && (
+                        <div className="text-xs font-normal bg-white/60 p-2 rounded-lg flex items-start gap-1">
+                            <Info size={14} className="mt-0.5 shrink-0"/>
+                            <span>السبب: {t.cancellation_reason}</span>
+                        </div>
+                    )}
+                </div>
+                <div className="absolute right-0 top-0 bottom-0 w-1 bg-red-600"></div>
+            </div>
+        );
+    }
     
     return (
-        <div className={`p-4 rounded-xl shadow-sm border flex flex-col gap-3 relative overflow-hidden group transition-all ${isCancelled ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
+        <div className={`p-4 rounded-xl shadow-sm border flex flex-col gap-3 relative overflow-hidden group transition-all bg-white border-gray-100`}>
             <div className="flex justify-between items-start">
                 <div className="flex items-center gap-2 text-gray-500 text-xs">
-                    <span className="bg-white/50 px-2 py-0.5 rounded-full border border-gray-200">{new Date(t.created_at).toLocaleDateString('ar-EG')}</span>
+                    <span className="bg-gray-100 px-2 py-0.5 rounded-full">{new Date(t.created_at).toLocaleDateString('ar-EG')}</span>
                     <span>{new Date(t.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</span>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-gray-500 bg-white/50 px-2 py-1 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
                     <User size={12} />
                     <span>{getEmployeeName(t.employee_id)}</span>
                 </div>
             </div>
 
             <div className="flex justify-between items-center">
-                <div>
-                     {isCancelled ? (
-                         <div className="text-red-600 font-bold">
-                             <div className="flex items-center gap-2 mb-1">
-                                <Ban size={20} />
-                                <span>عملية ملغاة</span>
-                             </div>
-                             {t.cancellation_reason && (
-                                 <div className="text-xs font-normal bg-red-100 p-2 rounded-lg flex items-start gap-1 max-w-[200px]">
-                                     <Info size={14} className="mt-0.5 shrink-0"/>
-                                     <span>السبب: {t.cancellation_reason}</span>
-                                 </div>
-                             )}
-                         </div>
-                     ) : t.type === 'expense' ? (
-                        <div className="text-red-600">
-                             <span className="text-xs font-bold block mb-1 flex items-center gap-1"><TrendingDown size={14}/> منصرف</span>
-                             <span className="text-xl font-bold">{fmt(t.from_amount)} {t.from_currency}</span>
-                        </div>
-                     ) : t.type === 'sale' ? (
-                        <div className="text-purple-600">
-                             <span className="text-xs font-bold block mb-1 flex items-center gap-1"><ShoppingCart size={14}/> بيع: {t.product_name}</span>
-                             <span className="text-xl font-bold">{fmt(t.from_amount)} {t.from_currency}</span>
-                        </div>
-                     ) : t.type === 'exchange' ? (
-                         <div className="text-green-600">
-                             <span className="text-xs font-bold block mb-1 flex items-center gap-1"><ArrowDownLeft size={14}/> استلام</span>
-                             <span className="text-xl font-bold">{fmt(t.from_amount)} {t.from_currency}</span>
-                         </div>
-                     ) : isWallet ? (
-                        <div className="text-pink-600">
-                             <span className="text-xs font-bold block mb-1 flex items-center gap-1">
-                                {t.type === 'wallet_feed' ? 'تغذية' : t.wallet_type === 'withdraw' ? 'سحب' : t.wallet_type === 'deposit' ? 'إيداع' : 'صرف'}
-                             </span>
-                             <span className="text-xs block text-gray-500 mb-1">{getWalletInfo(t.wallet_id)}</span>
-                             <span className="text-xl font-bold">{fmt(t.from_amount)} {t.from_currency}</span>
-                        </div>
-                     ) : (
-                         <div className={t.type === 'treasury_feed' ? 'text-green-600' : 'text-red-600'}>
-                             <span className="text-xs font-bold block mb-1">{t.type === 'treasury_feed' ? 'إيداع خزينة' : 'سحب خزينة'}</span>
-                             <span className="text-xl font-bold">{fmt(t.from_amount)} {t.from_currency}</span>
-                         </div>
+                <div className={style.colorClass}>
+                     <span className="text-xs font-bold block mb-1 flex items-center gap-1">
+                        <TxIcon size={16} /> {style.label}
+                     </span>
+                     <span className="text-xl font-bold">{fmt(t.from_amount)} {t.from_currency}</span>
+                     
+                     {t.type.includes('wallet') && (
+                        <span className="text-xs block text-gray-400 mt-1">{getWalletInfo(t.wallet_id)}</span>
+                     )}
+                     
+                     {(t.type === 'expense' || t.type.includes('treasury')) && t.description && (
+                        <span className="text-xs block text-gray-400 mt-1 max-w-[150px] truncate">{t.description}</span>
                      )}
                 </div>
 
                 <div className="text-right">
                     {t.type === 'exchange' && t.to_amount && (
-                        <div className={isCancelled ? 'text-red-400 opacity-75' : 'text-red-500'}>
-                            <span className="text-xs font-bold block mb-1 flex items-center justify-end gap-1">تسليم <ArrowUpRight size={14}/></span>
-                            <span className="text-xl font-bold">{fmt(t.to_amount)} {t.to_currency}</span>
-                        </div>
-                    )}
-                    {/* Show original type info even if cancelled for context */}
-                    {(t.type === 'expense' || t.type.includes('treasury')) && (
-                        <div className="text-gray-400 text-xs max-w-[150px] truncate">
-                            {t.description || '-'}
-                        </div>
-                    )}
-                    {isWallet && t.commission && t.commission > 0 && (
-                         <div className="text-green-600 text-xs font-bold mt-1">
-                            + {fmt(t.commission)} عمولة
-                        </div>
-                    )}
-                    
-                    {/* Cancellation Metadata */}
-                    {isCancelled && t.cancelled_at && (
-                        <div className="text-[10px] text-red-500 mt-2">
-                            ألغيت في: {new Date(t.cancelled_at).toLocaleTimeString('ar-EG')}
+                        <div className="text-gray-500">
+                            <span className="text-xs font-bold block mb-1 flex items-center justify-end gap-1">تسليم للعميل <ArrowUp size={14} className="text-red-400"/></span>
+                            <span className="text-xl font-bold text-gray-700">{fmt(t.to_amount)} {t.to_currency}</span>
                         </div>
                     )}
                 </div>
             </div>
 
-            <div className="flex justify-between items-center border-t border-gray-200/50 pt-3 mt-1">
+            <div className="flex justify-between items-center border-t border-gray-100 pt-3 mt-1">
                  <div className="text-xs font-mono text-gray-400">
                      #{t.receipt_number || t.id}
                  </div>
                  <div className="flex gap-2">
-                     {!isCancelled && (
-                         <button onClick={() => setViewTransaction(t)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition" title="عرض الإيصال">
-                             <Eye size={16} />
-                         </button>
-                     )}
+                     <button onClick={() => setViewTransaction(t)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition" title="عرض الإيصال">
+                         <Eye size={16} />
+                     </button>
                      
-                     {/* Show Cancel Button ONLY if Not Cancelled AND User is Admin */}
-                     {!isCancelled && currentUser?.role === 'admin' && (
+                     {currentUser?.role === 'admin' && (
                         <button 
                             onClick={() => handleCancelClick(t.id)} 
                             className="p-2 rounded-lg transition flex items-center gap-1 text-orange-500 bg-orange-50 hover:bg-orange-100"
@@ -235,16 +274,10 @@ const Reports: React.FC = () => {
                             <XCircle size={16} />
                         </button>
                      )}
-
-                     {isCancelled && (
-                         <span className="text-xs text-red-500 font-bold bg-white px-2 py-1 rounded border border-red-200 flex items-center gap-1">
-                             <Ban size={12}/> تم الإلغاء
-                         </span>
-                     )}
                  </div>
             </div>
             
-            <div className={`absolute right-0 top-0 bottom-0 w-1 ${isCancelled ? 'bg-red-600' : t.type === 'expense' ? 'bg-red-500' : t.type === 'sale' ? 'bg-purple-500' : t.type === 'exchange' ? 'bg-blue-500' : isWallet ? 'bg-pink-500' : 'bg-emerald-500'}`}></div>
+            <div className={`absolute right-0 top-0 bottom-0 w-1 ${style.stripe}`}></div>
         </div>
     );
   };
@@ -292,6 +325,9 @@ const Reports: React.FC = () => {
             <button onClick={() => setActiveTab('breakdown')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'breakdown' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
                 <FileText size={16}/> الملخص
             </button>
+            <button onClick={() => setActiveTab('treasury')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'treasury' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
+                <FileText size={16}/> الخزينة
+            </button>
             <button onClick={() => setActiveTab('sales')} className={`flex-1 py-3 px-4 text-sm font-bold rounded-lg whitespace-nowrap transition flex items-center justify-center gap-2 ${activeTab === 'sales' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
                 <ShoppingCart size={16}/> المبيعات
             </button>
@@ -332,47 +368,22 @@ const Reports: React.FC = () => {
              </div>
         )}
 
-        {activeTab === 'sales' && (
-            <div className="space-y-3 animate-in fade-in duration-300">
-                {salesTx.map(t => <CardRow key={t.id} t={t} />)}
-                {salesTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد مبيعات</div>}
-            </div>
-        )}
-        
-        {activeTab === 'wallet' && (
-            <div className="space-y-3 animate-in fade-in duration-300">
-                {walletTx.map(t => <CardRow key={t.id} t={t} />)}
-                {walletTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد بيانات</div>}
-            </div>
-        )}
-
-        {activeTab === 'expenses' && (
-            <div className="space-y-3 animate-in fade-in duration-300">
-                {expenseTx.map(t => <CardRow key={t.id} t={t} />)}
-                {expenseTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد بيانات</div>}
-            </div>
-        )}
-
-        {activeTab === 'exchange' && (
-            <div className="space-y-3 animate-in fade-in duration-300">
-                {exchangeTx.map(t => <CardRow key={t.id} t={t} />)}
-                {exchangeTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد بيانات</div>}
-            </div>
-        )}
-
-        {activeTab === 'treasury' && (
-             <div className="space-y-3 animate-in fade-in duration-300">
-                 {treasuryTx.map(t => <CardRow key={t.id} t={t} />)}
-                 {treasuryTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد بيانات</div>}
-             </div>
-        )}
-
-        {activeTab === 'cancelled' && (
-             <div className="space-y-3 animate-in fade-in duration-300">
-                 {cancelledTx.map(t => <CardRow key={t.id} t={t} />)}
-                 {cancelledTx.length === 0 && <div className="text-center text-gray-400 py-10">لا توجد عمليات ملغاة</div>}
-             </div>
-        )}
+        {/* Tab Content Logic */}
+        {[
+            { tab: 'sales', data: salesTx, empty: 'لا توجد مبيعات' },
+            { tab: 'wallet', data: walletTx, empty: 'لا توجد بيانات محافظ' },
+            { tab: 'expenses', data: expenseTx, empty: 'لا توجد منصرفات' },
+            { tab: 'exchange', data: exchangeTx, empty: 'لا توجد عمليات صرف' },
+            { tab: 'treasury', data: treasuryTx, empty: 'لا توجد عمليات خزينة' },
+            { tab: 'cancelled', data: cancelledTx, empty: 'لا توجد عمليات ملغاة' }
+        ].map(section => (
+            activeTab === section.tab && (
+                <div key={section.tab} className="space-y-3 animate-in fade-in duration-300">
+                    {section.data.map(t => <CardRow key={t.id} t={t} />)}
+                    {section.data.length === 0 && <div className="text-center text-gray-400 py-10">{section.empty}</div>}
+                </div>
+            )
+        ))}
 
         {viewTransaction && (
             <ReceiptModal 
