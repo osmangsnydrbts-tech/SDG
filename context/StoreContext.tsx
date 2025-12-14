@@ -491,13 +491,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Ensure integer
       amount = Math.round(amount);
 
-      const empTreasury = treasuries.find(t => t.employee_id === employeeId);
-      if (!empTreasury) return { success: false, message: 'خزينة الموظف غير موجودة' };
+      // Add to Main Company Sales Treasury (Accumulated Sales)
+      const { data: mainTreasury, error: mainError } = await supabase
+        .from('treasuries')
+        .select('*')
+        .eq('company_id', companyId)
+        .is('employee_id', null)
+        .single();
 
-      // Add to Sales Balance (assuming EGP)
+      if (mainError || !mainTreasury) return { success: false, message: 'الخزينة الرئيسية غير موجودة' };
+
       await supabase.from('treasuries').update({
-          sales_balance: Math.round((empTreasury.sales_balance || 0) + amount)
-      }).eq('id', empTreasury.id);
+          sales_balance: Math.round((mainTreasury.sales_balance || 0) + amount)
+      }).eq('id', mainTreasury.id);
 
       await supabase.from('transactions').insert({
           company_id: companyId,
@@ -583,10 +589,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 }).eq('id', empTreasury.id);
             }
         } else if (transaction.type === 'sale') {
-            if (!empTreasury) throw new Error('خزينة الموظف غير موجودة');
+             // Reversal: Deduct from Main Treasury Sales Balance
+             const mainTreasury = treasuries.find(t => t.company_id === transaction.company_id && !t.employee_id);
+             if (!mainTreasury) throw new Error('الخزينة الرئيسية غير موجودة');
+             
             await supabase.from('treasuries').update({
-                sales_balance: Math.round((empTreasury.sales_balance || 0) - transaction.from_amount)
-            }).eq('id', empTreasury.id);
+                sales_balance: Math.round((mainTreasury.sales_balance || 0) - transaction.from_amount)
+            }).eq('id', mainTreasury.id);
         } else if (transaction.type === 'expense') {
             if (!empTreasury) throw new Error('خزينة الموظف غير موجودة');
             const currency = transaction.from_currency as 'EGP' | 'SDG';
