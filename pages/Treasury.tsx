@@ -1,16 +1,19 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { ArrowDownCircle, ArrowUpCircle, AlertCircle, CheckCircle2, UserCheck, Banknote, Loader2 } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, AlertCircle, CheckCircle2, UserCheck, Banknote, Loader2, ShoppingCart } from 'lucide-react';
 
 const Treasury: React.FC = () => {
-  const { currentUser, treasuries, users, manageTreasury } = useStore();
+  const { currentUser, treasuries, users, manageTreasury, collectSalesToTreasury } = useStore();
   const [activeTab, setActiveTab] = useState<'main' | 'employee'>('main');
   
   // Modals
   const [showModal, setShowModal] = useState<false | 'deposit' | 'withdraw'>(false);
   const [modalActionType, setModalActionType] = useState<'feed' | 'withdraw'>('feed');
   const [modalTargetType, setModalTargetType] = useState<'main' | 'employee'>('main');
+
+  // Sales Transfer Modal
+  const [showSalesModal, setShowSalesModal] = useState(false);
 
   const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null);
   const [amount, setAmount] = useState('');
@@ -82,20 +85,65 @@ const Treasury: React.FC = () => {
     }
   };
 
+  const handleSalesTransfer = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!currentUser?.company_id || isLoading) return;
+      setMessage(null);
+      setIsLoading(true);
+
+      const numericAmount = parseFloat(amount.replace(/,/g, ''));
+      if (isNaN(numericAmount) || numericAmount <= 0) {
+          setMessage({ type: 'error', text: 'يرجى إدخال مبلغ صحيح' });
+          setIsLoading(false);
+          return;
+      }
+
+      try {
+          const res = await collectSalesToTreasury(currentUser.company_id, Math.round(numericAmount));
+          if (res.success) {
+              setMessage({ type: 'success', text: res.message });
+              setAmount('');
+              setTimeout(() => setShowSalesModal(false), 1500);
+          } else {
+               setMessage({ type: 'error', text: res.message });
+          }
+      } catch (err) {
+          setMessage({ type: 'error', text: 'حدث خطأ غير متوقع' });
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
   const fmt = (n?: number) => n ? Math.round(n).toLocaleString() : '0';
 
   return (
     <div className="space-y-6">
       {/* Main Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white p-5 rounded-2xl shadow-lg">
-          <p className="text-blue-200 text-sm mb-1">الخزينة الرئيسية (EGP)</p>
-          <h3 className="text-2xl font-bold">{fmt(mainTreasury?.egp_balance)}</h3>
-        </div>
-        <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 text-white p-5 rounded-2xl shadow-lg">
-          <p className="text-emerald-200 text-sm mb-1">الخزينة الرئيسية (SDG)</p>
-          <h3 className="text-2xl font-bold">{fmt(mainTreasury?.sdg_balance)}</h3>
-        </div>
+      <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white p-5 rounded-2xl shadow-lg">
+              <p className="text-blue-200 text-sm mb-1">الخزينة الرئيسية (EGP)</p>
+              <h3 className="text-2xl font-bold">{fmt(mainTreasury?.egp_balance)}</h3>
+            </div>
+            <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 text-white p-5 rounded-2xl shadow-lg">
+              <p className="text-emerald-200 text-sm mb-1">الخزينة الرئيسية (SDG)</p>
+              <h3 className="text-2xl font-bold">{fmt(mainTreasury?.sdg_balance)}</h3>
+            </div>
+          </div>
+          
+          {/* Admin Sales Treasury Card */}
+          <div className="bg-gradient-to-r from-purple-700 to-purple-900 text-white p-5 rounded-2xl shadow-lg flex justify-between items-center">
+              <div>
+                  <p className="text-purple-200 text-sm mb-1 flex items-center gap-2"><ShoppingCart size={16}/> خزينة المبيعات</p>
+                  <h3 className="text-2xl font-bold">{fmt(mainTreasury?.sales_balance)} EGP</h3>
+              </div>
+              <button 
+                  onClick={() => { setShowSalesModal(true); setMessage(null); setAmount(''); }}
+                  className="bg-white text-purple-700 px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-gray-100 transition active:scale-95"
+              >
+                  ترحيل للرئيسية
+              </button>
+          </div>
       </div>
 
       {/* Simplified Tabs */}
@@ -237,6 +285,68 @@ const Treasury: React.FC = () => {
                               </>
                           ) : (
                               `تأكيد ${modalActionType === 'feed' ? 'الإيداع' : 'السحب'}`
+                          )}
+                      </button>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* Sales Transfer Modal */}
+      {showSalesModal && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-end flex-col sm:justify-center">
+              <div className="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6 animate-slide-up">
+                  <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-gray-800">
+                          ترحيل من المبيعات
+                      </h3>
+                      <button onClick={() => setShowSalesModal(false)} className="bg-gray-100 p-2 rounded-full text-gray-600">✕</button>
+                  </div>
+
+                  <form onSubmit={handleSalesTransfer} className="space-y-5">
+                      <div className="p-4 bg-purple-50 rounded-xl text-purple-800 text-sm mb-4">
+                          <p className="font-bold mb-1">المصدر: خزينة المبيعات</p>
+                          <p className="text-xs">سيتم نقل المبلغ إلى الخزينة الرئيسية (EGP)</p>
+                      </div>
+
+                      <div className="relative">
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                              <Banknote className="text-gray-400" />
+                          </div>
+                          <input 
+                              type="text" 
+                              inputMode="decimal"
+                              value={amount}
+                              onChange={handleAmountChange}
+                              className="w-full pr-12 pl-4 py-4 text-2xl font-bold border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                              placeholder="0"
+                              autoFocus
+                          />
+                          {amount && (
+                            <div className="text-center mt-2 text-sm font-bold text-purple-600 bg-purple-50 py-1 rounded-lg">
+                                {amount} EGP
+                            </div>
+                          )}
+                      </div>
+
+                      {message && (
+                        <div className={`p-3 rounded-lg text-sm text-center font-bold flex items-center justify-center gap-2 ${message.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                            {message.type === 'error' ? <AlertCircle size={16}/> : <CheckCircle2 size={16}/>}
+                            {message.text}
+                        </div>
+                      )}
+
+                      <button 
+                        disabled={isLoading}
+                        className={`w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg flex items-center justify-center gap-2 bg-purple-700 hover:bg-purple-800 ${isLoading ? 'opacity-75 cursor-wait' : ''}`}
+                      >
+                          {isLoading ? (
+                              <>
+                                <Loader2 size={24} className="animate-spin" />
+                                جاري المعالجة...
+                              </>
+                          ) : (
+                              'تأكيد الترحيل'
                           )}
                       </button>
                   </form>
