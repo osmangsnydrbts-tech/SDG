@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { ArrowDownCircle, ArrowUpCircle, AlertCircle, CheckCircle2, UserCheck, Banknote, Loader2, ShoppingCart } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, AlertCircle, CheckCircle2, UserCheck, Banknote, Loader2, ShoppingCart, ChevronRight, User } from 'lucide-react';
 
 const Treasury: React.FC = () => {
   const { currentUser, treasuries, users, manageTreasury, collectSalesToTreasury } = useStore();
@@ -14,6 +14,7 @@ const Treasury: React.FC = () => {
 
   // Sales Transfer Modal
   const [showSalesModal, setShowSalesModal] = useState(false);
+  const [salesCollectTarget, setSalesCollectTarget] = useState<number | null>(null); // Employee ID being collected from
 
   const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null);
   const [amount, setAmount] = useState('');
@@ -26,6 +27,13 @@ const Treasury: React.FC = () => {
   
   // Get Employees (Active Only)
   const employees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee' && u.is_active);
+
+  // Calculate Total Pending Sales from ALL employees
+  const totalPendingSales = useMemo(() => {
+      return treasuries
+          .filter(t => t.company_id === currentUser?.company_id && t.employee_id && (t.sales_balance || 0) > 0)
+          .reduce((sum, t) => sum + (t.sales_balance || 0), 0);
+  }, [treasuries, currentUser]);
 
   // Input Formatting
   const formatInput = (val: string) => {
@@ -85,9 +93,15 @@ const Treasury: React.FC = () => {
     }
   };
 
-  const handleSalesTransfer = async (e: React.FormEvent) => {
+  const initiateSalesCollection = (empId: number, balance: number) => {
+      setSalesCollectTarget(empId);
+      setAmount(Math.round(balance).toLocaleString());
+      setMessage(null);
+  };
+
+  const confirmSalesCollection = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!currentUser?.company_id || isLoading) return;
+      if (!currentUser?.company_id || !salesCollectTarget || isLoading) return;
       setMessage(null);
       setIsLoading(true);
 
@@ -99,11 +113,14 @@ const Treasury: React.FC = () => {
       }
 
       try {
-          const res = await collectSalesToTreasury(currentUser.company_id, Math.round(numericAmount));
+          const res = await collectSalesToTreasury(currentUser.company_id, salesCollectTarget, Math.round(numericAmount));
           if (res.success) {
               setMessage({ type: 'success', text: res.message });
-              setAmount('');
-              setTimeout(() => setShowSalesModal(false), 1500);
+              setTimeout(() => {
+                  setSalesCollectTarget(null);
+                  setAmount('');
+                  setMessage(null);
+              }, 1500);
           } else {
                setMessage({ type: 'error', text: res.message });
           }
@@ -115,6 +132,15 @@ const Treasury: React.FC = () => {
   };
 
   const fmt = (n?: number) => n ? Math.round(n).toLocaleString() : '0';
+
+  // Helper for Sales Modal List
+  const employeesWithSales = employees.map(emp => {
+      const t = treasuries.find(tr => tr.employee_id === emp.id);
+      return { 
+          ...emp, 
+          salesBalance: t?.sales_balance || 0 
+      };
+  }).filter(e => e.salesBalance > 0);
 
   return (
     <div className="space-y-6">
@@ -134,14 +160,14 @@ const Treasury: React.FC = () => {
           {/* Admin Sales Treasury Card */}
           <div className="bg-gradient-to-r from-purple-700 to-purple-900 text-white p-5 rounded-2xl shadow-lg flex justify-between items-center">
               <div>
-                  <p className="text-purple-200 text-sm mb-1 flex items-center gap-2"><ShoppingCart size={16}/> خزينة المبيعات</p>
-                  <h3 className="text-2xl font-bold">{fmt(mainTreasury?.sales_balance)} EGP</h3>
+                  <p className="text-purple-200 text-sm mb-1 flex items-center gap-2"><ShoppingCart size={16}/> إجمالي مبيعات معلقة</p>
+                  <h3 className="text-2xl font-bold">{fmt(totalPendingSales)} EGP</h3>
               </div>
               <button 
-                  onClick={() => { setShowSalesModal(true); setMessage(null); setAmount(''); }}
+                  onClick={() => { setShowSalesModal(true); setMessage(null); setAmount(''); setSalesCollectTarget(null); }}
                   className="bg-white text-purple-700 px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-gray-100 transition active:scale-95"
               >
-                  ترحيل للرئيسية
+                  ترحيل المبيعات
               </button>
           </div>
       </div>
@@ -292,64 +318,108 @@ const Treasury: React.FC = () => {
           </div>
       )}
 
-      {/* Sales Transfer Modal */}
+      {/* Sales Collection List Modal */}
       {showSalesModal && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-end flex-col sm:justify-center">
-              <div className="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6 animate-slide-up">
-                  <div className="flex justify-between items-center mb-6">
+              <div className="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-2xl p-6 animate-slide-up max-h-[85vh] flex flex-col">
+                  <div className="flex justify-between items-center mb-4">
                       <h3 className="text-xl font-bold text-gray-800">
-                          ترحيل من المبيعات
+                          {salesCollectTarget ? 'تأكيد السحب' : 'ترحيل مبيعات الموظفين'}
                       </h3>
-                      <button onClick={() => setShowSalesModal(false)} className="bg-gray-100 p-2 rounded-full text-gray-600">✕</button>
+                      <button onClick={() => { setShowSalesModal(false); setSalesCollectTarget(null); }} className="bg-gray-100 p-2 rounded-full text-gray-600">✕</button>
                   </div>
 
-                  <form onSubmit={handleSalesTransfer} className="space-y-5">
-                      <div className="p-4 bg-purple-50 rounded-xl text-purple-800 text-sm mb-4">
-                          <p className="font-bold mb-1">المصدر: خزينة المبيعات</p>
-                          <p className="text-xs">سيتم نقل المبلغ إلى الخزينة الرئيسية (EGP)</p>
+                  {!salesCollectTarget ? (
+                      <div className="space-y-3 overflow-y-auto flex-1 pb-4">
+                          {employeesWithSales.length > 0 ? (
+                              employeesWithSales.map(emp => (
+                                  <div key={emp.id} className="bg-purple-50 p-4 rounded-xl border border-purple-100 flex justify-between items-center">
+                                      <div className="flex items-center gap-3">
+                                          <div className="bg-white p-2 rounded-full text-purple-600 shadow-sm">
+                                              <User size={18}/>
+                                          </div>
+                                          <div>
+                                              <p className="font-bold text-gray-800 text-sm">{emp.full_name}</p>
+                                              <p className="text-xs text-gray-500">رصيد المبيعات</p>
+                                          </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                          <div className="text-right">
+                                              <span className="block font-bold text-purple-700">{fmt(emp.salesBalance)}</span>
+                                              <span className="text-[10px] text-gray-400">EGP</span>
+                                          </div>
+                                          <button 
+                                              onClick={() => initiateSalesCollection(emp.id, emp.salesBalance)}
+                                              className="bg-purple-600 text-white p-2 rounded-lg shadow-sm hover:bg-purple-700"
+                                          >
+                                              <ChevronRight size={18} />
+                                          </button>
+                                      </div>
+                                  </div>
+                              ))
+                          ) : (
+                              <div className="text-center py-10 text-gray-500">
+                                  لا توجد مبيعات معلقة للترحيل.
+                              </div>
+                          )}
                       </div>
-
-                      <div className="relative">
-                          <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                              <Banknote className="text-gray-400" />
+                  ) : (
+                      <form onSubmit={confirmSalesCollection} className="space-y-5">
+                          <div className="p-4 bg-purple-50 rounded-xl text-purple-800 text-sm mb-4">
+                              <p className="font-bold mb-1">سحب مبيعات من:</p>
+                              <p className="text-lg">{users.find(u => u.id === salesCollectTarget)?.full_name}</p>
                           </div>
-                          <input 
-                              type="text" 
-                              inputMode="decimal"
-                              value={amount}
-                              onChange={handleAmountChange}
-                              className="w-full pr-12 pl-4 py-4 text-2xl font-bold border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                              placeholder="0"
-                              autoFocus
-                          />
-                          {amount && (
-                            <div className="text-center mt-2 text-sm font-bold text-purple-600 bg-purple-50 py-1 rounded-lg">
-                                {amount} EGP
+
+                          <div className="relative">
+                              <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                                  <Banknote className="text-gray-400" />
+                              </div>
+                              <input 
+                                  type="text" 
+                                  inputMode="decimal"
+                                  value={amount}
+                                  onChange={handleAmountChange}
+                                  className="w-full pr-12 pl-4 py-4 text-2xl font-bold border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                  placeholder="0"
+                                  autoFocus
+                              />
+                              <div className="text-center mt-2 text-sm font-bold text-purple-600 bg-purple-50 py-1 rounded-lg">
+                                  {amount || 0} EGP
+                              </div>
+                          </div>
+
+                          {message && (
+                            <div className={`p-3 rounded-lg text-sm text-center font-bold flex items-center justify-center gap-2 ${message.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                {message.type === 'error' ? <AlertCircle size={16}/> : <CheckCircle2 size={16}/>}
+                                {message.text}
                             </div>
                           )}
-                      </div>
 
-                      {message && (
-                        <div className={`p-3 rounded-lg text-sm text-center font-bold flex items-center justify-center gap-2 ${message.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                            {message.type === 'error' ? <AlertCircle size={16}/> : <CheckCircle2 size={16}/>}
-                            {message.text}
-                        </div>
-                      )}
-
-                      <button 
-                        disabled={isLoading}
-                        className={`w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg flex items-center justify-center gap-2 bg-purple-700 hover:bg-purple-800 ${isLoading ? 'opacity-75 cursor-wait' : ''}`}
-                      >
-                          {isLoading ? (
-                              <>
-                                <Loader2 size={24} className="animate-spin" />
-                                جاري المعالجة...
-                              </>
-                          ) : (
-                              'تأكيد الترحيل'
-                          )}
-                      </button>
-                  </form>
+                          <div className="flex gap-2">
+                              <button 
+                                type="submit"
+                                disabled={isLoading}
+                                className={`flex-1 py-4 rounded-xl text-white font-bold text-lg shadow-lg flex items-center justify-center gap-2 bg-purple-700 hover:bg-purple-800 ${isLoading ? 'opacity-75 cursor-wait' : ''}`}
+                              >
+                                  {isLoading ? (
+                                      <>
+                                        <Loader2 size={24} className="animate-spin" />
+                                        جاري المعالجة...
+                                      </>
+                                  ) : (
+                                      'تأكيد وسحب'
+                                  )}
+                              </button>
+                              <button 
+                                  type="button"
+                                  onClick={() => setSalesCollectTarget(null)}
+                                  className="bg-gray-100 text-gray-700 px-6 rounded-xl font-bold"
+                              >
+                                  رجوع
+                              </button>
+                          </div>
+                      </form>
+                  )}
               </div>
           </div>
       )}
