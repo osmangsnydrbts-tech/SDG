@@ -73,6 +73,8 @@ interface StoreData {
     employeeId?: number
   ) => Promise<{ success: boolean; message: string; transaction?: Transaction }>;
 
+  collectSalesToTreasury: (companyId: number, amount: number) => Promise<{ success: boolean; message: string }>;
+
   addEWallet: (companyId: number, employeeId: number, phoneNumber: string, provider: string, commission: number) => Promise<{ success: boolean; message: string }>;
   deleteEWallet: (walletId: number) => Promise<void>;
   feedEWallet: (walletId: number, amount: number) => Promise<{ success: boolean; message: string }>;
@@ -772,6 +774,37 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return { success: true, message: 'تم تنفيذ العملية بنجاح', transaction: newTx };
   };
 
+  const collectSalesToTreasury = async (companyId: number, amount: number) => {
+    // Ensure integer
+    amount = Math.round(amount);
+
+    const mainTreasury = treasuries.find(t => t.company_id === companyId && !t.employee_id);
+    if (!mainTreasury) return { success: false, message: 'الخزينة الرئيسية غير موجودة' };
+
+    const currentSalesBalance = mainTreasury.sales_balance || 0;
+    if (currentSalesBalance < amount) return { success: false, message: 'رصيد خزينة المبيعات غير كافي' };
+
+    // Deduct from Sales Balance and Add to EGP Main Balance
+    await supabase.from('treasuries').update({
+        sales_balance: Math.round(currentSalesBalance - amount),
+        egp_balance: Math.round(mainTreasury.egp_balance + amount)
+    }).eq('id', mainTreasury.id);
+
+    // Record as a Treasury Feed (Internal)
+    await supabase.from('transactions').insert({
+        company_id: companyId,
+        type: 'treasury_feed',
+        from_amount: amount,
+        from_currency: 'EGP',
+        description: 'ترحيل من خزينة المبيعات',
+        created_at: new Date().toISOString()
+    });
+
+    await fetchData();
+    showToast('تم ترحيل المبيعات بنجاح', 'success');
+    return { success: true, message: 'تم الترحيل بنجاح' };
+  };
+
   const addEWallet = async (companyId: number, employeeId: number, phoneNumber: string, provider: string, commission: number) => {
     const exists = eWallets.some(w => w.phone_number === phoneNumber && w.is_active);
     if (exists) return { success: false, message: 'رقم المحفظة مسجل مسبقاً' };
@@ -918,6 +951,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       login, logout, addCompany, updateCompany, renewSubscription, deleteCompany, toggleCompanyStatus, updateExchangeRate, 
       addEmployee, updateEmployee, updateEmployeePassword, deleteEmployee,
       performExchange, recordExpense, performSale, cancelTransaction, addMerchant, deleteMerchant, addMerchantEntry, manageTreasury,
+      collectSalesToTreasury,
       addEWallet, deleteEWallet, feedEWallet, performEWalletTransfer,
       exportDatabase, importDatabase
     }}>
