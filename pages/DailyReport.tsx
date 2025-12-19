@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { ShoppingCart, Share2, User, Smartphone, TrendingDown, ChevronLeft, X, Clock, Calendar, Filter, Banknote } from 'lucide-react';
+import { ShoppingCart, Share2, User, Smartphone, TrendingDown, ChevronLeft, X, Clock, Calendar, Filter, Banknote, ArrowDownRight, ArrowLeftRight, CreditCard, Loader2 } from 'lucide-react';
 import { Transaction } from '../types';
 
 const DailyReport: React.FC = () => {
@@ -12,7 +13,7 @@ const DailyReport: React.FC = () => {
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   // Modal States
-  const [detailsModalType, setDetailsModalType] = useState<'sales' | 'expenses' | null>(null);
+  const [detailsModalType, setDetailsModalType] = useState<'sales' | 'expenses' | 'cash' | null>(null);
 
   const company = companies.find(c => c.id === currentUser?.company_id);
   const companyEmployees = users.filter(u => u.company_id === currentUser?.company_id && u.role === 'employee');
@@ -49,9 +50,20 @@ const DailyReport: React.FC = () => {
 
     const salesTx = filteredTx.filter(t => t.type === 'sale');
     const expensesTx = filteredTx.filter(t => t.type === 'expense');
+    
+    // Breakdown for Cash Treasury
+    const feedTx = filteredTx.filter(t => t.type === 'treasury_feed');
+    const exchangeTx = filteredTx.filter(t => t.type === 'exchange');
+    const walletTransferTx = filteredTx.filter(t => t.type === 'wallet_transfer');
 
     const totalSalesPeriod = salesTx.reduce((sum, t) => sum + t.from_amount, 0);
     const totalExpensesPeriod = expensesTx.reduce((sum, t) => sum + t.from_amount, 0);
+    
+    const totalFeedsEgp = feedTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0);
+    const totalFeedsSdg = feedTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0);
+    
+    const totalExchangesEgp = exchangeTx.filter(t => t.from_currency === 'EGP').reduce((sum, t) => sum + t.from_amount, 0);
+    const totalExchangesSdg = exchangeTx.filter(t => t.from_currency === 'SDG').reduce((sum, t) => sum + t.from_amount, 0);
 
     return {
         employeeName: employee?.full_name || '',
@@ -64,6 +76,13 @@ const DailyReport: React.FC = () => {
         totalExpensesPeriod,
         salesTx,
         expensesTx,
+        feedTx,
+        exchangeTx,
+        walletTransferTx,
+        totalFeedsEgp,
+        totalFeedsSdg,
+        totalExchangesEgp,
+        totalExchangesSdg,
         wallets: wallets.map(w => ({
             provider: w.provider,
             phone: w.phone_number,
@@ -123,6 +142,84 @@ const DailyReport: React.FC = () => {
   const DetailsModal = () => {
       if (!detailsModalType || !reportData) return null;
 
+      if (detailsModalType === 'cash') {
+          return (
+              <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                  <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl">
+                      <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                          <h3 className="font-bold text-lg flex items-center gap-2 text-green-700">
+                              <Banknote size={20}/> تفاصيل حركة النقدية
+                          </h3>
+                          <button onClick={() => setDetailsModalType(null)} className="p-1 hover:bg-gray-200 rounded-full">
+                              <X size={20} className="text-gray-500"/>
+                          </button>
+                      </div>
+                      
+                      <div className="overflow-y-auto p-4 space-y-5 flex-1 no-scrollbar">
+                          {/* Feeds Section */}
+                          <section>
+                              <h4 className="text-xs font-bold text-gray-400 mb-2 flex items-center gap-1">
+                                  <ArrowDownRight size={14} className="text-blue-500"/> تغذية الخزينة (من الإدارة)
+                              </h4>
+                              <div className="space-y-2">
+                                  <div className="bg-blue-50 p-3 rounded-lg flex justify-between">
+                                      <span className="text-sm font-bold text-blue-800">إجمالي مصري</span>
+                                      <span className="font-bold">{fmt(reportData.totalFeedsEgp)} EGP</span>
+                                  </div>
+                                  <div className="bg-blue-50 p-3 rounded-lg flex justify-between">
+                                      <span className="text-sm font-bold text-blue-800">إجمالي سوداني</span>
+                                      <span className="font-bold">{fmt(reportData.totalFeedsSdg)} SDG</span>
+                                  </div>
+                              </div>
+                          </section>
+
+                          {/* Exchange Section */}
+                          <section>
+                              <h4 className="text-xs font-bold text-gray-400 mb-2 flex items-center gap-1">
+                                  <ArrowLeftRight size={14} className="text-green-500"/> التحويلات (مبالغ مستلمة)
+                              </h4>
+                              <div className="space-y-2">
+                                  <div className="bg-green-50 p-3 rounded-lg flex justify-between">
+                                      <span className="text-sm font-bold text-green-800">مستلم مصري</span>
+                                      <span className="font-bold">{fmt(reportData.totalExchangesEgp)} EGP</span>
+                                  </div>
+                                  <div className="bg-green-50 p-3 rounded-lg flex justify-between">
+                                      <span className="text-sm font-bold text-green-800">مستلم سوداني</span>
+                                      <span className="font-bold">{fmt(reportData.totalExchangesSdg)} SDG</span>
+                                  </div>
+                              </div>
+                          </section>
+
+                          {/* Wallets Impact Section */}
+                          <section>
+                              <h4 className="text-xs font-bold text-gray-400 mb-2 flex items-center gap-1">
+                                  <Smartphone size={14} className="text-pink-500"/> المحافظ الإلكترونية (تغذية نقدية)
+                              </h4>
+                              <div className="space-y-2">
+                                  {reportData.walletTransferTx.map(t => (
+                                      <div key={t.id} className="border border-gray-100 p-2 rounded-lg flex justify-between items-center text-xs">
+                                          <div>
+                                              <p className="font-bold">{t.wallet_type === 'withdraw' ? 'سحب من محفظة' : t.wallet_type === 'deposit' ? 'إيداع في محفظة' : 'صرف محفظة'}</p>
+                                              <p className="text-[10px] text-gray-400">{new Date(t.created_at).toLocaleTimeString('ar-EG')}</p>
+                                          </div>
+                                          <span className={`font-bold ${t.wallet_type === 'withdraw' ? 'text-green-600' : 'text-red-600'}`}>
+                                              {t.wallet_type === 'withdraw' ? '+' : '-'}{fmt(t.from_amount)} EGP
+                                          </span>
+                                      </div>
+                                  ))}
+                                  {reportData.walletTransferTx.length === 0 && <p className="text-center text-gray-400 text-[10px] py-2">لا توجد عمليات محفظة نقدية</p>}
+                              </div>
+                          </section>
+                      </div>
+
+                      <div className="p-4 border-t bg-gray-50 flex justify-between items-center rounded-b-2xl">
+                          <span className="text-xs text-gray-500">الفترة من {startDate} إلى {endDate}</span>
+                      </div>
+                  </div>
+              </div>
+          );
+      }
+
       const isSales = detailsModalType === 'sales';
       const title = isSales ? 'تفاصيل المبيعات' : 'تفاصيل المنصرفات';
       const list = isSales ? reportData.salesTx : reportData.expensesTx;
@@ -142,7 +239,7 @@ const DailyReport: React.FC = () => {
                       </button>
                   </div>
                   
-                  <div className="overflow-y-auto p-4 space-y-3 flex-1">
+                  <div className="overflow-y-auto p-4 space-y-3 flex-1 no-scrollbar">
                       {list.length > 0 ? list.map((t, idx) => (
                           <div key={t.id} className="border border-gray-100 p-3 rounded-xl shadow-sm flex justify-between items-center">
                               <div>
@@ -234,11 +331,17 @@ const DailyReport: React.FC = () => {
                         <Share2 size={20} /> مشاركة التقرير
                     </button>
 
-                    {/* Cash Treasury */}
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="text-gray-500 font-bold text-sm mb-3 flex items-center gap-2">
-                            <Banknote size={18} className="text-green-600"/> الخزينة النقدية (الرصيد الحالي)
-                        </h3>
+                    {/* Cash Treasury - Clickable for details */}
+                    <div 
+                        onClick={() => setDetailsModalType('cash')}
+                        className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:border-green-300 transition active:scale-95 group"
+                    >
+                        <div className="flex justify-between items-center mb-3">
+                             <h3 className="text-gray-500 font-bold text-sm flex items-center gap-2">
+                                <Banknote size={18} className="text-green-600"/> الخزينة النقدية (الرصيد الحالي)
+                            </h3>
+                            <ChevronLeft size={16} className="text-gray-300 group-hover:text-green-500 transition"/>
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-green-50 p-3 rounded-lg text-center border border-green-100">
                                 <span className="text-xs text-green-600 block mb-1 font-bold">مصري (EGP)</span>
@@ -249,6 +352,7 @@ const DailyReport: React.FC = () => {
                                 <span className="text-xl font-extrabold text-indigo-800">{fmt(reportData.sdgBalance)}</span>
                             </div>
                         </div>
+                        <div className="mt-2 text-[10px] text-gray-400 text-center font-bold">اضغط لعرض تفاصيل التغذية والتحويلات</div>
                     </div>
 
                     {/* Sales Treasury (Clickable) */}
